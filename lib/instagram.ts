@@ -7,13 +7,13 @@ export function getMetaAuthUrl(redirectUri: string): string {
     client_id: process.env.META_APP_ID!,
     redirect_uri: redirectUri,
     scope: [
-      "instagram_basic",
-      "instagram_manage_comments",
-      "instagram_manage_messages",
-      "pages_messaging",
-      "pages_read_engagement",
-      "pages_show_list",
-      "business_management",
+      "instagram_basic", // read the connected IG account and its media
+      "instagram_manage_comments", // read comments, post the public reply
+      "instagram_manage_messages", // send DMs and read is_user_follow_business
+      "pages_show_list", // list the Pages this user manages
+      "pages_read_engagement", // resolve Page -> IG account
+      "pages_messaging", // send messages on behalf of the Page
+      "pages_manage_metadata", // POST /{page-id}/subscribed_apps for webhooks
     ].join(","),
     response_type: "code",
   });
