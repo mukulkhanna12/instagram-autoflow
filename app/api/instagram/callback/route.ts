@@ -6,6 +6,7 @@ import {
   getLongLivedToken,
   getUserPages,
   getInstagramAccountForPage,
+  subscribeToWebhooks,
 } from "@/lib/instagram";
 
 export async function GET(req: NextRequest) {
@@ -56,6 +57,16 @@ export async function GET(req: NextRequest) {
           profilePicUrl: igAccount.profile_picture_url,
         },
       });
+
+      // Nothing is delivered until the Page itself is subscribed, so do it now
+      // rather than leaving it as a manual dashboard step people forget.
+      const subscribed = await subscribeToWebhooks(page.id, page.access_token);
+      if (!subscribed) {
+        console.error(`Connected ${igAccount.username} but webhook subscription failed for page ${page.id}`);
+        return NextResponse.redirect(
+          `${process.env.NEXTAUTH_URL}/settings?success=connected&warning=webhook_subscription_failed`
+        );
+      }
 
       return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/settings?success=connected`);
     }

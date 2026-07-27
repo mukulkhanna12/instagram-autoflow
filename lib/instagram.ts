@@ -74,6 +74,43 @@ export async function getInstagramAccountForPage(
   return data.instagram_business_account ?? null;
 }
 
+// ── Webhook subscription ─────────────────────────────────────────────────────
+
+/**
+ * Subscribe the Page to webhook deliveries.
+ *
+ * Configuring the callback URL in the Meta dashboard is only half of it — until
+ * the Page itself is subscribed, Instagram delivers nothing and the automation
+ * silently never fires. This runs when an account is connected.
+ *
+ * `comments` covers new comments on posts and reels; `messages` and
+ * `messaging_postbacks` cover people tapping the buttons in the DM.
+ */
+export async function subscribeToWebhooks(
+  pageId: string,
+  pageToken: string
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${GRAPH_API}/${pageId}/subscribed_apps`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subscribed_fields: ["comments", "messages", "messaging_postbacks"],
+        access_token: pageToken,
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("subscribeToWebhooks error:", await res.text());
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("subscribeToWebhooks threw:", err);
+    return false;
+  }
+}
+
 // ── Posts / Media ────────────────────────────────────────────────────────────
 
 export interface IgMedia {
