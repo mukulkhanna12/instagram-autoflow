@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts   Account[]
+  sessions   Session[]
+  igAccounts InstagramAccount[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model InstagramAccount {
+  id              String   @id @default(cuid())
+  userId          String
+  instagramId     String   @unique
+  username        String
+  profilePicUrl   String?
+  accessToken     String   @db.Text
+  pageId          String?
+  pageName        String?
+  pageAccessToken String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  automations PostAutomation[]
+}
+
+model PostAutomation {
+  id            String  @id @default(cuid())
+  igAccountId   String
+  postId        String
+  postUrl       String?
+  postCaption   String? @db.Text
+  postThumbnail String?
+  isActive      Boolean @default(false)
+
+  commentReplyText   String @default("I've sent the details to your DM! Check it 📩") @db.Text
+  greetingMessage    String @default("Hey! 👋 Hope you're doing great.\n\nClick the button below to get the details I promised!") @db.Text
+  greetingButtonText String @default("Get Details →")
+  followMessage      String @default("To receive the details, please follow my page first! 🙏\n\nOnce you follow, click the button below.") @db.Text
+  followButtonText   String @default("I've Followed ✓")
+  // Sent when they tap "I've followed" but still are not following. Loops until they do.
+  followRetryMessage String @default("Hmm, I can't see you on my followers list yet 👀\n\nPlease follow the page first, then tap the button again.") @db.Text
+  detailsMessage     String @default("Here are the details you asked for! 🎉\n\nClick below to visit the page.") @db.Text
+  detailsButtonText  String @default("Visit Page 🔗")
+  detailsUrl         String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  igAccount     InstagramAccount @relation(fields: [igAccountId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@unique([igAccountId, postId])
+}
+
+model Conversation {
+  id           String   @id @default(cuid())
+  automationId String
+  igUserId     String
+  igUsername   String?
+  state        String   @default("greeted")
+  commentId    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  automation PostAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@unique([automationId, igUserId])
+  @@index([igUserId])
+}
