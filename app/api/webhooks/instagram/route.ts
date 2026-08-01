@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { replyToComment } from "@/lib/instagram";
 import { handleNewComment, handlePostback } from "@/lib/flow-engine";
+import { automationCreateFromTemplate } from "@/lib/templates";
 
 // ── Webhook verification ──────────────────────────────────────────────────────
 
@@ -93,11 +94,22 @@ async function handleCommentChange(pageId: string, value: Record<string, unknown
 
   if (!mediaId || !commentId || !senderIgUserId) return;
 
-  const automation = await db.postAutomation.findFirst({
-    where: { postId: mediaId, isActive: true },
+  // Look for an automation for this reel — active or not. An inactive one means
+  // the user deliberately turned this reel off, so we leave it alone.
+  let automation = await db.postAutomation.findFirst({
+    where: { postId: mediaId },
     include: { igAccount: true },
   });
-  if (!automation) return;
+
+  // No automation at all → this is likely a reel uploaded after the account's
+  // default template was enabled. Materialize one from the template so future
+  // reels start working the moment someone comments, with nothing to click.
+  if (!automation) {
+    automation = await materializeFromTemplate(pageId, mediaId);
+    if (!automation) return;
+  }
+
+  if (!automation.isActive) return;
 
   const { igAccount } = automation;
 
@@ -123,6 +135,29 @@ async function handleCommentChange(pageId: string, value: Record<string, unknown
     senderUsername,
     pageId: igAccount.pageId ?? pageId,
     pageToken,
+  });
+}
+
+/**
+ * Create an automation for a reel that has none yet, copying the owning
+ * account's default template — but only if that template is enabled. Returns the
+ * new automation (with its account) or null when there's no enabled template.
+ *
+ * The webhook only carries the page/IG id and the media id, so the account is
+ * resolved by matching either identifier (whichever Instagram sent as entry.id).
+ */
+async function materializeFromTemplate(pageId: string, mediaId: string) {
+  const igAccount = await db.instagramAccount.findFirst({
+    where: { OR: [{ instagramId: pageId }, { pageId }] },
+    include: { template: true },
+  });
+  if (!igAccount?.template?.enabled) return null;
+
+  return db.postAutomation.upsert({
+    where: { igAccountId_postId: { igAccountId: igAccount.id, postId: mediaId } },
+    create: automationCreateFromTemplate(igAccount.id, mediaId, igAccount.template),
+    update: {}, // a race could create it first; don't clobber an existing one
+    include: { igAccount: true },
   });
 }
 

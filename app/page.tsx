@@ -103,7 +103,7 @@ export default async function LandingPage() {
         <div className="bg-brand-50 border border-brand-100 rounded-2xl p-8">
           <h3 className="text-2xl font-bold text-gray-900 mb-4">100% Free to use</h3>
           <div className="grid sm:grid-cols-3 gap-3 mb-6">
-            {["Unlimited automations", "Google Sign In", "Real-time DM flow"].map((f) => (
+            {["Unlimited automations", "Secure email login", "Real-time DM flow"].map((f) => (
               <div key={f} className="flex items-center gap-2 text-sm text-gray-700">
                 <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
                 {f}
@@ -114,7 +114,7 @@ export default async function LandingPage() {
             href="/login"
             className="inline-flex items-center gap-2 bg-brand-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-brand-700 transition-colors"
           >
-            Sign in with Google <ArrowRight className="w-4 h-4" />
+            Sign in <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>

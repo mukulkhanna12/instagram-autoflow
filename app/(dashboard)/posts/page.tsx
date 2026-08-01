@@ -23,6 +23,7 @@ interface Automation {
   id: string;
   postId: string;
   isActive: boolean;
+  fromTemplate: boolean;
   _count: { conversations: number };
 }
 
@@ -139,7 +140,10 @@ export default function PostsPage() {
                     </div>
                   )}
                   {automation && (
-                    <div className="absolute top-2 right-2">
+                    <div className="absolute top-2 right-2 flex gap-1">
+                      {automation.fromTemplate && (
+                        <Badge variant="info" className="bg-brand-100 text-brand-700">Auto</Badge>
+                      )}
                       <Badge variant={automation.isActive ? "success" : "info"}>
                         {automation.isActive ? "Live" : "Draft"}
                       </Badge>

@@ -15,7 +15,7 @@
  */
 
 import { db } from "./db";
-import { sendDM, checkFollowerStatus } from "./instagram";
+import { sendDM, checkFollowerStatus, type SendResult } from "./instagram";
 
 export type FlowState = "greeted" | "follow_requested" | "completed";
 
@@ -51,7 +51,7 @@ export async function handleNewComment(opts: {
   // every time they leave another comment on the same reel.
   if (existing?.state === "completed") return;
 
-  await db.conversation.upsert({
+  const convo = await db.conversation.upsert({
     where: key,
     create: {
       automationId: opts.automationId,
@@ -66,7 +66,7 @@ export async function handleNewComment(opts: {
 
   // First contact: Instagram has no open messaging window with this person yet,
   // so the greeting must be sent as a private reply addressed to their comment.
-  await sendDM(
+  const result = await sendDM(
     opts.pageId,
     { commentId: opts.commentId },
     {
@@ -82,6 +82,7 @@ export async function handleNewComment(opts: {
     },
     opts.pageToken
   );
+  await noteSend(convo.id, result, "greeting");
 }
 
 export async function handlePostback(opts: {
@@ -110,14 +111,16 @@ export async function handlePostback(opts: {
 
   // Already delivered once — resend rather than leaving them with a dead button.
   if (conversation.state === "completed") {
-    await sendDetailsMessage(automation, opts);
+    const result = await sendDetailsMessage(automation, opts);
+    await noteSend(conversation.id, result, "details");
     return;
   }
 
   const isFollower = await checkFollowerStatus(opts.senderIgUserId, opts.pageToken);
 
   if (isFollower) {
-    await sendDetailsMessage(automation, opts);
+    const result = await sendDetailsMessage(automation, opts);
+    await noteSend(conversation.id, result, "details");
     await db.conversation.update({
       where: { id: conversation.id },
       data: { state: "completed" },
@@ -130,7 +133,7 @@ export async function handlePostback(opts: {
   // so this loops until they actually follow.
   const isFirstRefusal = conversation.state === "greeted";
 
-  await sendDM(
+  const result = await sendDM(
     opts.pageId,
     { id: opts.senderIgUserId },
     {
@@ -146,6 +149,7 @@ export async function handlePostback(opts: {
     },
     opts.pageToken
   );
+  await noteSend(conversation.id, result, "follow-required");
 
   if (isFirstRefusal) {
     await db.conversation.update({
@@ -158,10 +162,10 @@ export async function handlePostback(opts: {
 async function sendDetailsMessage(
   automation: { detailsMessage: string; detailsButtonText: string; detailsUrl: string },
   opts: SendContext
-): Promise<void> {
+): Promise<SendResult> {
   const link = automation.detailsUrl?.trim();
 
-  await sendDM(
+  return sendDM(
     opts.pageId,
     { id: opts.senderIgUserId },
     link
@@ -175,4 +179,22 @@ async function sendDetailsMessage(
         { type: "text", text: automation.detailsMessage },
     opts.pageToken
   );
+}
+
+/**
+ * Record whether a DM send succeeded on the conversation. On success any prior
+ * error is cleared; on failure the reason is stored so it shows in the dashboard.
+ * Best-effort — a logging write must never break the flow.
+ */
+async function noteSend(conversationId: string, result: SendResult, context: string): Promise<void> {
+  try {
+    await db.conversation.update({
+      where: { id: conversationId },
+      data: result.ok
+        ? { lastError: null, lastErrorAt: null }
+        : { lastError: `Failed to send ${context} DM: ${result.error ?? "unknown error"}`, lastErrorAt: new Date() },
+    });
+  } catch (err) {
+    console.error("noteSend failed:", err);
+  }
 }

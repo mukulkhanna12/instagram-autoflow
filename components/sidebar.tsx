@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ImageIcon, Settings, Zap, LogOut, ChevronRight } from "lucide-react";
+import { LayoutDashboard, ImageIcon, Settings, Zap, LogOut, ChevronRight, Wand2 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -13,6 +13,7 @@ interface SidebarProps {
 const links = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/posts", icon: ImageIcon, label: "Posts" },
+  { href: "/template", icon: Wand2, label: "New-reel flow" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 

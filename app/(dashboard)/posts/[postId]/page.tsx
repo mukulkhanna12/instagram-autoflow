@@ -34,6 +34,7 @@ interface Conversation {
   igUsername?: string;
   igUserId: string;
   state: string;
+  lastError?: string | null;
   createdAt: string;
 }
 
@@ -337,10 +338,14 @@ export default function FlowEditorPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-gray-800">@{c.igUsername ?? c.igUserId}</p>
-                      <p className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</p>
+                      {c.lastError ? (
+                        <p className="text-xs text-red-500 truncate" title={c.lastError}>⚠ {c.lastError}</p>
+                      ) : (
+                        <p className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</p>
+                      )}
                     </div>
-                    <Badge variant={c.state === "completed" ? "success" : c.state === "follow_requested" ? "warning" : "info"} className="shrink-0">
-                      {c.state === "completed" ? "Done" : c.state === "follow_requested" ? "Follow" : "Active"}
+                    <Badge variant={c.lastError ? "danger" : c.state === "completed" ? "success" : c.state === "follow_requested" ? "warning" : "info"} className="shrink-0">
+                      {c.lastError ? "Error" : c.state === "completed" ? "Done" : c.state === "follow_requested" ? "Follow" : "Active"}
                     </Badge>
                   </div>
                 ))}

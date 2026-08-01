@@ -56,6 +56,20 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+// One-time login codes for the email-OTP sign-in. A code is hashed (never stored
+// in the clear), expires quickly, and is rate-limited per email. `attempts` caps
+// how many wrong guesses a single code tolerates before it is thrown away.
+model LoginCode {
+  id        String   @id @default(cuid())
+  email     String
+  codeHash  String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
 model InstagramAccount {
   id              String   @id @default(cuid())
   userId          String
@@ -69,8 +83,35 @@ model InstagramAccount {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   automations PostAutomation[]
+  template    AutomationTemplate?
+}
+
+// The "default flow for future reels". One per Instagram account. When enabled,
+// any reel that gets a comment and has no automation of its own gets one created
+// on the fly from these fields (see the webhook handler), and a daily sync
+// pre-creates them so they show up in the dashboard. Same message fields as
+// PostAutomation so an auto-created automation is a faithful copy.
+model AutomationTemplate {
+  id          String  @id @default(cuid())
+  igAccountId String  @unique
+  enabled     Boolean @default(false)
+
+  commentReplyText   String @default("I've sent the details to your DM! Check it 📩") @db.Text
+  greetingMessage    String @default("Hey! 👋 Hope you're doing great.\n\nClick the button below to get the details I promised!") @db.Text
+  greetingButtonText String @default("Get Details →")
+  followMessage      String @default("To receive the details, please follow my page first! 🙏\n\nOnce you follow, click the button below.") @db.Text
+  followButtonText   String @default("I've Followed ✓")
+  followRetryMessage String @default("Hmm, I can't see you on my followers list yet 👀\n\nPlease follow the page first, then tap the button again.") @db.Text
+  detailsMessage     String @default("Here are the details you asked for! 🎉\n\nClick below to visit the page.") @db.Text
+  detailsButtonText  String @default("Visit Page 🔗")
+  detailsUrl         String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  igAccount InstagramAccount @relation(fields: [igAccountId], references: [id], onDelete: Cascade)
 }
 
 model PostAutomation {
@@ -81,6 +122,9 @@ model PostAutomation {
   postCaption   String? @db.Text
   postThumbnail String?
   isActive      Boolean @default(false)
+  // True when this automation was created automatically from the account's
+  // default template (a reel uploaded after the template was enabled).
+  fromTemplate  Boolean @default(false)
 
   commentReplyText   String @default("I've sent the details to your DM! Check it 📩") @db.Text
   greetingMessage    String @default("Hey! 👋 Hope you're doing great.\n\nClick the button below to get the details I promised!") @db.Text
@@ -109,6 +153,10 @@ model Conversation {
   igUsername   String?
   state        String   @default("greeted")
   commentId    String?
+  // Last DM send failure for this person, surfaced in the flow editor so a
+  // silent delivery problem (expired token, permission gap) is visible.
+  lastError    String?   @db.Text
+  lastErrorAt  DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

@@ -1,4 +1,4 @@
-const GRAPH_API = "https://graph.facebook.com/v19.0";
+const GRAPH_API = "https://graph.facebook.com/v21.0";
 
 // ── OAuth ────────────────────────────────────────────────────────────────────
 
@@ -190,12 +190,17 @@ function toRecipientPayload(to: DmRecipient): Record<string, string> {
   return "commentId" in to ? { comment_id: to.commentId } : { id: to.id };
 }
 
+export interface SendResult {
+  ok: boolean;
+  error?: string;
+}
+
 export async function sendDM(
   pageId: string,
   to: DmRecipient,
   message: TextMessage | ButtonMessage,
   pageToken: string
-): Promise<void> {
+): Promise<SendResult> {
   const recipient = toRecipientPayload(to);
   let body: Record<string, unknown>;
 
@@ -224,6 +229,8 @@ export async function sendDM(
     };
   }
 
+  // NOTE: sends go to /{page-id}/messages. If a live test shows Instagram wants
+  // the IG-user-id / graph.instagram.com path for this account type, adjust here.
   const res = await fetch(`${GRAPH_API}/${pageId}/messages?access_token=${pageToken}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -233,7 +240,9 @@ export async function sendDM(
   if (!res.ok) {
     const err = await res.text();
     console.error("sendDM error:", err);
+    return { ok: false, error: err.slice(0, 500) };
   }
+  return { ok: true };
 }
 
 // ── Follower check ────────────────────────────────────────────────────────────
