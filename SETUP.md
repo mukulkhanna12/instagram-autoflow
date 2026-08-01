@@ -13,12 +13,19 @@ npm install
 2. Create a new project → copy the **Connection string** (postgresql://...)
 3. Paste it into `.env` as `DATABASE_URL`
 
-## 3. Google OAuth
+## 3. Login (email-OTP)
 
-1. Go to https://console.cloud.google.com
-2. Create a project → APIs & Services → Credentials → OAuth 2.0 Client IDs
-3. Authorised redirect URI: `http://localhost:3000/api/auth/callback/google`
-4. Copy Client ID and Secret into `.env`
+Sign-in is passwordless and locked to a single address — only your email can get
+in, via a one-time code emailed to it.
+
+1. Set `ALLOWED_LOGIN_EMAIL` in `.env` to your own email address.
+2. Create a free account at https://resend.com and copy an API key into
+   `RESEND_API_KEY`. Resend can send to your own account email from
+   `onboarding@resend.dev` without verifying a domain, which is enough here.
+   (Optional: set `EMAIL_FROM` once you verify your own domain.)
+
+Without `RESEND_API_KEY` (pure local dev) the code is printed to the server
+console instead of emailed, so you can still log in.
 
 ## 4. Meta Developer App
 
@@ -131,5 +138,14 @@ npm i -g vercel
 vercel
 ```
 
-Add all environment variables in Vercel dashboard.
-Update all URLs from `localhost:3000` to your Vercel URL.
+Add all environment variables in Vercel dashboard (including `CRON_SECRET` —
+`openssl rand -base64 32`). Update all URLs from `localhost:3000` to your Vercel URL.
+
+The daily jobs in `vercel.json` run automatically once deployed:
+
+- `/api/cron/refresh-tokens` — keeps the long-lived Instagram token alive (it
+  otherwise expires ~60 days after you connect, silently stopping everything).
+- `/api/cron/sync-posts` — pre-creates automations for new reels from your
+  default template so they show in the dashboard.
+
+Vercel's free plan allows daily crons and up to two jobs — exactly these two.

@@ -58,7 +58,8 @@ silently never fires. The app does this when you connect an account.
 
 - **Next.js** (App Router) + TypeScript
 - **Prisma** + PostgreSQL — free tier on [Neon](https://neon.tech)
-- **NextAuth** — Google sign-in only
+- **NextAuth** — passwordless email-OTP sign-in, locked to one address
+- **Resend** — delivers the login code email
 - **Tailwind** + Radix UI
 - **Instagram Graph API** — comments, messaging, profile
 
@@ -88,9 +89,11 @@ app, required permissions, and which webhook fields to subscribe.
 |---|---|
 | `DATABASE_URL` | Neon Postgres connection string |
 | `NEXTAUTH_URL` / `NEXTAUTH_SECRET` | Session handling (`openssl rand -base64 32`) |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google sign-in |
+| `ALLOWED_LOGIN_EMAIL` | The only email allowed to sign in |
+| `RESEND_API_KEY` | Sends the login-code email ([resend.com](https://resend.com)) |
 | `META_APP_ID` / `META_APP_SECRET` | Instagram OAuth + webhook signature verification |
 | `META_WEBHOOK_VERIFY_TOKEN` | Any random string; must match the Meta dashboard |
+| `CRON_SECRET` | Protects the scheduled `/api/cron/*` routes |
 
 ## Project structure
 
@@ -99,21 +102,31 @@ app/
   (dashboard)/
     dashboard/        overview
     posts/            your media, and the per-reel flow editor
+    template/         the default flow applied to future reels
     settings/         connect / disconnect Instagram
   api/
+    auth/otp/         request a login code
     automations/      CRUD for per-reel flows
+    template/         CRUD for the default (future-reel) flow
     instagram/        OAuth connect, callback, posts
+    cron/             daily token refresh + post sync
     webhooks/         Instagram event receiver
 lib/
   flow-engine.ts      conversation state machine
   instagram.ts        Graph API client
+  templates.ts        build an automation from the default template
+  otp.ts / email.ts   email-OTP login codes
   auth.ts             NextAuth config
 prisma/
-  schema.prisma       User, InstagramAccount, PostAutomation, Conversation
+  schema.prisma       User, InstagramAccount, PostAutomation, Conversation,
+                      AutomationTemplate, LoginCode
 ```
 
 `PostAutomation` is one reel's flow; `Conversation` tracks one person's progress
-through it (`greeted` → `follow_requested` → `completed`).
+through it (`greeted` → `follow_requested` → `completed`). `AutomationTemplate`
+is the "default flow for new reels": when enabled, any reel with no automation of
+its own is materialized from it the moment someone comments — so reels you upload
+later just work, with nothing to click.
 
 ## Security
 
