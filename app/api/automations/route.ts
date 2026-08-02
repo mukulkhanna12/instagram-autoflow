@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
+import { buildStats, type StateCounts } from "@/lib/analytics";
 
 const createSchema = z.object({
   postId: z.string(),
@@ -23,7 +24,33 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json({ automations });
+  // One grouped query for every automation's conversation states, then fold the
+  // per-step funnel onto each automation.
+  const ids = automations.map((a) => a.id);
+  const grouped = ids.length
+    ? await db.conversation.groupBy({
+        by: ["automationId", "state"],
+        where: { automationId: { in: ids } },
+        _count: { _all: true },
+      })
+    : [];
+
+  const countsById = new Map<string, StateCounts>(
+    ids.map((id) => [id, { greeted: 0, follow_requested: 0, completed: 0 }])
+  );
+  for (const g of grouped) {
+    const c = countsById.get(g.automationId);
+    if (c && (g.state === "greeted" || g.state === "follow_requested" || g.state === "completed")) {
+      c[g.state] = g._count._all;
+    }
+  }
+
+  const withStats = automations.map((a) => ({
+    ...a,
+    stats: buildStats(a, countsById.get(a.id)!),
+  }));
+
+  return NextResponse.json({ automations: withStats });
 }
 
 export async function POST(req: NextRequest) {

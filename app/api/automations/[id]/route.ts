@@ -2,6 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
+import { buildStats, type StateCounts } from "@/lib/analytics";
+
+/** Tally an automation's conversations by state for the analytics funnel. */
+async function stateCounts(automationId: string): Promise<StateCounts> {
+  const grouped = await db.conversation.groupBy({
+    by: ["state"],
+    where: { automationId },
+    _count: { _all: true },
+  });
+  const counts: StateCounts = { greeted: 0, follow_requested: 0, completed: 0 };
+  for (const g of grouped) {
+    if (g.state === "greeted" || g.state === "follow_requested" || g.state === "completed") {
+      counts[g.state] = g._count._all;
+    }
+  }
+  return counts;
+}
 
 const updateSchema = z.object({
   isActive: z.boolean().optional(),
@@ -36,7 +53,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     take: 50,
   });
 
-  return NextResponse.json({ automation, conversations });
+  const stats = buildStats(automation, await stateCounts(id));
+
+  return NextResponse.json({ automation, conversations, stats });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

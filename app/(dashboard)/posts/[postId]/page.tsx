@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Loader2, MessageSquare, UserCheck, Link2, ArrowLeft,
-  Zap, ChevronRight, ToggleLeft, ToggleRight, Trash2, Save
+  Zap, ChevronRight, ToggleLeft, ToggleRight, Trash2, Pencil, X, Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
@@ -38,6 +38,31 @@ interface Conversation {
   createdAt: string;
 }
 
+interface StepEvent { name: string; total: number; unique: number; pct?: number }
+interface Step {
+  key: "comment" | "greeting" | "follow" | "details";
+  label: string;
+  reached: number;
+  reachedPct: number;
+  events: StepEvent[];
+  newFollows?: number;
+}
+interface Stats {
+  contacts: number;
+  totalSends: number;
+  completed: number;
+  newFollows: number;
+  greetingCtr: number;
+  steps: Step[];
+}
+
+// The content fields that Edit → Update actually saves.
+const CONTENT_FIELDS = [
+  "commentReplyText", "greetingMessage", "greetingButtonText",
+  "followMessage", "followButtonText", "followRetryMessage",
+  "detailsMessage", "detailsButtonText", "detailsUrl",
+] as const;
+
 const STEPS = [
   { id: "comment", icon: MessageSquare, color: "bg-blue-50 text-blue-600 border-blue-200", label: "Step 1 — Comment Reply", desc: "Public reply on the comment" },
   { id: "greeting", icon: Zap, color: "bg-brand-50 text-brand-600 border-brand-200", label: "Step 2 — DM Greeting", desc: "First DM sent to commenter" },
@@ -49,48 +74,58 @@ export default function FlowEditorPage() {
   const { postId } = useParams<{ postId: string }>();
   const router = useRouter();
   const [automation, setAutomation] = useState<Automation | null>(null);
+  const [draft, setDraft] = useState<Automation | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [mode, setMode] = useState<"view" | "edit">("view");
   const [activeStep, setActiveStep] = useState("comment");
 
   useEffect(() => {
     fetch(`/api/automations/${postId}`)
       .then((r) => r.json())
-      .then(({ automation, conversations }) => {
+      .then(({ automation, conversations, stats }) => {
         setAutomation(automation);
         setConversations(conversations ?? []);
+        setStats(stats ?? null);
       })
       .finally(() => setLoading(false));
   }, [postId]);
 
-  function updateField(field: keyof Automation, value: string | boolean) {
-    setAutomation((prev) => prev ? { ...prev, [field]: value } : prev);
+  const editing = mode === "edit";
+  // What the fields render: the draft while editing, the saved copy otherwise.
+  const v = editing ? draft : automation;
+
+  function updateField(field: keyof Automation, value: string) {
+    setDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
   }
 
-  async function save() {
+  function startEdit() {
     if (!automation) return;
+    setDraft({ ...automation });
+    setMode("edit");
+  }
+
+  function cancelEdit() {
+    setDraft(null);
+    setMode("view");
+  }
+
+  async function update() {
+    if (!draft) return;
     setSaving(true);
-    await fetch(`/api/automations/${postId}`, {
+    const res = await fetch(`/api/automations/${postId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        commentReplyText: automation.commentReplyText,
-        greetingMessage: automation.greetingMessage,
-        greetingButtonText: automation.greetingButtonText,
-        followMessage: automation.followMessage,
-        followButtonText: automation.followButtonText,
-        followRetryMessage: automation.followRetryMessage,
-        detailsMessage: automation.detailsMessage,
-        detailsButtonText: automation.detailsButtonText,
-        detailsUrl: automation.detailsUrl,
-      }),
+      body: JSON.stringify(Object.fromEntries(CONTENT_FIELDS.map((f) => [f, draft[f]]))),
     });
+    const { automation: updated } = await res.json();
+    setAutomation(updated);
+    setDraft(null);
+    setMode("view");
     setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   }
 
   async function toggleActive() {
@@ -102,14 +137,14 @@ export default function FlowEditorPage() {
       body: JSON.stringify({ isActive: !automation.isActive }),
     });
     const { automation: updated } = await res.json();
-    setAutomation(updated);
+    setAutomation((prev) => (prev ? { ...prev, isActive: updated.isActive } : updated));
     setToggling(false);
   }
 
   async function deleteAutomation() {
     if (!confirm("Delete this automation? This cannot be undone.")) return;
     await fetch(`/api/automations/${postId}`, { method: "DELETE" });
-    router.push("/posts");
+    router.push("/dashboard");
   }
 
   if (loading) {
@@ -120,49 +155,85 @@ export default function FlowEditorPage() {
     );
   }
 
-  if (!automation) {
+  if (!automation || !v) {
     return (
       <div className="p-8">
         <p className="text-gray-500">Automation not found.</p>
-        <Link href="/posts" className="text-brand-600 underline mt-2 inline-block">← Back to posts</Link>
+        <Link href="/dashboard" className="text-brand-600 underline mt-2 inline-block">← Back to automations</Link>
       </div>
     );
   }
+
+  const stepStats = (key: string) => stats?.steps.find((s) => s.key === key);
 
   return (
     <div className="p-8 max-w-6xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Link href="/posts" className="text-gray-400 hover:text-gray-600 transition-colors">
+          <Link href="/dashboard" className="text-gray-400 hover:text-gray-600 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Flow Editor</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Configure your comment-to-DM automation</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-gray-900">Flow Editor</h1>
+              {automation.isActive
+                ? <Badge variant="success">LIVE</Badge>
+                : <Badge variant="default">Off</Badge>}
+              {editing && <Badge variant="warning">Editing</Badge>}
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {editing ? "Make your changes, then Update to save" : "Viewing your comment-to-DM automation"}
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={toggleActive}
-            disabled={toggling}
-            className="flex items-center gap-2 text-sm font-medium cursor-pointer"
-          >
-            {automation.isActive ? (
-              <><ToggleRight className="w-8 h-8 text-emerald-500" /> <span className="text-emerald-600">Live</span></>
-            ) : (
-              <><ToggleLeft className="w-8 h-8 text-gray-400" /> <span className="text-gray-500">Inactive</span></>
-            )}
-          </button>
-          <Button variant="outline" size="sm" onClick={deleteAutomation}>
-            <Trash2 className="w-4 h-4 text-red-400" />
-          </Button>
-          <Button size="sm" onClick={save} loading={saving}>
-            {saved ? "✓ Saved" : <><Save className="w-4 h-4" /> Save</>}
-          </Button>
+          {!editing && (
+            <button
+              onClick={toggleActive}
+              disabled={toggling}
+              className="flex items-center gap-2 text-sm font-medium cursor-pointer"
+              title={automation.isActive ? "Live — replying to comments" : "Off — ignoring comments"}
+            >
+              {automation.isActive ? (
+                <><ToggleRight className="w-8 h-8 text-emerald-500" /> <span className="text-emerald-600">Live</span></>
+              ) : (
+                <><ToggleLeft className="w-8 h-8 text-gray-400" /> <span className="text-gray-500">Off</span></>
+              )}
+            </button>
+          )}
+
+          {editing ? (
+            <>
+              <Button variant="outline" size="sm" onClick={cancelEdit}>
+                <X className="w-4 h-4" /> Cancel
+              </Button>
+              <Button variant="outline" size="sm" onClick={deleteAutomation}>
+                <Trash2 className="w-4 h-4 text-red-400" />
+              </Button>
+              <Button size="sm" onClick={update} loading={saving}>
+                <Check className="w-4 h-4" /> Update
+              </Button>
+            </>
+          ) : (
+            <Button size="sm" onClick={startEdit}>
+              <Pencil className="w-4 h-4" /> Edit
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Key metrics */}
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+          <Kpi label="Unique contacts" value={stats.contacts} />
+          <Kpi label="Messages sent" value={stats.totalSends} />
+          <Kpi label="Final DMs" value={stats.completed} />
+          <Kpi label="New follows" value={stats.newFollows} highlight />
+          <Kpi label="Greeting CTR" value={`${stats.greetingCtr}%`} />
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Step navigator + editor */}
@@ -190,15 +261,17 @@ export default function FlowEditorPage() {
             {activeStep === "comment" && (
               <div className="space-y-4">
                 <StepHeader step={STEPS[0]} />
+                {stepStats("comment") && <StepMetrics step={stepStats("comment")!} />}
                 <Textarea
                   label="Comment reply text"
-                  value={automation.commentReplyText}
+                  value={v.commentReplyText}
                   onChange={(e) => updateField("commentReplyText", e.target.value)}
+                  disabled={!editing}
                   hint="This is posted publicly as a reply to the comment"
                   rows={2}
                 />
                 <DmPreview>
-                  <CommentBubble text={automation.commentReplyText} isReply />
+                  <CommentBubble text={v.commentReplyText} isReply />
                 </DmPreview>
               </div>
             )}
@@ -206,19 +279,22 @@ export default function FlowEditorPage() {
             {activeStep === "greeting" && (
               <div className="space-y-4">
                 <StepHeader step={STEPS[1]} />
+                {stepStats("greeting") && <StepMetrics step={stepStats("greeting")!} />}
                 <Textarea
                   label="Greeting message"
-                  value={automation.greetingMessage}
+                  value={v.greetingMessage}
                   onChange={(e) => updateField("greetingMessage", e.target.value)}
+                  disabled={!editing}
                   rows={3}
                 />
                 <Input
                   label="Button text"
-                  value={automation.greetingButtonText}
+                  value={v.greetingButtonText}
                   onChange={(e) => updateField("greetingButtonText", e.target.value)}
+                  disabled={!editing}
                 />
                 <DmPreview>
-                  <DmBubble text={automation.greetingMessage} button={automation.greetingButtonText} buttonColor="brand" />
+                  <DmBubble text={v.greetingMessage} button={v.greetingButtonText} buttonColor="brand" />
                 </DmPreview>
               </div>
             )}
@@ -226,22 +302,25 @@ export default function FlowEditorPage() {
             {activeStep === "follow" && (
               <div className="space-y-4">
                 <StepHeader step={STEPS[2]} />
+                {stepStats("follow") && <StepMetrics step={stepStats("follow")!} />}
                 <p className="text-xs text-gray-400 bg-amber-50 border border-amber-100 rounded-lg p-3">
                   Shown only if the user is <strong>not following</strong> your account.
                 </p>
                 <Textarea
                   label="Follow-required message"
-                  value={automation.followMessage}
+                  value={v.followMessage}
                   onChange={(e) => updateField("followMessage", e.target.value)}
+                  disabled={!editing}
                   rows={3}
                 />
                 <Input
                   label="Button text"
-                  value={automation.followButtonText}
+                  value={v.followButtonText}
                   onChange={(e) => updateField("followButtonText", e.target.value)}
+                  disabled={!editing}
                 />
                 <DmPreview>
-                  <DmBubble text={automation.followMessage} button={automation.followButtonText} buttonColor="amber" />
+                  <DmBubble text={v.followMessage} button={v.followButtonText} buttonColor="amber" />
                 </DmPreview>
 
                 <div className="pt-4 border-t border-gray-100 space-y-4">
@@ -251,12 +330,13 @@ export default function FlowEditorPage() {
                   </p>
                   <Textarea
                     label="Still-not-following message"
-                    value={automation.followRetryMessage}
+                    value={v.followRetryMessage}
                     onChange={(e) => updateField("followRetryMessage", e.target.value)}
+                    disabled={!editing}
                     rows={3}
                   />
                   <DmPreview>
-                    <DmBubble text={automation.followRetryMessage} button={automation.followButtonText} buttonColor="amber" />
+                    <DmBubble text={v.followRetryMessage} button={v.followButtonText} buttonColor="amber" />
                   </DmPreview>
                 </div>
               </div>
@@ -265,27 +345,31 @@ export default function FlowEditorPage() {
             {activeStep === "details" && (
               <div className="space-y-4">
                 <StepHeader step={STEPS[3]} />
+                {stepStats("details") && <StepMetrics step={stepStats("details")!} />}
                 <Textarea
                   label="Details message"
-                  value={automation.detailsMessage}
+                  value={v.detailsMessage}
                   onChange={(e) => updateField("detailsMessage", e.target.value)}
+                  disabled={!editing}
                   rows={3}
                 />
                 <Input
                   label="Button text"
-                  value={automation.detailsButtonText}
+                  value={v.detailsButtonText}
                   onChange={(e) => updateField("detailsButtonText", e.target.value)}
+                  disabled={!editing}
                 />
                 <Input
                   label="Link URL"
                   type="url"
-                  value={automation.detailsUrl}
+                  value={v.detailsUrl}
                   onChange={(e) => updateField("detailsUrl", e.target.value)}
+                  disabled={!editing}
                   placeholder="https://yourwebsite.com"
                   hint="The URL opened when user clicks the button"
                 />
                 <DmPreview>
-                  <DmBubble text={automation.detailsMessage} button={automation.detailsButtonText} buttonColor="emerald" url={automation.detailsUrl} />
+                  <DmBubble text={v.detailsMessage} button={v.detailsButtonText} buttonColor="emerald" url={v.detailsUrl} />
                 </DmPreview>
               </div>
             )}
@@ -297,11 +381,11 @@ export default function FlowEditorPage() {
             <div className="flex flex-col gap-1">
               {[
                 { label: "💬 User comments on post", sub: "Triggers automation" },
-                { label: "📢 Public comment reply", sub: automation.commentReplyText.slice(0, 40) + "…" },
-                { label: "📩 DM: Greeting", sub: automation.greetingMessage.slice(0, 40) + "…" },
+                { label: "📢 Public comment reply", sub: v.commentReplyText.slice(0, 40) + "…" },
+                { label: "📩 DM: Greeting", sub: v.greetingMessage.slice(0, 40) + "…" },
                 { label: "👥 Follower check", sub: "Is user following your account?" },
-                { label: "🚫 Not following → Follow gate", sub: automation.followMessage.slice(0, 40) + "…" },
-                { label: "✅ Following → Final details", sub: automation.detailsMessage.slice(0, 40) + "…" },
+                { label: "🚫 Not following → Follow gate", sub: v.followMessage.slice(0, 40) + "…" },
+                { label: "✅ Following → Final details", sub: v.detailsMessage.slice(0, 40) + "…" },
               ].map((item, i) => (
                 <div key={i} className="flex gap-3 items-start">
                   <div className="flex flex-col items-center">
@@ -354,17 +438,17 @@ export default function FlowEditorPage() {
           </div>
 
           {/* Post preview */}
-          {automation.postThumbnail && (
+          {v.postThumbnail && (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-700">Post</h3>
               </div>
               <div className="relative aspect-square">
-                <Image src={automation.postThumbnail} alt="Post" fill className="object-cover" />
+                <Image src={v.postThumbnail} alt="Post" fill className="object-cover" />
               </div>
-              {automation.postCaption && (
+              {v.postCaption && (
                 <div className="p-4">
-                  <p className="text-xs text-gray-500 line-clamp-3">{automation.postCaption}</p>
+                  <p className="text-xs text-gray-500 line-clamp-3">{v.postCaption}</p>
                 </div>
               )}
             </div>
@@ -376,6 +460,57 @@ export default function FlowEditorPage() {
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+function Kpi({ label, value, highlight }: { label: string; value: number | string; highlight?: boolean }) {
+  return (
+    <div className={`rounded-xl border p-3 ${highlight ? "bg-emerald-50 border-emerald-100" : "bg-white border-gray-100"} shadow-sm`}>
+      <p className={`text-xl font-bold ${highlight ? "text-emerald-700" : "text-gray-900"}`}>{value}</p>
+      <p className="text-[11px] text-gray-500 mt-0.5">{label}</p>
+    </div>
+  );
+}
+
+function StepMetrics({ step }: { step: Step }) {
+  return (
+    <div className="bg-gray-50 border border-gray-100 rounded-lg p-4">
+      <div className="flex items-baseline justify-between mb-3">
+        <div>
+          <span className="text-lg font-bold text-gray-900">{step.reached}</span>
+          <span className="text-xs text-gray-500 ml-1.5">reached this step</span>
+        </div>
+        <span className="text-sm font-semibold text-emerald-600">{step.reachedPct}%</span>
+      </div>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-gray-400 border-b border-gray-100">
+            <th className="text-left font-medium pb-1.5">Event</th>
+            <th className="text-right font-medium pb-1.5">Total</th>
+            <th className="text-right font-medium pb-1.5">Unique</th>
+          </tr>
+        </thead>
+        <tbody>
+          {step.events.map((e) => (
+            <tr key={e.name} className="border-b border-gray-50 last:border-0">
+              <td className="py-1.5 text-gray-700">{e.name}</td>
+              <td className="py-1.5 text-right text-gray-900 font-medium">
+                {e.total}
+                {typeof e.pct === "number" && <span className="text-emerald-600 font-normal ml-1">{e.pct}%</span>}
+              </td>
+              <td className="py-1.5 text-right text-gray-900 font-medium">{e.unique}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {typeof step.newFollows === "number" && (
+        <div className="mt-3 flex items-center justify-between bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+          <span className="text-xs font-medium text-emerald-700">New follows from this reel</span>
+          <span className="text-sm font-bold text-emerald-700">{step.newFollows}</span>
+        </div>
+      )}
+      <p className="text-[10px] text-gray-400 mt-2">Opens aren&apos;t reported by Instagram, so they&apos;re not shown.</p>
+    </div>
+  );
+}
 
 function StepHeader({ step }: { step: typeof STEPS[number] }) {
   return (

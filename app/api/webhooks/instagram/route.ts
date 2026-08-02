@@ -128,6 +128,12 @@ async function handleCommentChange(pageId: string, value: Record<string, unknown
 
   await replyToComment(commentId, automation.commentReplyText, pageToken);
 
+  // Count this as one comment handled (dedup above ensures one per comment id).
+  await db.postAutomation.update({
+    where: { id: automation.id },
+    data: { commentsHandled: { increment: 1 } },
+  });
+
   await handleNewComment({
     automationId: automation.id,
     commentId,

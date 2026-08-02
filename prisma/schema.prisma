@@ -126,6 +126,19 @@ model PostAutomation {
   // default template (a reel uploaded after the template was enabled).
   fromTemplate  Boolean @default(false)
 
+  // Per-step analytics counters, incremented as the flow runs. "Sent" counts
+  // successful DM sends; "Clicked" counts button taps (a postback from the user).
+  // These power the ManyChat-style Sent / Clicked / CTR figures in the editor.
+  commentsHandled Int @default(0) // public comment replies posted
+  greetingSent    Int @default(0)
+  greetingClicked Int @default(0)
+  followSent      Int @default(0)
+  followClicked   Int @default(0)
+  detailsSent     Int @default(0) // final message delivered
+  // New follows attributable to this reel: people who were gated as "not
+  // following", then went and followed and came back to a passing check.
+  followsGained   Int @default(0)
+
   commentReplyText   String @default("I've sent the details to your DM! Check it 📩") @db.Text
   greetingMessage    String @default("Hey! 👋 Hope you're doing great.\n\nClick the button below to get the details I promised!") @db.Text
   greetingButtonText String @default("Get Details →")

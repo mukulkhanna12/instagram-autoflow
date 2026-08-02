@@ -83,6 +83,7 @@ export async function handleNewComment(opts: {
     opts.pageToken
   );
   await noteSend(convo.id, result, "greeting");
+  if (result.ok) await bump(opts.automationId, "greetingSent");
 }
 
 export async function handlePostback(opts: {
@@ -109,6 +110,10 @@ export async function handlePostback(opts: {
   // already sitting in people's inboxes keep working.
   if (action !== "CHECK_FOLLOW" && action !== "CONTINUE" && action !== "FOLLOWED") return;
 
+  // A valid postback IS a button click — attribute it to the step they were on.
+  if (conversation.state === "greeted") await bump(automationId, "greetingClicked");
+  else if (conversation.state === "follow_requested") await bump(automationId, "followClicked");
+
   // Already delivered once — resend rather than leaving them with a dead button.
   if (conversation.state === "completed") {
     const result = await sendDetailsMessage(automation, opts);
@@ -119,8 +124,15 @@ export async function handlePostback(opts: {
   const isFollower = await checkFollowerStatus(opts.senderIgUserId, opts.pageToken);
 
   if (isFollower) {
+    // If they were previously gated as "not following" and are now following,
+    // this reel earned the follow — count it.
+    const isNewFollow = conversation.state === "follow_requested";
+
     const result = await sendDetailsMessage(automation, opts);
     await noteSend(conversation.id, result, "details");
+    if (result.ok) await bump(automationId, "detailsSent");
+    if (isNewFollow) await bump(automationId, "followsGained");
+
     await db.conversation.update({
       where: { id: conversation.id },
       data: { state: "completed" },
@@ -150,6 +162,7 @@ export async function handlePostback(opts: {
     opts.pageToken
   );
   await noteSend(conversation.id, result, "follow-required");
+  if (result.ok) await bump(automationId, "followSent");
 
   if (isFirstRefusal) {
     await db.conversation.update({
@@ -186,6 +199,28 @@ async function sendDetailsMessage(
  * error is cleared; on failure the reason is stored so it shows in the dashboard.
  * Best-effort — a logging write must never break the flow.
  */
+// The per-reel analytics counters on PostAutomation that the flow increments.
+type Counter =
+  | "commentsHandled"
+  | "greetingSent"
+  | "greetingClicked"
+  | "followSent"
+  | "followClicked"
+  | "detailsSent"
+  | "followsGained";
+
+/** Increment one analytics counter. Best-effort — never breaks the flow. */
+async function bump(automationId: string, field: Counter): Promise<void> {
+  try {
+    await db.postAutomation.update({
+      where: { id: automationId },
+      data: { [field]: { increment: 1 } },
+    });
+  } catch (err) {
+    console.error(`bump ${field} failed:`, err);
+  }
+}
+
 async function noteSend(conversationId: string, result: SendResult, context: string): Promise<void> {
   try {
     await db.conversation.update({
