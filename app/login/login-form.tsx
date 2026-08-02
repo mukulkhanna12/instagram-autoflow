@@ -16,6 +16,7 @@ export function LoginForm() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [devCode, setDevCode] = useState<string | null>(null);
 
   async function requestCode(e: React.FormEvent) {
     e.preventDefault();
@@ -32,6 +33,9 @@ export function LoginForm() {
         setError(error ?? "Something went wrong. Please try again.");
         return;
       }
+      // In demo mode the API returns the code so it can be shown on-screen.
+      const data = await res.json().catch(() => ({}));
+      if (data.devCode) setDevCode(data.devCode);
       // Always advances — the response is deliberately identical whether or not
       // the address is allow-listed, so a code only actually arrives for yours.
       setStep("code");
@@ -97,6 +101,18 @@ export function LoginForm() {
             </form>
           ) : (
             <form onSubmit={verifyCode} className="space-y-4">
+              {devCode && (
+                <button
+                  type="button"
+                  onClick={() => setCode(devCode)}
+                  className="w-full text-left bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-amber-100 transition-colors"
+                >
+                  <p className="text-xs text-amber-700">
+                    Demo mode — no email is set up. Your code is{" "}
+                    <span className="font-bold tracking-wider">{devCode}</span>. Tap to fill.
+                  </p>
+                </button>
+              )}
               <Input
                 label="Login code"
                 inputMode="numeric"

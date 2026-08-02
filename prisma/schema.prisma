@@ -98,7 +98,11 @@ model AutomationTemplate {
   igAccountId String  @unique
   enabled     Boolean @default(false)
 
-  commentReplyText   String @default("I've sent the details to your DM! Check it 📩") @db.Text
+  // Comment reply, plus up to two optional variants. A random non-empty one is
+  // posted each time so replies don't look automated (spam-safe).
+  commentReplyText   String  @default("I've sent the details to your DM! Check it 📩") @db.Text
+  commentReplyText2  String? @db.Text
+  commentReplyText3  String? @db.Text
   greetingMessage    String @default("Hey! 👋 Hope you're doing great.\n\nClick the button below to get the details I promised!") @db.Text
   greetingButtonText String @default("Get Details →")
   followMessage      String @default("To receive the details, please follow my page first! 🙏\n\nOnce you follow, click the button below.") @db.Text
@@ -139,7 +143,11 @@ model PostAutomation {
   // following", then went and followed and came back to a passing check.
   followsGained   Int @default(0)
 
-  commentReplyText   String @default("I've sent the details to your DM! Check it 📩") @db.Text
+  // Comment reply, plus up to two optional variants. A random non-empty one is
+  // posted each time so replies don't look automated (spam-safe).
+  commentReplyText   String  @default("I've sent the details to your DM! Check it 📩") @db.Text
+  commentReplyText2  String? @db.Text
+  commentReplyText3  String? @db.Text
   greetingMessage    String @default("Hey! 👋 Hope you're doing great.\n\nClick the button below to get the details I promised!") @db.Text
   greetingButtonText String @default("Get Details →")
   followMessage      String @default("To receive the details, please follow my page first! 🙏\n\nOnce you follow, click the button below.") @db.Text

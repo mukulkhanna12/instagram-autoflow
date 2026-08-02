@@ -23,6 +23,8 @@ async function stateCounts(automationId: string): Promise<StateCounts> {
 const updateSchema = z.object({
   isActive: z.boolean().optional(),
   commentReplyText: z.string().optional(),
+  commentReplyText2: z.string().optional(),
+  commentReplyText3: z.string().optional(),
   greetingMessage: z.string().optional(),
   greetingButtonText: z.string().optional(),
   followMessage: z.string().optional(),

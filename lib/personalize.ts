@@ -2,7 +2,8 @@
  * Merge tags for message text, ManyChat-style. Authors write tokens like
  * `Hey {{first_name}} 👋` and they're filled in at send time.
  *
- * Supported: {{first_name}}, {{full_name}}, {{name}} (= first name), {{username}}.
+ * Supported: {{first_name}}, {{last_name}}, {{full_name}}, {{name}} (= first name),
+ * {{username}}.
  * Anything unknown or unavailable falls back gracefully to the username, then to
  * a friendly "there", so a message never goes out with a raw {{token}} in it.
  *
@@ -19,11 +20,14 @@ export interface Person {
 export function personalize(text: string, p: Person): string {
   const username = (p.username ?? "").trim();
   const full = (p.name ?? "").trim();
-  const first = full.split(/\s+/)[0] || username || "there";
+  const parts = full.split(/\s+/).filter(Boolean);
+  const first = parts[0] || username || "there";
+  const last = parts.slice(1).join(" "); // empty when there's no surname
   const fullOrFallback = full || username || "there";
 
   return text
     .replace(/\{\{\s*first[_\s]?name\s*\}\}/gi, first)
+    .replace(/\{\{\s*last[_\s]?name\s*\}\}/gi, last)
     .replace(/\{\{\s*full[_\s]?name\s*\}\}/gi, fullOrFallback)
     .replace(/\{\{\s*name\s*\}\}/gi, first)
     .replace(/\{\{\s*username\s*\}\}/gi, username || first);

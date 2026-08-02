@@ -12,7 +12,7 @@ interface SidebarProps {
 
 const links = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/posts", icon: ImageIcon, label: "Posts" },
+  { href: "/posts", icon: ImageIcon, label: "Reels" },
   { href: "/template", icon: Wand2, label: "New-reel flow" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];

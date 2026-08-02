@@ -6,6 +6,8 @@ import { z } from "zod";
 const updateSchema = z.object({
   enabled: z.boolean().optional(),
   commentReplyText: z.string().optional(),
+  commentReplyText2: z.string().optional(),
+  commentReplyText3: z.string().optional(),
   greetingMessage: z.string().optional(),
   greetingButtonText: z.string().optional(),
   followMessage: z.string().optional(),

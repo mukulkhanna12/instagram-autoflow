@@ -126,7 +126,18 @@ async function handleCommentChange(pageId: string, value: Record<string, unknown
 
   const pageToken = igAccount.pageAccessToken ?? igAccount.accessToken;
 
-  await replyToComment(commentId, automation.commentReplyText, pageToken);
+  // Post a random one of the configured reply variants so repeated replies on a
+  // reel don't look automated (Instagram can flag identical replies as spam).
+  const replyPool = [
+    automation.commentReplyText,
+    automation.commentReplyText2,
+    automation.commentReplyText3,
+  ]
+    .map((t) => t?.trim())
+    .filter((t): t is string => !!t);
+  const reply = replyPool[Math.floor(Math.random() * replyPool.length)] ?? automation.commentReplyText;
+
+  await replyToComment(commentId, reply, pageToken);
 
   // Count this as one comment handled (dedup above ensures one per comment id).
   await db.postAutomation.update({

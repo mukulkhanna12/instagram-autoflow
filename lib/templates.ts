@@ -5,6 +5,8 @@ import type { IgMedia } from "./instagram";
 export type TemplateFields = Pick<
   AutomationTemplate,
   | "commentReplyText"
+  | "commentReplyText2"
+  | "commentReplyText3"
   | "greetingMessage"
   | "greetingButtonText"
   | "followMessage"
@@ -35,6 +37,8 @@ export function automationCreateFromTemplate(
     postCaption: media?.caption,
     postThumbnail: media?.thumbnail_url ?? media?.media_url,
     commentReplyText: template.commentReplyText,
+    commentReplyText2: template.commentReplyText2,
+    commentReplyText3: template.commentReplyText3,
     greetingMessage: template.greetingMessage,
     greetingButtonText: template.greetingButtonText,
     followMessage: template.followMessage,

@@ -11,6 +11,8 @@ interface Template {
   id: string;
   enabled: boolean;
   commentReplyText: string;
+  commentReplyText2?: string | null;
+  commentReplyText3?: string | null;
   greetingMessage: string;
   greetingButtonText: string;
   followMessage: string;
@@ -22,10 +24,18 @@ interface Template {
 }
 
 const FIELDS = [
-  "commentReplyText", "greetingMessage", "greetingButtonText",
+  "commentReplyText", "commentReplyText2", "commentReplyText3",
+  "greetingMessage", "greetingButtonText",
   "followMessage", "followButtonText", "followRetryMessage",
   "detailsMessage", "detailsButtonText", "detailsUrl",
 ] as const;
+
+const TOKENS = [
+  { label: "First name", token: "{{first_name}}" },
+  { label: "Last name", token: "{{last_name}}" },
+  { label: "Full name", token: "{{full_name}}" },
+  { label: "Username", token: "{{username}}" },
+];
 
 export default function TemplatePage() {
   const [template, setTemplate] = useState<Template | null>(null);
@@ -49,6 +59,15 @@ export default function TemplatePage() {
     setTemplate((prev) => (prev ? { ...prev, [field]: value } : prev));
   }
 
+  function insertToken(field: keyof Template, token: string) {
+    setTemplate((prev) => {
+      if (!prev) return prev;
+      const current = (prev[field] as string | null | undefined) ?? "";
+      const sep = current && !current.endsWith(" ") ? " " : "";
+      return { ...prev, [field]: `${current}${sep}${token}` };
+    });
+  }
+
   async function patch(data: Partial<Template>) {
     const res = await fetch("/api/template", {
       method: "PATCH",
@@ -62,7 +81,7 @@ export default function TemplatePage() {
   async function save() {
     if (!template) return;
     setSaving(true);
-    const data = Object.fromEntries(FIELDS.map((f) => [f, template[f]]));
+    const data = Object.fromEntries(FIELDS.map((f) => [f, template[f] ?? ""]));
     const updated = await patch(data);
     setTemplate(updated);
     setSaving(false);
@@ -149,10 +168,28 @@ export default function TemplatePage() {
       {/* Fields */}
       <div className="space-y-4">
         <Section icon={MessageSquare} color="text-blue-600 bg-blue-50 border-blue-200" title="Comment reply" desc="Public reply posted on the comment">
+          <p className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg p-3">
+            Add up to 3 variants — a <strong>random one is posted each time</strong> so replies don&apos;t
+            look automated.
+          </p>
           <Textarea
-            label="Comment reply text"
+            label="Comment reply — variant 1"
             value={template.commentReplyText}
             onChange={(e) => updateField("commentReplyText", e.target.value)}
+            rows={2}
+          />
+          <Textarea
+            label="Variant 2 (optional)"
+            value={template.commentReplyText2 ?? ""}
+            onChange={(e) => updateField("commentReplyText2", e.target.value)}
+            placeholder="Add a different wording…"
+            rows={2}
+          />
+          <Textarea
+            label="Variant 3 (optional)"
+            value={template.commentReplyText3 ?? ""}
+            onChange={(e) => updateField("commentReplyText3", e.target.value)}
+            placeholder="Add a different wording…"
             rows={2}
           />
         </Section>
@@ -164,6 +201,7 @@ export default function TemplatePage() {
             onChange={(e) => updateField("greetingMessage", e.target.value)}
             rows={3}
           />
+          <TokenChips onInsert={(t) => insertToken("greetingMessage", t)} />
           <Input
             label="Button text"
             value={template.greetingButtonText}
@@ -178,6 +216,7 @@ export default function TemplatePage() {
             onChange={(e) => updateField("followMessage", e.target.value)}
             rows={3}
           />
+          <TokenChips onInsert={(t) => insertToken("followMessage", t)} />
           <Input
             label="Button text"
             value={template.followButtonText}
@@ -198,6 +237,7 @@ export default function TemplatePage() {
             onChange={(e) => updateField("detailsMessage", e.target.value)}
             rows={3}
           />
+          <TokenChips onInsert={(t) => insertToken("detailsMessage", t)} />
           <Input
             label="Button text"
             value={template.detailsButtonText}
@@ -213,6 +253,24 @@ export default function TemplatePage() {
           />
         </Section>
       </div>
+    </div>
+  );
+}
+
+function TokenChips({ onInsert }: { onInsert: (token: string) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-xs text-gray-400 mr-0.5">Insert:</span>
+      {TOKENS.map((t) => (
+        <button
+          key={t.token}
+          type="button"
+          onClick={() => onInsert(t.token)}
+          className="text-xs px-2 py-1 rounded-md bg-brand-50 text-brand-700 border border-brand-200 hover:bg-brand-100 cursor-pointer"
+        >
+          {t.label}
+        </button>
+      ))}
     </div>
   );
 }

@@ -42,5 +42,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true });
+  // DEMO ONLY: surface the code in the response so a demo without an email
+  // provider can still log in. Double-gated — impossible in production, and off
+  // unless DEMO_SHOW_OTP=1 is set. Never enable this on a real deployment.
+  const showCode =
+    process.env.NODE_ENV !== "production" && process.env.DEMO_SHOW_OTP === "1";
+
+  return NextResponse.json({ ok: true, ...(showCode ? { devCode: code } : {}) });
 }

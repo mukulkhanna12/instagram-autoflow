@@ -110,15 +110,15 @@ export default function PostsPage() {
   return (
     <div className="p-8 max-w-6xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Posts</h1>
-        <p className="text-gray-500 text-sm mt-1">Select a post to set up a comment-to-DM automation</p>
+        <h1 className="text-2xl font-bold text-gray-900">Reels</h1>
+        <p className="text-gray-500 text-sm mt-1">Select a reel to set up a comment-to-DM automation</p>
       </div>
 
       {posts.length === 0 ? (
         <div className="text-center py-20 text-gray-400">
           <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No posts found</p>
-          <p className="text-sm mt-1">Make sure your Instagram Business account has posts.</p>
+          <p className="font-medium">No reels found</p>
+          <p className="text-sm mt-1">Make sure your Instagram Business account has reels.</p>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
