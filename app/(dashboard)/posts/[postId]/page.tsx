@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
+import { MessageInput } from "@/components/message-input";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import Image from "next/image";
@@ -66,14 +67,6 @@ const CONTENT_FIELDS = [
   "detailsMessage", "detailsButtonText", "detailsUrl",
 ] as const;
 
-// Merge tags that pull the commenter's details into a DM at send time.
-const TOKENS = [
-  { label: "First name", token: "{{first_name}}" },
-  { label: "Last name", token: "{{last_name}}" },
-  { label: "Full name", token: "{{full_name}}" },
-  { label: "Username", token: "{{username}}" },
-];
-
 const STEPS = [
   { id: "comment", icon: MessageSquare, color: "bg-blue-50 text-blue-600 border-blue-200", label: "Step 1 — Comment Reply", desc: "Public reply on the comment" },
   { id: "greeting", icon: Zap, color: "bg-brand-50 text-brand-600 border-brand-200", label: "Step 2 — DM Greeting", desc: "First DM sent to commenter" },
@@ -111,16 +104,6 @@ export default function FlowEditorPage() {
 
   function updateField(field: keyof Automation, value: string) {
     setDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
-  }
-
-  // Append a merge tag to a message field (edit mode only).
-  function insertToken(field: keyof Automation, token: string) {
-    setDraft((prev) => {
-      if (!prev) return prev;
-      const current = (prev[field] as string | null | undefined) ?? "";
-      const sep = current && !current.endsWith(" ") ? " " : "";
-      return { ...prev, [field]: `${current}${sep}${token}` };
-    });
   }
 
   function startEdit() {
@@ -328,14 +311,13 @@ export default function FlowEditorPage() {
               <div className="space-y-4">
                 <StepHeader step={STEPS[1]} />
                 {stepStats("greeting") && <StepMetrics step={stepStats("greeting")!} />}
-                <Textarea
+                <MessageInput
                   label="Greeting message"
                   value={v.greetingMessage}
-                  onChange={(e) => updateField("greetingMessage", e.target.value)}
+                  onChange={(val) => updateField("greetingMessage", val)}
                   disabled={!editing}
                   rows={3}
                 />
-                {editing && <TokenChips onInsert={(t) => insertToken("greetingMessage", t)} />}
                 <Input
                   label="Button text"
                   value={v.greetingButtonText}
@@ -355,14 +337,13 @@ export default function FlowEditorPage() {
                 <p className="text-xs text-gray-400 bg-amber-50 border border-amber-100 rounded-lg p-3">
                   Shown only if the user is <strong>not following</strong> your account.
                 </p>
-                <Textarea
+                <MessageInput
                   label="Follow-required message"
                   value={v.followMessage}
-                  onChange={(e) => updateField("followMessage", e.target.value)}
+                  onChange={(val) => updateField("followMessage", val)}
                   disabled={!editing}
                   rows={3}
                 />
-                {editing && <TokenChips onInsert={(t) => insertToken("followMessage", t)} />}
                 <Input
                   label="Button text"
                   value={v.followButtonText}
@@ -378,14 +359,13 @@ export default function FlowEditorPage() {
                     Sent when they tap the button but <strong>still aren&apos;t following</strong>. Repeats
                     on every tap until they do — the final message is never sent before that.
                   </p>
-                  <Textarea
+                  <MessageInput
                     label="Still-not-following message"
                     value={v.followRetryMessage}
-                    onChange={(e) => updateField("followRetryMessage", e.target.value)}
+                    onChange={(val) => updateField("followRetryMessage", val)}
                     disabled={!editing}
                     rows={3}
                   />
-                  {editing && <TokenChips onInsert={(t) => insertToken("followRetryMessage", t)} />}
                   <DmPreview>
                     <DmBubble text={v.followRetryMessage} button={v.followButtonText} buttonColor="amber" />
                   </DmPreview>
@@ -397,14 +377,13 @@ export default function FlowEditorPage() {
               <div className="space-y-4">
                 <StepHeader step={STEPS[3]} />
                 {stepStats("details") && <StepMetrics step={stepStats("details")!} />}
-                <Textarea
+                <MessageInput
                   label="Details message"
                   value={v.detailsMessage}
-                  onChange={(e) => updateField("detailsMessage", e.target.value)}
+                  onChange={(val) => updateField("detailsMessage", val)}
                   disabled={!editing}
                   rows={3}
                 />
-                {editing && <TokenChips onInsert={(t) => insertToken("detailsMessage", t)} />}
                 <Input
                   label="Button text"
                   value={v.detailsButtonText}
@@ -487,24 +466,6 @@ export default function FlowEditorPage() {
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-
-function TokenChips({ onInsert }: { onInsert: (token: string) => void }) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs text-gray-400 mr-0.5">Insert:</span>
-      {TOKENS.map((t) => (
-        <button
-          key={t.token}
-          type="button"
-          onClick={() => onInsert(t.token)}
-          className="text-xs px-2 py-1 rounded-md bg-brand-50 text-brand-700 border border-brand-200 hover:bg-brand-100 cursor-pointer"
-        >
-          {t.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function Kpi({ label, value, highlight }: { label: string; value: number | string; highlight?: boolean }) {
   return (

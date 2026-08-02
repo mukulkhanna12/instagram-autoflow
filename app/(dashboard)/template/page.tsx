@@ -6,6 +6,7 @@ import {
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
+import { MessageInput } from "@/components/message-input";
 
 interface Template {
   id: string;
@@ -30,13 +31,6 @@ const FIELDS = [
   "detailsMessage", "detailsButtonText", "detailsUrl",
 ] as const;
 
-const TOKENS = [
-  { label: "First name", token: "{{first_name}}" },
-  { label: "Last name", token: "{{last_name}}" },
-  { label: "Full name", token: "{{full_name}}" },
-  { label: "Username", token: "{{username}}" },
-];
-
 export default function TemplatePage() {
   const [template, setTemplate] = useState<Template | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,15 +51,6 @@ export default function TemplatePage() {
 
   function updateField(field: keyof Template, value: string) {
     setTemplate((prev) => (prev ? { ...prev, [field]: value } : prev));
-  }
-
-  function insertToken(field: keyof Template, token: string) {
-    setTemplate((prev) => {
-      if (!prev) return prev;
-      const current = (prev[field] as string | null | undefined) ?? "";
-      const sep = current && !current.endsWith(" ") ? " " : "";
-      return { ...prev, [field]: `${current}${sep}${token}` };
-    });
   }
 
   async function patch(data: Partial<Template>) {
@@ -195,13 +180,12 @@ export default function TemplatePage() {
         </Section>
 
         <Section icon={Zap} color="text-brand-600 bg-brand-50 border-brand-200" title="DM greeting" desc="First DM sent to the commenter, with a button">
-          <Textarea
+          <MessageInput
             label="Greeting message"
             value={template.greetingMessage}
-            onChange={(e) => updateField("greetingMessage", e.target.value)}
+            onChange={(val) => updateField("greetingMessage", val)}
             rows={3}
           />
-          <TokenChips onInsert={(t) => insertToken("greetingMessage", t)} />
           <Input
             label="Button text"
             value={template.greetingButtonText}
@@ -210,34 +194,32 @@ export default function TemplatePage() {
         </Section>
 
         <Section icon={UserCheck} color="text-amber-600 bg-amber-50 border-amber-200" title="Follow gate" desc="Shown until the user follows you">
-          <Textarea
+          <MessageInput
             label="Follow-required message"
             value={template.followMessage}
-            onChange={(e) => updateField("followMessage", e.target.value)}
+            onChange={(val) => updateField("followMessage", val)}
             rows={3}
           />
-          <TokenChips onInsert={(t) => insertToken("followMessage", t)} />
           <Input
             label="Button text"
             value={template.followButtonText}
             onChange={(e) => updateField("followButtonText", e.target.value)}
           />
-          <Textarea
+          <MessageInput
             label="Still-not-following message (loops until they follow)"
             value={template.followRetryMessage}
-            onChange={(e) => updateField("followRetryMessage", e.target.value)}
+            onChange={(val) => updateField("followRetryMessage", val)}
             rows={3}
           />
         </Section>
 
         <Section icon={Link2} color="text-emerald-600 bg-emerald-50 border-emerald-200" title="Final details" desc="Sent once the follow is confirmed">
-          <Textarea
+          <MessageInput
             label="Details message"
             value={template.detailsMessage}
-            onChange={(e) => updateField("detailsMessage", e.target.value)}
+            onChange={(val) => updateField("detailsMessage", val)}
             rows={3}
           />
-          <TokenChips onInsert={(t) => insertToken("detailsMessage", t)} />
           <Input
             label="Button text"
             value={template.detailsButtonText}
@@ -253,24 +235,6 @@ export default function TemplatePage() {
           />
         </Section>
       </div>
-    </div>
-  );
-}
-
-function TokenChips({ onInsert }: { onInsert: (token: string) => void }) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs text-gray-400 mr-0.5">Insert:</span>
-      {TOKENS.map((t) => (
-        <button
-          key={t.token}
-          type="button"
-          onClick={() => onInsert(t.token)}
-          className="text-xs px-2 py-1 rounded-md bg-brand-50 text-brand-700 border border-brand-200 hover:bg-brand-100 cursor-pointer"
-        >
-          {t.label}
-        </button>
-      ))}
     </div>
   );
 }
