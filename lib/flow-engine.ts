@@ -15,7 +15,8 @@
  */
 
 import { db } from "./db";
-import { sendDM, checkFollowerStatus, type SendResult } from "./instagram";
+import { sendDM, getUserProfile, type SendResult } from "./instagram";
+import { personalize, type Person } from "./personalize";
 
 export type FlowState = "greeted" | "follow_requested" | "completed";
 
@@ -71,7 +72,8 @@ export async function handleNewComment(opts: {
     { commentId: opts.commentId },
     {
       type: "button",
-      text: automation.greetingMessage,
+      // Only the username is known at comment time; {{first_name}} falls back to it.
+      text: personalize(automation.greetingMessage, { username: opts.senderUsername }),
       buttons: [
         {
           kind: "postback",
@@ -114,21 +116,28 @@ export async function handlePostback(opts: {
   if (conversation.state === "greeted") await bump(automationId, "greetingClicked");
   else if (conversation.state === "follow_requested") await bump(automationId, "followClicked");
 
+  // One profile lookup serves both the follow check and message personalization.
+  // Fail closed: a missing/failed lookup counts as "not following".
+  const profile = await getUserProfile(opts.senderIgUserId, opts.pageToken);
+  const isFollower = profile?.is_user_follow_business === true;
+  const person: Person = {
+    username: profile?.username ?? conversation.igUsername,
+    name: profile?.name,
+  };
+
   // Already delivered once — resend rather than leaving them with a dead button.
   if (conversation.state === "completed") {
-    const result = await sendDetailsMessage(automation, opts);
+    const result = await sendDetailsMessage(automation, opts, person);
     await noteSend(conversation.id, result, "details");
     return;
   }
-
-  const isFollower = await checkFollowerStatus(opts.senderIgUserId, opts.pageToken);
 
   if (isFollower) {
     // If they were previously gated as "not following" and are now following,
     // this reel earned the follow — count it.
     const isNewFollow = conversation.state === "follow_requested";
 
-    const result = await sendDetailsMessage(automation, opts);
+    const result = await sendDetailsMessage(automation, opts, person);
     await noteSend(conversation.id, result, "details");
     if (result.ok) await bump(automationId, "detailsSent");
     if (isNewFollow) await bump(automationId, "followsGained");
@@ -150,7 +159,10 @@ export async function handlePostback(opts: {
     { id: opts.senderIgUserId },
     {
       type: "button",
-      text: isFirstRefusal ? automation.followMessage : automation.followRetryMessage,
+      text: personalize(
+        isFirstRefusal ? automation.followMessage : automation.followRetryMessage,
+        person
+      ),
       buttons: [
         {
           kind: "postback",
@@ -174,9 +186,11 @@ export async function handlePostback(opts: {
 
 async function sendDetailsMessage(
   automation: { detailsMessage: string; detailsButtonText: string; detailsUrl: string },
-  opts: SendContext
+  opts: SendContext,
+  person: Person = {}
 ): Promise<SendResult> {
   const link = automation.detailsUrl?.trim();
+  const text = personalize(automation.detailsMessage, person);
 
   return sendDM(
     opts.pageId,
@@ -184,12 +198,12 @@ async function sendDetailsMessage(
     link
       ? {
           type: "button",
-          text: automation.detailsMessage,
+          text,
           buttons: [{ kind: "url", title: automation.detailsButtonText, url: link }],
         }
       : // No link configured — a button template whose button does nothing is
         // worse than plain text, so just send the message.
-        { type: "text", text: automation.detailsMessage },
+        { type: "text", text },
     opts.pageToken
   );
 }

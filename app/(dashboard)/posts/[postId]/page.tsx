@@ -235,6 +235,9 @@ export default function FlowEditorPage() {
         </div>
       )}
 
+      {/* ManyChat-style visual flow */}
+      <FlowCanvas v={v} stats={stats} onSelect={setActiveStep} className="mb-6" />
+
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Step navigator + editor */}
         <div className="lg:col-span-2 space-y-4">
@@ -285,6 +288,7 @@ export default function FlowEditorPage() {
                   value={v.greetingMessage}
                   onChange={(e) => updateField("greetingMessage", e.target.value)}
                   disabled={!editing}
+                  hint="Personalize with {{first_name}} or {{username}}"
                   rows={3}
                 />
                 <Input
@@ -375,31 +379,6 @@ export default function FlowEditorPage() {
             )}
           </div>
 
-          {/* Flow diagram */}
-          <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Flow Overview</h3>
-            <div className="flex flex-col gap-1">
-              {[
-                { label: "💬 User comments on post", sub: "Triggers automation" },
-                { label: "📢 Public comment reply", sub: v.commentReplyText.slice(0, 40) + "…" },
-                { label: "📩 DM: Greeting", sub: v.greetingMessage.slice(0, 40) + "…" },
-                { label: "👥 Follower check", sub: "Is user following your account?" },
-                { label: "🚫 Not following → Follow gate", sub: v.followMessage.slice(0, 40) + "…" },
-                { label: "✅ Following → Final details", sub: v.detailsMessage.slice(0, 40) + "…" },
-              ].map((item, i) => (
-                <div key={i} className="flex gap-3 items-start">
-                  <div className="flex flex-col items-center">
-                    <div className="w-2 h-2 rounded-full bg-brand-400 mt-1.5 shrink-0" />
-                    {i < 5 && <div className="w-0.5 h-5 bg-gray-100 my-0.5" />}
-                  </div>
-                  <div className="pb-1">
-                    <p className="text-xs font-medium text-gray-700">{item.label}</p>
-                    <p className="text-xs text-gray-400">{item.sub}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Right panel: Conversations */}
@@ -509,6 +488,152 @@ function StepMetrics({ step }: { step: Step }) {
       )}
       <p className="text-[10px] text-gray-400 mt-2">Opens aren&apos;t reported by Instagram, so they&apos;re not shown.</p>
     </div>
+  );
+}
+
+// ── ManyChat-style visual flow ────────────────────────────────────────────────
+
+function FlowCanvas({
+  v, stats, onSelect, className = "",
+}: {
+  v: Automation;
+  stats: Stats | null;
+  onSelect: (id: string) => void;
+  className?: string;
+}) {
+  const step = (k: string) => stats?.steps.find((s) => s.key === k);
+  const ev = (k: string, name: string) => step(k)?.events.find((e) => e.name === name);
+
+  return (
+    <div className={`bg-white rounded-xl border border-gray-100 p-5 shadow-sm ${className}`}>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-gray-700">Flow builder</h3>
+        <span className="text-xs text-gray-400">Tap a card to edit it</span>
+      </div>
+
+      <div className="flex items-stretch overflow-x-auto pb-2">
+        {/* Trigger */}
+        <button
+          onClick={() => onSelect("comment")}
+          className="text-left shrink-0 w-64 rounded-xl border border-gray-200 bg-white overflow-hidden hover:border-brand-300 hover:shadow-md transition-all"
+        >
+          <div className="bg-emerald-50 px-4 py-2 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-emerald-600" />
+            <span className="text-sm font-semibold text-gray-800">When…</span>
+          </div>
+          <div className="p-3">
+            <div className="flex items-center gap-2 mb-2">
+              {v.postThumbnail ? (
+                <div className="relative w-9 h-9 rounded overflow-hidden shrink-0">
+                  <Image src={v.postThumbnail} alt="" fill className="object-cover" />
+                </div>
+              ) : (
+                <MessageSquare className="w-5 h-5 text-gray-300 shrink-0" />
+              )}
+              <p className="text-xs font-medium text-gray-700">Someone comments on this reel</p>
+            </div>
+            <div className="bg-gray-100 text-gray-700 text-xs rounded-xl p-2 line-clamp-2">
+              ↩ {v.commentReplyText || "—"}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-2">
+              {ev("comment", "Replied")?.total ?? 0} comments handled
+            </p>
+          </div>
+        </button>
+
+        <Arrow />
+
+        {/* Message #1 — greeting + follow check */}
+        <MessageNode
+          title="Send Message #1"
+          onClick={() => onSelect("greeting")}
+          reached={step("greeting")?.reached}
+          metrics={[
+            { label: "Sent", value: ev("greeting", "Sent")?.total ?? 0 },
+            { label: "Delivered", value: ev("greeting", "Delivered")?.total ?? 0, pct: 100 },
+            { label: "Clicked", value: ev("greeting", "Clicks")?.total ?? 0, pct: ev("greeting", "Clicks")?.pct },
+          ]}
+          text={v.greetingMessage}
+          button={v.greetingButtonText}
+          buttonCtr={stats?.greetingCtr}
+        />
+
+        <Arrow />
+
+        {/* Message #2 — final details */}
+        <MessageNode
+          title="Send Message #2"
+          onClick={() => onSelect("details")}
+          reached={step("details")?.reached}
+          metrics={[{ label: "Sent", value: ev("details", "Sent")?.total ?? 0, pct: 100 }]}
+          text={v.detailsMessage}
+          button={v.detailsButtonText}
+          link={v.detailsUrl}
+        />
+      </div>
+
+      <p className="text-xs text-gray-400 mt-3">
+        Between #1 and #2, if they aren&apos;t following, the follow-gate DM is sent and loops until they
+        follow. Personalize any message with <code>{"{{first_name}}"}</code> or <code>{"{{username}}"}</code>.
+      </p>
+    </div>
+  );
+}
+
+function Arrow() {
+  return (
+    <div className="flex items-center px-1.5 shrink-0 self-center">
+      <div className="w-5 h-0.5 bg-gray-200" />
+      <div className="w-0 h-0 border-y-4 border-y-transparent border-l-[6px] border-l-gray-300" />
+    </div>
+  );
+}
+
+function MessageNode({
+  title, onClick, reached, metrics, text, button, buttonCtr, link,
+}: {
+  title: string;
+  onClick: () => void;
+  reached?: number;
+  metrics: { label: string; value: number; pct?: number }[];
+  text: string;
+  button: string;
+  buttonCtr?: number;
+  link?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="text-left shrink-0 w-72 rounded-xl border border-gray-200 bg-white overflow-hidden hover:border-brand-300 hover:shadow-md transition-all"
+    >
+      <div className="bg-brand-50 px-4 py-2 flex items-center justify-between">
+        <span className="text-sm font-semibold text-gray-800">{title}</span>
+        {typeof reached === "number" && <span className="text-xs text-gray-500">{reached} reached</span>}
+      </div>
+      <div className="px-4 py-3 flex gap-5 border-b border-gray-100">
+        {metrics.map((m) => (
+          <div key={m.label}>
+            <p className="text-sm font-bold text-gray-900">
+              {m.value}
+              {typeof m.pct === "number" && <span className="text-emerald-600 text-xs font-medium ml-1">{m.pct}%</span>}
+            </p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide">{m.label}</p>
+          </div>
+        ))}
+      </div>
+      <div className="p-3">
+        <div className="bg-gray-100 text-gray-800 text-xs rounded-2xl rounded-tl-sm p-3 leading-relaxed whitespace-pre-line mb-2 line-clamp-4">
+          {text || "—"}
+        </div>
+        <div className="border border-gray-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-brand-600 truncate">{button || "Button"}</span>
+          <span className="flex items-center gap-1 shrink-0">
+            {typeof buttonCtr === "number" && <span className="text-xs text-brand-500 font-medium">CTR {buttonCtr}%</span>}
+            {link ? <Link2 className="w-3 h-3 text-brand-400" /> : <ChevronRight className="w-3 h-3 text-brand-400" />}
+          </span>
+        </div>
+      </div>
+    </button>
   );
 }
 

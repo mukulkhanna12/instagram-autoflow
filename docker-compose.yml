@@ -1,0 +1,38 @@
+# Self-host the whole stack (app + Postgres) anywhere Docker runs — a VPS, or
+# your machine. For Vercel you don't need this; Vercel builds from GitHub.
+#
+#   cp .env.example .env   # fill in the values (DATABASE_URL is set below)
+#   docker compose up -d --build
+#   docker compose exec app npx prisma db push   # first run: create the schema
+#
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: autoflow
+      POSTGRES_PASSWORD: autoflow
+      POSTGRES_DB: autoflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autoflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      # Override DATABASE_URL to point at the bundled Postgres service.
+      DATABASE_URL: postgresql://autoflow:autoflow@db:5432/autoflow
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
