@@ -6,6 +6,11 @@ import { isAllowedEmail, normalizeEmail, verifyLoginCode } from "./otp";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
+  // Auth.js v5 reads AUTH_SECRET by name; pass ours explicitly so NEXTAUTH_SECRET
+  // (or AUTH_SECRET) works. Without a secret, production throws a "Configuration"
+  // error. trustHost is required behind a proxy/host like Vercel.
+  secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+  trustHost: true,
   // Credentials-based sign-in requires JWT sessions (there's no OAuth account to
   // persist), so the session id is carried in the token rather than a DB row.
   session: { strategy: "jwt" },
