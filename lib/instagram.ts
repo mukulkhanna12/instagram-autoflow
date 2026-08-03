@@ -12,8 +12,9 @@ export function getMetaAuthUrl(redirectUri: string): string {
       "instagram_manage_messages", // send DMs and read is_user_follow_business
       "pages_show_list", // list the Pages this user manages
       "pages_read_engagement", // resolve Page -> IG account
-      "pages_messaging", // send messages on behalf of the Page
-      "pages_manage_metadata", // POST /{page-id}/subscribed_apps for webhooks
+      // Note: pages_messaging (Messenger-only, not used for IG DMs) and
+      // pages_manage_metadata are omitted — Meta rejects them as invalid for
+      // this app, and IG messaging/comments run on the instagram_* scopes above.
     ].join(","),
     response_type: "code",
   });
