@@ -1,106 +1,123 @@
-const GRAPH_API = "https://graph.facebook.com/v21.0";
+// Instagram API with Instagram Login (graph.instagram.com).
+//
+// Unlike the older Facebook-Page-based flow, this connects an Instagram
+// professional account directly — no Facebook Page, no Page tokens. A single
+// Instagram user access token drives comments, messaging, and the follow check.
+
+const IG_GRAPH = "https://graph.instagram.com/v21.0";
 
 // ── OAuth ────────────────────────────────────────────────────────────────────
 
-export function getMetaAuthUrl(redirectUri: string): string {
+/**
+ * The "Log in with Instagram" authorize URL. One button — the user logs into
+ * their Instagram professional account and approves; no Facebook involved.
+ */
+export function getInstagramAuthUrl(redirectUri: string): string {
   const params = new URLSearchParams({
-    client_id: process.env.META_APP_ID!,
+    client_id: process.env.INSTAGRAM_APP_ID!,
     redirect_uri: redirectUri,
-    scope: [
-      "instagram_basic", // read the connected IG account and its media
-      "instagram_manage_comments", // read comments, post the public reply
-      "instagram_manage_messages", // send DMs and read is_user_follow_business
-      "pages_show_list", // list the Pages this user manages
-      "pages_read_engagement", // resolve Page -> IG account
-      // Note: pages_messaging (Messenger-only, not used for IG DMs) and
-      // pages_manage_metadata are omitted — Meta rejects them as invalid for
-      // this app, and IG messaging/comments run on the instagram_* scopes above.
-    ].join(","),
     response_type: "code",
+    scope: [
+      "instagram_business_basic", // read the account and its media
+      "instagram_business_manage_comments", // read comments, post the public reply
+      "instagram_business_manage_messages", // send DMs and read is_user_follow_business
+    ].join(","),
   });
-  return `https://www.facebook.com/v19.0/dialog/oauth?${params}`;
+  return `https://www.instagram.com/oauth/authorize?${params}`;
 }
 
+/**
+ * Exchange the OAuth code for a short-lived token + the Instagram user id.
+ * This endpoint wants form-encoded POST body, not query params.
+ */
 export async function exchangeCodeForToken(
   code: string,
   redirectUri: string
-): Promise<{ access_token: string; token_type: string }> {
-  const params = new URLSearchParams({
-    client_id: process.env.META_APP_ID!,
-    client_secret: process.env.META_APP_SECRET!,
+): Promise<{ access_token: string; user_id: string }> {
+  const body = new URLSearchParams({
+    client_id: process.env.INSTAGRAM_APP_ID!,
+    client_secret: process.env.INSTAGRAM_APP_SECRET!,
+    grant_type: "authorization_code",
     redirect_uri: redirectUri,
     code,
   });
-  const res = await fetch(`${GRAPH_API}/oauth/access_token?${params}`);
+  const res = await fetch("https://api.instagram.com/oauth/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  const data = await res.json();
+  return { access_token: data.access_token, user_id: String(data.user_id) };
 }
 
+/** Trade the short-lived token for a ~60-day long-lived one. */
 export async function getLongLivedToken(
   shortToken: string
 ): Promise<{ access_token: string; expires_in: number }> {
   const params = new URLSearchParams({
-    grant_type: "fb_exchange_token",
-    client_id: process.env.META_APP_ID!,
-    client_secret: process.env.META_APP_SECRET!,
-    fb_exchange_token: shortToken,
+    grant_type: "ig_exchange_token",
+    client_secret: process.env.INSTAGRAM_APP_SECRET!,
+    access_token: shortToken,
   });
-  const res = await fetch(`${GRAPH_API}/oauth/access_token?${params}`);
+  const res = await fetch(`${IG_GRAPH}/access_token?${params}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-// ── Pages & Instagram accounts ───────────────────────────────────────────────
-
-export async function getUserPages(
-  accessToken: string
-): Promise<Array<{ id: string; name: string; access_token: string }>> {
-  const res = await fetch(
-    `${GRAPH_API}/me/accounts?fields=id,name,access_token&access_token=${accessToken}`
-  );
+/** Refresh a long-lived token to extend it another ~60 days. */
+export async function refreshLongLivedToken(
+  token: string
+): Promise<{ access_token: string; expires_in: number }> {
+  const params = new URLSearchParams({
+    grant_type: "ig_refresh_token",
+    access_token: token,
+  });
+  const res = await fetch(`${IG_GRAPH}/refresh_access_token?${params}`);
   if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  return data.data ?? [];
+  return res.json();
 }
 
-export async function getInstagramAccountForPage(
-  pageId: string,
-  pageToken: string
+// ── Account ──────────────────────────────────────────────────────────────────
+
+/** The connected Instagram professional account's own profile. */
+export async function getInstagramProfile(
+  accessToken: string
 ): Promise<{ id: string; username: string; profile_picture_url?: string } | null> {
   const res = await fetch(
-    `${GRAPH_API}/${pageId}?fields=instagram_business_account{id,username,profile_picture_url}&access_token=${pageToken}`
+    `${IG_GRAPH}/me?fields=user_id,username,profile_picture_url&access_token=${accessToken}`
   );
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.error("getInstagramProfile error:", await res.text());
+    return null;
+  }
   const data = await res.json();
-  return data.instagram_business_account ?? null;
+  return {
+    id: String(data.user_id ?? data.id),
+    username: data.username,
+    profile_picture_url: data.profile_picture_url,
+  };
 }
 
 // ── Webhook subscription ─────────────────────────────────────────────────────
 
 /**
- * Subscribe the Page to webhook deliveries.
- *
- * Configuring the callback URL in the Meta dashboard is only half of it — until
- * the Page itself is subscribed, Instagram delivers nothing and the automation
- * silently never fires. This runs when an account is connected.
- *
- * `comments` covers new comments on posts and reels; `messages` and
- * `messaging_postbacks` cover people tapping the buttons in the DM.
+ * Subscribe this Instagram account to webhook deliveries. Configuring the
+ * callback URL in the dashboard only subscribes the app; the account itself
+ * must be subscribed too, or nothing is delivered. Runs on connect.
  */
 export async function subscribeToWebhooks(
-  pageId: string,
-  pageToken: string
+  igUserId: string,
+  accessToken: string
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${GRAPH_API}/${pageId}/subscribed_apps`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subscribed_fields: ["comments", "messages", "messaging_postbacks"],
-        access_token: pageToken,
-      }),
+    const params = new URLSearchParams({
+      subscribed_fields: "comments,messages",
+      access_token: accessToken,
     });
-
+    const res = await fetch(`${IG_GRAPH}/${igUserId}/subscribed_apps?${params}`, {
+      method: "POST",
+    });
     if (!res.ok) {
       console.error("subscribeToWebhooks error:", await res.text());
       return false;
@@ -134,7 +151,7 @@ export async function getInstagramPosts(
   const fields =
     "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count";
   const res = await fetch(
-    `${GRAPH_API}/${igUserId}/media?fields=${fields}&limit=${limit}&access_token=${accessToken}`
+    `${IG_GRAPH}/${igUserId}/media?fields=${fields}&limit=${limit}&access_token=${accessToken}`
   );
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
@@ -148,14 +165,13 @@ export async function replyToComment(
   message: string,
   accessToken: string
 ): Promise<void> {
-  const res = await fetch(`${GRAPH_API}/${commentId}/replies`, {
+  const res = await fetch(`${IG_GRAPH}/${commentId}/replies`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, access_token: accessToken }),
   });
   if (!res.ok) {
-    const err = await res.text();
-    console.error("replyToComment error:", err);
+    console.error("replyToComment error:", await res.text());
   }
 }
 
@@ -196,20 +212,21 @@ export interface SendResult {
   error?: string;
 }
 
+/**
+ * Send a DM from the connected Instagram account. Posts to /{ig-user-id}/messages
+ * with the account's own access token.
+ */
 export async function sendDM(
-  pageId: string,
+  igUserId: string,
   to: DmRecipient,
   message: TextMessage | ButtonMessage,
-  pageToken: string
+  accessToken: string
 ): Promise<SendResult> {
   const recipient = toRecipientPayload(to);
   let body: Record<string, unknown>;
 
   if (message.type === "text") {
-    body = {
-      recipient,
-      message: { text: message.text },
-    };
+    body = { recipient, message: { text: message.text } };
   } else {
     body = {
       recipient,
@@ -230,9 +247,7 @@ export async function sendDM(
     };
   }
 
-  // NOTE: sends go to /{page-id}/messages. If a live test shows Instagram wants
-  // the IG-user-id / graph.instagram.com path for this account type, adjust here.
-  const res = await fetch(`${GRAPH_API}/${pageId}/messages?access_token=${pageToken}`, {
+  const res = await fetch(`${IG_GRAPH}/${igUserId}/messages?access_token=${accessToken}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -258,21 +273,17 @@ export interface IgUserProfile {
 }
 
 /**
- * Look up the person we're talking to in DMs.
- *
- * This is the Instagram Messaging user-profile endpoint, keyed on the IGSID
- * (the sender id that arrives in the webhook — NOT the public @username id).
- * It only works for people who have an open conversation with the account,
- * which is always true here: we only ever call it after they've tapped a button
- * in a DM, and a postback counts as a message from them.
+ * Look up the person we're talking to in DMs, keyed on their IGSID (the sender
+ * id from the webhook). Only works for people with an open conversation, which
+ * is always true here — we only call it after they've tapped a button.
  */
 export async function getUserProfile(
   igsid: string,
-  pageToken: string
+  accessToken: string
 ): Promise<IgUserProfile | null> {
   const fields = "name,username,profile_pic,is_user_follow_business,is_business_follow_user";
   try {
-    const res = await fetch(`${GRAPH_API}/${igsid}?fields=${fields}&access_token=${pageToken}`);
+    const res = await fetch(`${IG_GRAPH}/${igsid}?fields=${fields}&access_token=${accessToken}`);
     if (!res.ok) {
       console.error("getUserProfile error:", await res.text());
       return null;
@@ -285,28 +296,21 @@ export async function getUserProfile(
 }
 
 /**
- * Is this person following the connected account?
- *
- * There is no endpoint that lists an account's followers — Meta has never
- * exposed one — so the only supported way to answer this is the
- * `is_user_follow_business` flag on the Messaging user profile above.
- *
- * Fails closed: if the lookup errors or the field is missing we return false,
- * so the follow gate holds rather than letting everyone through. The error is
- * logged loudly because a permission problem here looks identical to "user
- * hasn't followed" from the outside.
+ * Is this person following the connected account? The only supported signal is
+ * `is_user_follow_business` on their messaging profile. Fails closed: any error
+ * or a missing field counts as "not following", so the gate holds.
  */
 export async function checkFollowerStatus(
   igsid: string,
-  pageToken: string
+  accessToken: string
 ): Promise<boolean> {
-  const profile = await getUserProfile(igsid, pageToken);
+  const profile = await getUserProfile(igsid, accessToken);
   if (!profile) return false;
 
   if (typeof profile.is_user_follow_business !== "boolean") {
     console.error(
-      `is_user_follow_business missing for ${igsid} — check the app has instagram_manage_messages ` +
-        `and the account is a Business/Creator account.`
+      `is_user_follow_business missing for ${igsid} — check the app has ` +
+        `instagram_business_manage_messages and the account is professional.`
     );
     return false;
   }

@@ -85,10 +85,9 @@ function SettingsContent() {
       {errorMsg && (
         <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
           <AlertCircle className="w-5 h-5 shrink-0" />
-          {errorMsg === "no_pages" && "No Facebook Pages found. Make sure you have a Page linked to your Instagram Business account."}
-          {errorMsg === "no_instagram" && "No Instagram Business account found on your Pages."}
+          {errorMsg === "no_instagram" && "Couldn't read your Instagram account. Make sure it's a professional (Business or Creator) account."}
           {errorMsg === "instagram_auth_failed" && "Instagram authorization failed. Please try again."}
-          {!["no_pages", "no_instagram", "instagram_auth_failed"].includes(errorMsg) && "Something went wrong. Please try again."}
+          {!["no_instagram", "instagram_auth_failed"].includes(errorMsg) && "Something went wrong. Please try again."}
         </div>
       )}
 
@@ -136,7 +135,7 @@ function SettingsContent() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <p className="text-sm text-gray-600">No Instagram account connected</p>
-                <p className="text-xs text-gray-400 mt-1">Requires an Instagram <strong>Business</strong> or <strong>Creator</strong> account linked to a Facebook Page</p>
+                <p className="text-xs text-gray-400 mt-1">One click — log in with your Instagram <strong>Business</strong> or <strong>Creator</strong> account. No Facebook Page needed.</p>
               </div>
               <a
                 href="/api/instagram/connect"
@@ -178,7 +177,7 @@ function SettingsContent() {
           <div>
             <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1.5">Verify Token</label>
             <code className="block bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono text-gray-700">
-              {process.env.NEXT_PUBLIC_META_APP_ID ? "Set in your .env as META_WEBHOOK_VERIFY_TOKEN" : "Set in your .env as META_WEBHOOK_VERIFY_TOKEN"}
+              Your META_WEBHOOK_VERIFY_TOKEN value (from your environment variables)
             </code>
           </div>
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
@@ -200,10 +199,10 @@ function SettingsContent() {
         <CardBody className="space-y-3">
           {[
             { num: "1", title: "Create a Meta Developer App", link: "https://developers.facebook.com/apps", text: "Go to developers.facebook.com → Create App → Business type" },
-            { num: "2", title: "Add Instagram Graph API product", text: "In your app dashboard → Add Product → Instagram Graph API" },
-            { num: "3", title: "Configure OAuth redirect URI", text: `Add this URL to your app's valid OAuth redirect URIs:\n${appUrl}/api/instagram/callback` },
-            { num: "4", title: "Set up Webhooks", text: "Add Instagram Webhooks product → use the Webhook URL above and your verify token from .env" },
-            { num: "5", title: "Connect your account", text: "Use the Connect Instagram button above to link your Business account" },
+            { num: "2", title: "Add the Instagram product (with Instagram login)", text: "In your app dashboard → Add Product → Instagram → 'API setup with Instagram login'. Copy the Instagram App ID and Secret into INSTAGRAM_APP_ID / INSTAGRAM_APP_SECRET." },
+            { num: "3", title: "Configure OAuth redirect URI", text: `Under Instagram → Business login settings, add:\n${appUrl}/api/instagram/callback` },
+            { num: "4", title: "Set up Webhooks", text: "Under the Instagram product → Webhooks: use the Webhook URL above + your verify token, subscribe to comments and messages." },
+            { num: "5", title: "Connect your account", text: "Use the Connect Instagram button above — one click, no Facebook Page needed." },
           ].map((step) => (
             <div key={step.num} className="flex gap-3">
               <div className="w-6 h-6 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">

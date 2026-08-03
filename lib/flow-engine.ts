@@ -21,9 +21,9 @@ import { personalize, type Person } from "./personalize";
 export type FlowState = "greeted" | "follow_requested" | "completed";
 
 interface SendContext {
-  pageId: string;
+  igUserId: string;
   senderIgUserId: string;
-  pageToken: string;
+  accessToken: string;
 }
 
 export async function handleNewComment(opts: {
@@ -31,8 +31,8 @@ export async function handleNewComment(opts: {
   commentId: string;
   senderIgUserId: string;
   senderUsername?: string;
-  pageId: string;
-  pageToken: string;
+  igUserId: string;
+  accessToken: string;
 }): Promise<void> {
   const automation = await db.postAutomation.findUnique({
     where: { id: opts.automationId },
@@ -68,7 +68,7 @@ export async function handleNewComment(opts: {
   // First contact: Instagram has no open messaging window with this person yet,
   // so the greeting must be sent as a private reply addressed to their comment.
   const result = await sendDM(
-    opts.pageId,
+    opts.igUserId,
     { commentId: opts.commentId },
     {
       type: "button",
@@ -82,7 +82,7 @@ export async function handleNewComment(opts: {
         },
       ],
     },
-    opts.pageToken
+    opts.accessToken
   );
   await noteSend(convo.id, result, "greeting");
   if (result.ok) await bump(opts.automationId, "greetingSent");
@@ -91,8 +91,8 @@ export async function handleNewComment(opts: {
 export async function handlePostback(opts: {
   payload: string;
   senderIgUserId: string;
-  pageId: string;
-  pageToken: string;
+  igUserId: string;
+  accessToken: string;
 }): Promise<void> {
   const [action, automationId] = opts.payload.split(":");
   if (!automationId) return;
@@ -118,7 +118,7 @@ export async function handlePostback(opts: {
 
   // One profile lookup serves both the follow check and message personalization.
   // Fail closed: a missing/failed lookup counts as "not following".
-  const profile = await getUserProfile(opts.senderIgUserId, opts.pageToken);
+  const profile = await getUserProfile(opts.senderIgUserId, opts.accessToken);
   const isFollower = profile?.is_user_follow_business === true;
   const person: Person = {
     username: profile?.username ?? conversation.igUsername,
@@ -155,7 +155,7 @@ export async function handlePostback(opts: {
   const isFirstRefusal = conversation.state === "greeted";
 
   const result = await sendDM(
-    opts.pageId,
+    opts.igUserId,
     { id: opts.senderIgUserId },
     {
       type: "button",
@@ -171,7 +171,7 @@ export async function handlePostback(opts: {
         },
       ],
     },
-    opts.pageToken
+    opts.accessToken
   );
   await noteSend(conversation.id, result, "follow-required");
   if (result.ok) await bump(automationId, "followSent");
@@ -193,7 +193,7 @@ async function sendDetailsMessage(
   const text = personalize(automation.detailsMessage, person);
 
   return sendDM(
-    opts.pageId,
+    opts.igUserId,
     { id: opts.senderIgUserId },
     link
       ? {
@@ -204,7 +204,7 @@ async function sendDetailsMessage(
       : // No link configured — a button template whose button does nothing is
         // worse than plain text, so just send the message.
         { type: "text", text },
-    opts.pageToken
+    opts.accessToken
   );
 }
 

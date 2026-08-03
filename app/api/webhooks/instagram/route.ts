@@ -20,12 +20,12 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * Meta signs every delivery with the app secret. Without this check, anyone who
- * knows the URL could POST a fake comment event and make the account DM
+ * Instagram signs every delivery with the app secret. Without this check, anyone
+ * who knows the URL could POST a fake comment event and make the account DM
  * arbitrary people, so an unsigned or mis-signed body is rejected outright.
  */
 function isValidSignature(rawBody: string, header: string | null): boolean {
-  const appSecret = process.env.META_APP_SECRET;
+  const appSecret = process.env.INSTAGRAM_APP_SECRET;
   if (!appSecret || !header?.startsWith("sha256=")) return false;
 
   const expected = crypto.createHmac("sha256", appSecret).update(rawBody, "utf8").digest("hex");
@@ -39,8 +39,8 @@ function isValidSignature(rawBody: string, header: string | null): boolean {
 // ── Webhook events ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  // Read the body as text: the signature covers the exact bytes Meta sent, so
-  // it has to be checked before any parse/re-serialise.
+  // Read the body as text: the signature covers the exact bytes sent, so it has
+  // to be checked before any parse/re-serialise.
   const rawBody = await req.text();
 
   if (!isValidSignature(rawBody, req.headers.get("x-hub-signature-256"))) {
@@ -56,13 +56,14 @@ export async function POST(req: NextRequest) {
   }
 
   for (const entry of body.entry ?? []) {
-    const pageId = entry.id as string;
+    // With Instagram Login, entry.id is the connected Instagram account's id.
+    const accountId = entry.id as string;
 
     // ── Comment events ──────────────────────────────────────────────────────
     for (const change of (entry.changes as Array<Record<string, unknown>>) ?? []) {
       if (change.field === "comments") {
         try {
-          await handleCommentChange(pageId, change.value as Record<string, unknown>);
+          await handleCommentChange(accountId, change.value as Record<string, unknown>);
         } catch (err) {
           console.error("comment handler failed:", err);
         }
@@ -72,21 +73,21 @@ export async function POST(req: NextRequest) {
     // ── DM / postback events ────────────────────────────────────────────────
     for (const event of (entry.messaging as Array<Record<string, unknown>>) ?? []) {
       try {
-        await handleMessagingEvent(pageId, event);
+        await handleMessagingEvent(event);
       } catch (err) {
         console.error("messaging handler failed:", err);
       }
     }
   }
 
-  // Always 200 once the delivery is authentic: a non-200 makes Meta retry the
-  // whole batch, which would re-send DMs people have already received.
+  // Always 200 once the delivery is authentic: a non-200 makes Instagram retry
+  // the whole batch, which would re-send DMs people have already received.
   return NextResponse.json({ status: "ok" });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function handleCommentChange(pageId: string, value: Record<string, unknown>) {
+async function handleCommentChange(accountId: string, value: Record<string, unknown>) {
   const mediaId = (value.media as { id?: string })?.id;
   const commentId = value.id as string;
   const senderIgUserId = (value.from as { id?: string })?.id;
@@ -101,11 +102,10 @@ async function handleCommentChange(pageId: string, value: Record<string, unknown
     include: { igAccount: true },
   });
 
-  // No automation at all → this is likely a reel uploaded after the account's
-  // default template was enabled. Materialize one from the template so future
-  // reels start working the moment someone comments, with nothing to click.
+  // No automation at all → likely a reel uploaded after the account's default
+  // template was enabled. Materialize one so future reels work with no clicks.
   if (!automation) {
-    automation = await materializeFromTemplate(pageId, mediaId);
+    automation = await materializeFromTemplate(accountId, mediaId);
     if (!automation) return;
   }
 
@@ -117,14 +117,13 @@ async function handleCommentChange(pageId: string, value: Record<string, unknown
   // account would keep replying to its own replies forever.
   if (senderIgUserId === igAccount.instagramId) return;
 
-  // Meta retries deliveries, and each retry would otherwise post another public
-  // reply on the same comment and re-send the greeting DM.
+  // Retries would otherwise post another public reply and re-send the greeting.
   const alreadyHandled = await db.conversation.findFirst({
     where: { automationId: automation.id, commentId },
   });
   if (alreadyHandled) return;
 
-  const pageToken = igAccount.pageAccessToken ?? igAccount.accessToken;
+  const token = igAccount.accessToken;
 
   // Post a random one of the configured reply variants so repeated replies on a
   // reel don't look automated (Instagram can flag identical replies as spam).
@@ -137,7 +136,7 @@ async function handleCommentChange(pageId: string, value: Record<string, unknown
     .filter((t): t is string => !!t);
   const reply = replyPool[Math.floor(Math.random() * replyPool.length)] ?? automation.commentReplyText;
 
-  await replyToComment(commentId, reply, pageToken);
+  await replyToComment(commentId, reply, token);
 
   // Count this as one comment handled (dedup above ensures one per comment id).
   await db.postAutomation.update({
@@ -150,8 +149,8 @@ async function handleCommentChange(pageId: string, value: Record<string, unknown
     commentId,
     senderIgUserId,
     senderUsername,
-    pageId: igAccount.pageId ?? pageId,
-    pageToken,
+    igUserId: igAccount.instagramId,
+    accessToken: token,
   });
 }
 
@@ -159,13 +158,10 @@ async function handleCommentChange(pageId: string, value: Record<string, unknown
  * Create an automation for a reel that has none yet, copying the owning
  * account's default template — but only if that template is enabled. Returns the
  * new automation (with its account) or null when there's no enabled template.
- *
- * The webhook only carries the page/IG id and the media id, so the account is
- * resolved by matching either identifier (whichever Instagram sent as entry.id).
  */
-async function materializeFromTemplate(pageId: string, mediaId: string) {
+async function materializeFromTemplate(accountId: string, mediaId: string) {
   const igAccount = await db.instagramAccount.findFirst({
-    where: { OR: [{ instagramId: pageId }, { pageId }] },
+    where: { instagramId: accountId },
     include: { template: true },
   });
   if (!igAccount?.template?.enabled) return null;
@@ -178,7 +174,7 @@ async function materializeFromTemplate(pageId: string, mediaId: string) {
   });
 }
 
-async function handleMessagingEvent(pageId: string, event: Record<string, unknown>) {
+async function handleMessagingEvent(event: Record<string, unknown>) {
   const sender = (event.sender as { id?: string })?.id;
   if (!sender) return;
 
@@ -205,7 +201,7 @@ async function handleMessagingEvent(pageId: string, event: Record<string, unknow
   await handlePostback({
     payload,
     senderIgUserId: sender,
-    pageId: igAccount.pageId ?? pageId,
-    pageToken: igAccount.pageAccessToken ?? igAccount.accessToken,
+    igUserId: igAccount.instagramId,
+    accessToken: igAccount.accessToken,
   });
 }
