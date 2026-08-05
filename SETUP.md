@@ -61,7 +61,8 @@ In the Meta app → **Webhooks → Instagram**, subscribe the Page to:
 Callback URL: `{NEXTAUTH_URL}/api/webhooks/instagram`, verify token: `META_WEBHOOK_VERIFY_TOKEN`.
 
 Deliveries are rejected unless they carry a valid `X-Hub-Signature-256` for your
-`META_APP_SECRET`, so the secret must be set correctly or every event 401s.
+`INSTAGRAM_APP_SECRET`, so the secret must be set correctly or every event 401s
+— silently, with no reply and no DM. See the README for a one-command check.
 
 ### How the follow check works
 
@@ -145,7 +146,9 @@ The daily jobs in `vercel.json` run automatically once deployed:
 
 - `/api/cron/refresh-tokens` — keeps the long-lived Instagram token alive (it
   otherwise expires ~60 days after you connect, silently stopping everything).
-- `/api/cron/sync-posts` — pre-creates automations for new reels from your
-  default template so they show in the dashboard.
+- `/api/cron/sync-posts` — attaches the next flow from your **Upcoming reels**
+  queue to any new reel, so it shows in the dashboard before its first comment.
+  (The webhook does the same on first comment; on the free plan this cron only
+  runs once a day, so the comment path is what makes it feel immediate.)
 
 Vercel's free plan allows daily crons and up to two jobs — exactly these two.

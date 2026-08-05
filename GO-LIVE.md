@@ -49,8 +49,8 @@ Set these env vars in Vercel (Project → Settings → Environment Variables), t
 | `RESEND_API_KEY` | from Resend |
 | `NEXTAUTH_URL` | set after first deploy (step below) |
 | `NEXT_PUBLIC_APP_URL` | same as NEXTAUTH_URL |
-| `META_APP_ID` / `META_APP_SECRET` | from step 5 |
-| `NEXT_PUBLIC_META_APP_ID` | same as META_APP_ID |
+| `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` | from step 5 |
+
 | `META_WEBHOOK_VERIFY_TOKEN` | your generated token |
 
 After the first deploy you get a URL like `https://instagram-autoflow-xxxx.vercel.app`.
@@ -64,8 +64,9 @@ Development mode with your own IG account added as a tester.
 
 1. https://developers.facebook.com/apps → **Create App → Business**.
 2. Add products: **Instagram Graph API** and **Webhooks**.
-3. **Settings → Basic**: copy **App ID** → `META_APP_ID` + `NEXT_PUBLIC_META_APP_ID`,
-   **App Secret** → `META_APP_SECRET`.
+3. **Settings → Basic**: copy **App ID** → `INSTAGRAM_APP_ID`, **App Secret** →
+   `INSTAGRAM_APP_SECRET`. (These were called `META_APP_*` before the switch to
+   Instagram Login — the code reads only the `INSTAGRAM_*` names now.)
 4. **App Roles → Roles**: add your own Instagram/Facebook account as **Tester** (and
    accept the invite). This is what lets messaging/comments work without App Review.
 5. **Facebook Login / Instagram → Settings → Valid OAuth Redirect URIs**, add:
@@ -88,7 +89,9 @@ Set the Meta env vars in Vercel and **redeploy**.
 1. Visit your URL → **Sign in** (code emailed to `ALLOWED_LOGIN_EMAIL`).
 2. **Settings → Connect Instagram** → authorize. The app also subscribes your Page
    to webhooks automatically on connect.
-3. **Reels** → pick a reel → set the messages → toggle **Live**.
+3. **Reels** → pick a reel → set the messages → toggle **Live**. For reels you
+   haven't posted yet, prepare flows on **Upcoming reels** instead — each one
+   attaches to the next reel you upload and is then used up.
 4. From a **second** Instagram account (not your admin/tester account), comment on
    that reel. Expect: public reply → greeting DM + button → follow gate → final DM.
 5. Watch it on the **Dashboard** — contacts, comments, final DMs, new follows, CTR.
