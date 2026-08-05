@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { replyToComment } from "@/lib/instagram";
 import { handleNewComment, handlePostback } from "@/lib/flow-engine";
-import { automationCreateFromTemplate } from "@/lib/templates";
+import { attachNextQueuedFlow } from "@/lib/templates";
 import { commentMatchesKeywords } from "@/lib/keywords";
 
 // ── Webhook verification ──────────────────────────────────────────────────────
@@ -104,8 +104,9 @@ async function handleCommentChange(accountId: string, value: Record<string, unkn
     include: { igAccount: true },
   });
 
-  // No automation at all → likely a reel uploaded after the account's default
-  // template was enabled. Materialize one so future reels work with no clicks.
+  // No automation at all → a reel we're seeing for the first time. It gets the
+  // flow prepared at the front of the queue, if there is one; an empty queue
+  // means this reel was never meant to be automated, so leave it alone.
   if (!automation) {
     automation = await materializeFromTemplate(accountId, mediaId);
     if (!automation) return;
@@ -162,23 +163,19 @@ async function handleCommentChange(accountId: string, value: Record<string, unkn
 }
 
 /**
- * Create an automation for a reel that has none yet, copying the owning
- * account's default template — but only if that template is enabled. Returns the
- * new automation (with its account) or null when there's no enabled template.
+ * A comment arrived on a reel with no automation — so this is the first we've
+ * seen of it. Claim the flow at the front of the prepared queue and attach it.
+ *
+ * Returns null when the queue is empty, which is the intended behaviour: a reel
+ * uploaded with nothing prepared for it gets no automation and is left alone.
  */
 async function materializeFromTemplate(accountId: string, mediaId: string) {
   const igAccount = await db.instagramAccount.findFirst({
     where: { instagramId: accountId },
-    include: { template: true },
   });
-  if (!igAccount?.template?.enabled) return null;
+  if (!igAccount) return null;
 
-  return db.postAutomation.upsert({
-    where: { igAccountId_postId: { igAccountId: igAccount.id, postId: mediaId } },
-    create: automationCreateFromTemplate(igAccount.id, mediaId, igAccount.template),
-    update: {}, // a race could create it first; don't clobber an existing one
-    include: { igAccount: true },
-  });
+  return attachNextQueuedFlow(igAccount.id, mediaId);
 }
 
 async function handleMessagingEvent(event: Record<string, unknown>) {

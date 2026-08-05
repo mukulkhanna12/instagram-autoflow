@@ -172,7 +172,7 @@ export default function PostsPage() {
                     {automation ? (
                       <Link
                         href={`/posts/${automation.id}`}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 bg-brand-600 text-white text-xs font-medium px-3 py-2 rounded-lg hover:bg-brand-700 transition-colors"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-600 text-white text-xs font-medium px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
                       >
                         <Zap className="w-3 h-3" /> Configure
                       </Link>

@@ -4,8 +4,24 @@ import { db } from "@/lib/db";
 import { z } from "zod";
 import { buttonsSchema } from "@/lib/schemas";
 
-const updateSchema = z.object({
-  enabled: z.boolean().optional(),
+/** Flows prepared for reels not yet uploaded, front of the queue first. */
+export async function GET() {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const igAccount = await db.instagramAccount.findFirst({ where: { userId: session.user.id } });
+  if (!igAccount) return NextResponse.json({ flows: null });
+
+  const flows = await db.queuedFlow.findMany({
+    where: { igAccountId: igAccount.id },
+    orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+  });
+
+  return NextResponse.json({ flows });
+}
+
+const createSchema = z.object({
+  name: z.string().optional(),
   keywords: z.string().optional(),
   commentReplyText: z.string().optional(),
   commentReplyText2: z.string().optional(),
@@ -22,37 +38,29 @@ const updateSchema = z.object({
   detailsUrl: z.string().optional(),
 });
 
-/** The default-flow template for the signed-in user's Instagram account. */
-export async function GET() {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const igAccount = await db.instagramAccount.findFirst({ where: { userId: session.user.id } });
-  if (!igAccount) return NextResponse.json({ template: null });
-
-  // Lazily create the template row with schema defaults on first view.
-  const template =
-    (await db.automationTemplate.findUnique({ where: { igAccountId: igAccount.id } })) ??
-    (await db.automationTemplate.create({ data: { igAccountId: igAccount.id } }));
-
-  return NextResponse.json({ template });
-}
-
-export async function PATCH(req: NextRequest) {
+/** Add a flow to the back of the queue. Unset fields take the schema defaults. */
+export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const igAccount = await db.instagramAccount.findFirst({ where: { userId: session.user.id } });
   if (!igAccount) return NextResponse.json({ error: "No Instagram account" }, { status: 404 });
 
-  const body = updateSchema.safeParse(await req.json());
+  const body = createSchema.safeParse(await req.json().catch(() => ({})));
   if (!body.success) return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
 
-  const template = await db.automationTemplate.upsert({
+  const last = await db.queuedFlow.findFirst({
     where: { igAccountId: igAccount.id },
-    create: { igAccountId: igAccount.id, ...body.data },
-    update: body.data,
+    orderBy: { position: "desc" },
   });
 
-  return NextResponse.json({ template });
+  const flow = await db.queuedFlow.create({
+    data: {
+      igAccountId: igAccount.id,
+      position: (last?.position ?? -1) + 1,
+      ...body.data,
+    },
+  });
+
+  return NextResponse.json({ flow });
 }

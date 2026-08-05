@@ -99,7 +99,7 @@ export default function DashboardPage() {
         </div>
         <Link
           href="/posts"
-          className="inline-flex items-center gap-2 bg-brand-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-brand-700 transition-colors"
+          className="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors"
         >
           <Plus className="w-4 h-4" /> New automation
         </Link>

@@ -85,18 +85,26 @@ model InstagramAccount {
 
   user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   automations PostAutomation[]
-  template    AutomationTemplate?
+  queuedFlows QueuedFlow[]
 }
 
-// The "default flow for future reels". One per Instagram account. When enabled,
-// any reel that gets a comment and has no automation of its own gets one created
-// on the fly from these fields (see the webhook handler), and a daily sync
-// pre-creates them so they show up in the dashboard. Same message fields as
-// PostAutomation so an auto-created automation is a faithful copy.
-model AutomationTemplate {
-  id          String  @id @default(cuid())
-  igAccountId String  @unique
-  enabled     Boolean @default(false)
+// A flow prepared in advance for a reel you haven't uploaded yet.
+//
+// These form an ordered queue per account. When a new reel appears, the flow at
+// the front is copied onto it and **deleted** — used up. Upload a reel with an
+// empty queue and it simply gets no automation. That's the whole point: each
+// prepared flow belongs to one upcoming reel, rather than a single default
+// blanketing every reel forever.
+//
+// Same message fields as PostAutomation, so what gets attached is a faithful copy.
+model QueuedFlow {
+  id          String @id @default(cuid())
+  igAccountId String
+  // Front of the queue is the lowest position; ties break on createdAt so the
+  // order is always total. Gaps are fine — consuming just deletes a row.
+  position    Int    @default(0)
+  // Optional label so a queue of several is tellable apart in the UI.
+  name        String @default("")
 
   // Optional comment filter. Comma-separated; empty means respond to every
   // comment. When set, a comment must contain at least one of these words
@@ -128,6 +136,8 @@ model AutomationTemplate {
   updatedAt DateTime @updatedAt
 
   igAccount InstagramAccount @relation(fields: [igAccountId], references: [id], onDelete: Cascade)
+
+  @@index([igAccountId, position])
 }
 
 model PostAutomation {
