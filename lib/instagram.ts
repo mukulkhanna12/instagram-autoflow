@@ -160,6 +160,45 @@ export async function getInstagramPosts(
 
 // ── Comments ─────────────────────────────────────────────────────────────────
 
+export interface IgComment {
+  id: string;
+  text?: string;
+  timestamp?: string;
+  from?: { id?: string; username?: string };
+  /** Replies already posted on this comment, used to spot ones we've answered. */
+  replies?: { data?: Array<{ id: string; from?: { id?: string } }> };
+}
+
+/**
+ * Existing comments on a reel, newest first, for backfilling a flow onto a reel
+ * that was already getting comments before it was configured.
+ *
+ * Pages until `max` is reached — a reel with thousands of comments would
+ * otherwise page forever inside a serverless function that gets killed at 60s.
+ */
+export async function getMediaComments(
+  mediaId: string,
+  accessToken: string,
+  max = 200
+): Promise<IgComment[]> {
+  const fields = "id,text,timestamp,from,replies{id,from}";
+  let url = `${IG_GRAPH}/${mediaId}/comments?fields=${fields}&limit=50&access_token=${accessToken}`;
+  const out: IgComment[] = [];
+
+  while (url && out.length < max) {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error("getMediaComments error:", await res.text());
+      break;
+    }
+    const body = await res.json();
+    out.push(...((body.data ?? []) as IgComment[]));
+    url = body.paging?.next ?? "";
+  }
+
+  return out.slice(0, max);
+}
+
 export async function replyToComment(
   commentId: string,
   message: string,

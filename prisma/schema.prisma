@@ -141,6 +141,10 @@ model PostAutomation {
   // True when this automation was created automatically from the account's
   // default template (a reel uploaded after the template was enabled).
   fromTemplate  Boolean @default(false)
+  // When the reel's pre-existing comments were last swept for a catch-up run.
+  // Null means never — which is what triggers the automatic sweep the first
+  // time the reel is switched Live. See lib/backfill.ts.
+  backfilledAt  DateTime?
 
   // Per-step analytics counters, incremented as the flow runs. "Sent" counts
   // successful DM sends; "Clicked" counts button taps (a postback from the user).

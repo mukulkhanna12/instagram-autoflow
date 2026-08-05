@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Loader2, MessageSquare, UserCheck, Link2, ArrowLeft,
   Zap, ChevronRight, ToggleLeft, ToggleRight, Trash2, Pencil, X, Check,
-  Filter, GitBranch, RotateCcw, Plus, Copy,
+  Filter, GitBranch, RotateCcw, Plus, Copy, History, Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
@@ -34,6 +34,18 @@ interface Automation {
   detailsButtons: DetailsButton[];
   detailsButtonText: string;
   detailsUrl: string;
+}
+
+interface BackfillResult {
+  scanned: number;
+  handled: number;
+  tooOld: number;
+  alreadyHandled: number;
+  alreadyReplied: number;
+  keywordMiss: number;
+  ownComment: number;
+  failed: number;
+  truncated: boolean;
 }
 
 interface DetailsButton {
@@ -114,6 +126,24 @@ export default function FlowEditorPage() {
   const [activeStep, setActiveStep] = useState("comment");
   const [copyOpen, setCopyOpen] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [preview, setPreview] = useState<BackfillResult | null>(null);
+  const [outcome, setOutcome] = useState<BackfillResult | null>(null);
+  const [sweeping, setSweeping] = useState(false);
+
+  async function sweep(dryRun: boolean) {
+    setSweeping(true);
+    const res = await fetch(`/api/automations/${postId}/backfill`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dryRun }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      if (dryRun) setPreview(data.result);
+      else { setOutcome(data.result); setPreview(null); }
+    }
+    setSweeping(false);
+  }
 
   useEffect(() => {
     fetch(`/api/automations/${postId}`)
@@ -187,8 +217,11 @@ export default function FlowEditorPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isActive: !automation.isActive }),
     });
-    const { automation: updated } = await res.json();
+    const { automation: updated, backfill } = await res.json();
     setAutomation((prev) => (prev ? { ...prev, isActive: updated.isActive } : updated));
+    // Switching a reel Live for the first time sweeps its existing comments —
+    // show what that did rather than letting it happen invisibly.
+    if (backfill) { setOutcome(backfill); setActiveStep("comment"); }
     setToggling(false);
   }
 
@@ -336,6 +369,18 @@ export default function FlowEditorPage() {
                   onChange={(val) => updateField("keywords", val)}
                   disabled={!editing}
                 />
+
+                {!editing && (
+                  <OldCommentsPanel
+                    isActive={automation.isActive}
+                    preview={preview}
+                    outcome={outcome}
+                    busy={sweeping}
+                    onPreview={() => sweep(true)}
+                    onRun={() => sweep(false)}
+                    onDismiss={() => { setPreview(null); setOutcome(null); }}
+                  />
+                )}
 
                 <p className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg p-3">
                   Add up to 3 reply variants — a <strong>random one is posted each time</strong>, so your
@@ -1051,6 +1096,89 @@ function MultiButtonBubble({ text, buttons }: { text: string; buttons: DetailsBu
           {b.title} <ChevronRight className="w-3 h-3" />
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Catch up on comments the reel had before it was configured. Always previews
+ * first — a bulk DM run is not something to fire off a single click.
+ */
+function OldCommentsPanel({
+  isActive, preview, outcome, busy, onPreview, onRun, onDismiss,
+}: {
+  isActive: boolean;
+  preview: BackfillResult | null;
+  outcome: BackfillResult | null;
+  busy: boolean;
+  onPreview: () => void;
+  onRun: () => void;
+  onDismiss: () => void;
+}) {
+  const r = outcome ?? preview;
+  const done = !!outcome;
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-2.5">
+          <History className="w-4 h-4 mt-0.5 shrink-0 text-gray-400" />
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Comments from before setup</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              People who commented before this reel was configured never got a reply.
+              Instagram only allows a DM within <strong>7 days</strong> of the comment, so
+              anything older is left alone.
+            </p>
+          </div>
+        </div>
+        {!r && (
+          <Button variant="outline" size="sm" onClick={onPreview} loading={busy} className="shrink-0">
+            Check
+          </Button>
+        )}
+      </div>
+
+      {r && (
+        <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
+          <p className="text-xs font-medium text-gray-700">
+            {done ? "Done." : "Found"} {r.scanned} comment{r.scanned === 1 ? "" : "s"} on this reel:
+          </p>
+          <ul className="text-xs space-y-1">
+            <li className="text-emerald-700 font-medium">
+              {done ? "✓ Handled" : "→ Will handle"}: {r.handled}
+            </li>
+            {r.tooOld > 0 && <li className="text-gray-500">· Older than 7 days, skipped: {r.tooOld}</li>}
+            {r.alreadyReplied > 0 && <li className="text-gray-500">· Already replied to: {r.alreadyReplied}</li>}
+            {r.alreadyHandled > 0 && <li className="text-gray-500">· Already in the flow: {r.alreadyHandled}</li>}
+            {r.keywordMiss > 0 && <li className="text-gray-500">· Missing your keyword: {r.keywordMiss}</li>}
+            {r.ownComment > 0 && <li className="text-gray-500">· Your own comments: {r.ownComment}</li>}
+            {r.failed > 0 && <li className="text-red-600">· Failed: {r.failed}</li>}
+          </ul>
+          {r.truncated && (
+            <p className="text-xs text-amber-700">
+              Hit the 200-comment scan cap — run again to continue.
+            </p>
+          )}
+
+          {!done && (
+            <div className="flex items-center gap-2 pt-1">
+              <Button size="sm" onClick={onRun} loading={busy} disabled={r.handled === 0 || !isActive}>
+                <Send className="w-3.5 h-3.5" /> Reply &amp; DM {r.handled}
+              </Button>
+              <Button variant="outline" size="sm" onClick={onDismiss}>Cancel</Button>
+            </div>
+          )}
+          {done && (
+            <Button variant="outline" size="sm" onClick={onDismiss}>Close</Button>
+          )}
+          {!isActive && !done && (
+            <p className="text-xs text-amber-700">
+              Switch this reel <strong>Live</strong> first — nothing is sent while it&apos;s off.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

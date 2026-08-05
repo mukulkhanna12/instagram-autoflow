@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { z } from "zod";
 import { buildStats, type StateCounts } from "@/lib/analytics";
 import { buttonsSchema } from "@/lib/schemas";
+import { backfillComments } from "@/lib/backfill";
 
 /** Tally an automation's conversations by state for the analytics funnel. */
 async function stateCounts(automationId: string): Promise<StateCounts> {
@@ -76,6 +77,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!body.success) return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
 
   const updated = await db.postAutomation.update({ where: { id }, data: body.data });
+
+  // First time this reel is switched Live, sweep the comments it already had —
+  // the webhook only ever fires for comments that arrive after configuration,
+  // so without this everyone who commented beforehand is silently skipped.
+  // Guarded by backfilledAt so toggling off and on again doesn't re-run it.
+  if (body.data.isActive === true && !automation.isActive && !automation.backfilledAt) {
+    const igAccount = await db.instagramAccount.findFirst({ where: { userId: session.user.id } });
+    if (igAccount) {
+      try {
+        const result = await backfillComments(updated, igAccount);
+        await db.postAutomation.update({ where: { id }, data: { backfilledAt: new Date() } });
+        return NextResponse.json({ automation: updated, backfill: result });
+      } catch (err) {
+        // Going Live is the user's actual request — a failed sweep must not
+        // fail it. They can retry from the button in the editor.
+        console.error("auto-backfill failed:", err);
+      }
+    }
+  }
+
   return NextResponse.json({ automation: updated });
 }
 
