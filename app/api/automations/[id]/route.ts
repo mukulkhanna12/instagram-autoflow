@@ -22,6 +22,7 @@ async function stateCounts(automationId: string): Promise<StateCounts> {
 
 const updateSchema = z.object({
   isActive: z.boolean().optional(),
+  keywords: z.string().optional(),
   commentReplyText: z.string().optional(),
   commentReplyText2: z.string().optional(),
   commentReplyText3: z.string().optional(),
@@ -31,6 +32,7 @@ const updateSchema = z.object({
   followButtonText: z.string().optional(),
   followRetryMessage: z.string().optional(),
   detailsMessage: z.string().optional(),
+  detailsButtonEnabled: z.boolean().optional(),
   detailsButtonText: z.string().optional(),
   detailsUrl: z.string().optional(),
 });

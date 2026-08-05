@@ -185,25 +185,33 @@ export async function handlePostback(opts: {
 }
 
 async function sendDetailsMessage(
-  automation: { detailsMessage: string; detailsButtonText: string; detailsUrl: string },
+  automation: {
+    detailsMessage: string;
+    detailsButtonEnabled: boolean;
+    detailsButtonText: string;
+    detailsUrl: string;
+  },
   opts: SendContext,
   person: Person = {}
 ): Promise<SendResult> {
   const link = automation.detailsUrl?.trim();
   const text = personalize(automation.detailsMessage, person);
 
+  // The button is opt-in, and it only works as a link. With it switched off — or
+  // switched on but with no URL filled in — send plain text: a button template
+  // whose button does nothing is worse than no button at all.
+  const withButton = automation.detailsButtonEnabled && !!link;
+
   return sendDM(
     opts.igUserId,
     { id: opts.senderIgUserId },
-    link
+    withButton
       ? {
           type: "button",
           text,
-          buttons: [{ kind: "url", title: automation.detailsButtonText, url: link }],
+          buttons: [{ kind: "url", title: automation.detailsButtonText, url: link! }],
         }
-      : // No link configured — a button template whose button does nothing is
-        // worse than plain text, so just send the message.
-        { type: "text", text },
+      : { type: "text", text },
     opts.accessToken
   );
 }

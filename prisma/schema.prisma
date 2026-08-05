@@ -98,19 +98,27 @@ model AutomationTemplate {
   igAccountId String  @unique
   enabled     Boolean @default(false)
 
+  // Optional comment filter. Comma-separated; empty means respond to every
+  // comment. When set, a comment must contain at least one of these words
+  // (case-insensitive) before anything is replied or DM'd.
+  keywords String @default("") @db.Text
+
   // Comment reply, plus up to two optional variants. A random non-empty one is
   // posted each time so replies don't look automated (spam-safe).
-  commentReplyText   String  @default("I've sent the details to your DM! Check it 📩") @db.Text
-  commentReplyText2  String? @db.Text
-  commentReplyText3  String? @db.Text
+  commentReplyText   String  @default("Sent you a DM! 📩") @db.Text
+  commentReplyText2  String? @default("Just DM'd you the details 🙌") @db.Text
+  commentReplyText3  String? @default("It's in your inbox now ✨") @db.Text
   greetingMessage    String @default("Hey! 👋 Hope you're doing great.\n\nClick the button below to get the details I promised!") @db.Text
   greetingButtonText String @default("Get Details →")
   followMessage      String @default("To receive the details, please follow my page first! 🙏\n\nOnce you follow, click the button below.") @db.Text
   followButtonText   String @default("I've Followed ✓")
   followRetryMessage String @default("Hmm, I can't see you on my followers list yet 👀\n\nPlease follow the page first, then tap the button again.") @db.Text
   detailsMessage     String @default("Here are the details you asked for! 🎉\n\nClick below to visit the page.") @db.Text
-  detailsButtonText  String @default("Visit Page 🔗")
-  detailsUrl         String @default("")
+  // The final message's button is optional — turn it off to send plain text.
+  // A button only makes sense with a link, so it needs detailsUrl to be set.
+  detailsButtonEnabled Boolean @default(true)
+  detailsButtonText    String  @default("Visit Page 🔗")
+  detailsUrl           String  @default("")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -143,11 +151,16 @@ model PostAutomation {
   // following", then went and followed and came back to a passing check.
   followsGained   Int @default(0)
 
+  // Optional comment filter. Comma-separated; empty means respond to every
+  // comment. When set, a comment must contain at least one of these words
+  // (case-insensitive) before anything is replied or DM'd.
+  keywords String @default("") @db.Text
+
   // Comment reply, plus up to two optional variants. A random non-empty one is
   // posted each time so replies don't look automated (spam-safe).
-  commentReplyText   String  @default("I've sent the details to your DM! Check it 📩") @db.Text
-  commentReplyText2  String? @db.Text
-  commentReplyText3  String? @db.Text
+  commentReplyText   String  @default("Sent you a DM! 📩") @db.Text
+  commentReplyText2  String? @default("Just DM'd you the details 🙌") @db.Text
+  commentReplyText3  String? @default("It's in your inbox now ✨") @db.Text
   greetingMessage    String @default("Hey! 👋 Hope you're doing great.\n\nClick the button below to get the details I promised!") @db.Text
   greetingButtonText String @default("Get Details →")
   followMessage      String @default("To receive the details, please follow my page first! 🙏\n\nOnce you follow, click the button below.") @db.Text
@@ -155,8 +168,11 @@ model PostAutomation {
   // Sent when they tap "I've followed" but still are not following. Loops until they do.
   followRetryMessage String @default("Hmm, I can't see you on my followers list yet 👀\n\nPlease follow the page first, then tap the button again.") @db.Text
   detailsMessage     String @default("Here are the details you asked for! 🎉\n\nClick below to visit the page.") @db.Text
-  detailsButtonText  String @default("Visit Page 🔗")
-  detailsUrl         String @default("")
+  // The final message's button is optional — turn it off to send plain text.
+  // A button only makes sense with a link, so it needs detailsUrl to be set.
+  detailsButtonEnabled Boolean @default(true)
+  detailsButtonText    String  @default("Visit Page 🔗")
+  detailsUrl           String  @default("")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
