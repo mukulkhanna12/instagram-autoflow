@@ -32,5 +32,10 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
+      # The database and Graph API are mocked, so this needs no services and no
+      # secrets — it runs before the build to fail fast on a logic regression.
+      - name: Test
+        run: npm test
+
       - name: Build
         run: npm run build

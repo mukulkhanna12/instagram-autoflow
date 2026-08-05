@@ -127,6 +127,14 @@ npm run db:push         # create the schema
 npm run dev
 ```
 
+Tests need no database and no credentials — the Prisma client and the Graph API
+are mocked, so the flow engine is driven entirely in memory:
+
+```bash
+npm test          # once
+npm run test:watch
+```
+
 Instagram webhooks need a public HTTPS URL, so for local testing put a tunnel in
 front of it (`cloudflared tunnel --url http://localhost:3000`) and use that URL
 for `NEXTAUTH_URL` and in the Meta dashboard.
@@ -188,6 +196,11 @@ lib/
 prisma/
   schema.prisma       User, InstagramAccount, PostAutomation, Conversation,
                       QueuedFlow, LoginCode
+tests/
+  flow-engine.test.ts the state machine, db + Graph API mocked
+  keywords.test.ts    the per-reel comment filter
+  buttons.test.ts     button resolution and the legacy fallback
+  backfill.test.ts    the 7-day window and duplicate guards
 ```
 
 `PostAutomation` is one reel's flow; `Conversation` tracks one person's progress
@@ -215,7 +228,6 @@ Known gaps:
 - [ ] No queueing or retry when the 750/hour private-reply limit is hit — those
       people are dropped, with the failure recorded on the conversation
 - [ ] Comments older than 7 days can't be reached at all
-- [ ] No automated test runner wired into CI; the suites live outside the repo
 - [ ] Meta App Review is only needed to serve accounts you don't own — a single
       account in Development mode with itself as a tester does not need it
 
