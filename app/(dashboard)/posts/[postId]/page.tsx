@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Loader2, MessageSquare, UserCheck, Link2, ArrowLeft,
   Zap, ChevronRight, ToggleLeft, ToggleRight, Trash2, Pencil, X, Check,
+  Filter, GitBranch, RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
@@ -19,6 +20,7 @@ interface Automation {
   postThumbnail?: string;
   postUrl?: string;
   isActive: boolean;
+  keywords: string;
   commentReplyText: string;
   commentReplyText2?: string | null;
   commentReplyText3?: string | null;
@@ -28,6 +30,7 @@ interface Automation {
   followButtonText: string;
   followRetryMessage: string;
   detailsMessage: string;
+  detailsButtonEnabled: boolean;
   detailsButtonText: string;
   detailsUrl: string;
 }
@@ -61,10 +64,11 @@ interface Stats {
 
 // The content fields that Edit → Update actually saves.
 const CONTENT_FIELDS = [
+  "keywords",
   "commentReplyText", "commentReplyText2", "commentReplyText3",
   "greetingMessage", "greetingButtonText",
   "followMessage", "followButtonText", "followRetryMessage",
-  "detailsMessage", "detailsButtonText", "detailsUrl",
+  "detailsMessage", "detailsButtonEnabled", "detailsButtonText", "detailsUrl",
 ] as const;
 
 const STEPS = [
@@ -102,7 +106,7 @@ export default function FlowEditorPage() {
   // What the fields render: the draft while editing, the saved copy otherwise.
   const v = editing ? draft : automation;
 
-  function updateField(field: keyof Automation, value: string) {
+  function updateField(field: keyof Automation, value: string | boolean) {
     setDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
   }
 
@@ -269,6 +273,13 @@ export default function FlowEditorPage() {
               <div className="space-y-4">
                 <StepHeader step={STEPS[0]} />
                 {stepStats("comment") && <StepMetrics step={stepStats("comment")!} />}
+
+                <KeywordFilter
+                  value={v.keywords ?? ""}
+                  onChange={(val) => updateField("keywords", val)}
+                  disabled={!editing}
+                />
+
                 <p className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg p-3">
                   Add up to 3 reply variants — a <strong>random one is posted each time</strong>, so your
                   replies don&apos;t look automated (Instagram can flag identical replies as spam).
@@ -384,23 +395,44 @@ export default function FlowEditorPage() {
                   disabled={!editing}
                   rows={3}
                 />
-                <Input
-                  label="Button text"
-                  value={v.detailsButtonText}
-                  onChange={(e) => updateField("detailsButtonText", e.target.value)}
+                <ButtonToggle
+                  enabled={v.detailsButtonEnabled ?? true}
+                  onChange={(on) => updateField("detailsButtonEnabled", on)}
                   disabled={!editing}
                 />
-                <Input
-                  label="Link URL"
-                  type="url"
-                  value={v.detailsUrl}
-                  onChange={(e) => updateField("detailsUrl", e.target.value)}
-                  disabled={!editing}
-                  placeholder="https://yourwebsite.com"
-                  hint="The URL opened when user clicks the button"
-                />
+
+                {(v.detailsButtonEnabled ?? true) && (
+                  <>
+                    <Input
+                      label="Button text"
+                      value={v.detailsButtonText}
+                      onChange={(e) => updateField("detailsButtonText", e.target.value)}
+                      disabled={!editing}
+                    />
+                    <Input
+                      label="Link URL"
+                      type="url"
+                      value={v.detailsUrl}
+                      onChange={(e) => updateField("detailsUrl", e.target.value)}
+                      disabled={!editing}
+                      placeholder="https://yourwebsite.com"
+                      hint="The URL opened when user clicks the button"
+                    />
+                    {!v.detailsUrl?.trim() && (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3">
+                        The button needs a link to do anything. Until you add one, this
+                        message goes out as <strong>plain text with no button</strong>.
+                      </p>
+                    )}
+                  </>
+                )}
+
                 <DmPreview>
-                  <DmBubble text={v.detailsMessage} button={v.detailsButtonText} buttonColor="emerald" url={v.detailsUrl} />
+                  {(v.detailsButtonEnabled ?? true) && v.detailsUrl?.trim() ? (
+                    <DmBubble text={v.detailsMessage} button={v.detailsButtonText} buttonColor="emerald" url={v.detailsUrl} />
+                  ) : (
+                    <PlainDmBubble text={v.detailsMessage} />
+                  )}
                 </DmPreview>
               </div>
             )}
@@ -557,8 +589,22 @@ function FlowCanvas({
               ) : (
                 <MessageSquare className="w-5 h-5 text-gray-300 shrink-0" />
               )}
-              <p className="text-xs font-medium text-gray-700">Someone comments on this reel</p>
+              <p className="text-xs font-medium text-gray-700">
+                {v.keywords?.trim()
+                  ? "Someone comments a keyword on this reel"
+                  : "Someone comments on this reel"}
+              </p>
             </div>
+            {v.keywords?.trim() && (
+              <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                <Filter className="w-3 h-3 text-violet-500 shrink-0" />
+                {v.keywords.split(",").map((k) => k.trim()).filter(Boolean).map((k) => (
+                  <span key={k} className="text-[10px] font-medium bg-violet-100 text-violet-700 rounded px-1.5 py-0.5">
+                    {k}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="bg-gray-100 text-gray-700 text-xs rounded-xl p-2 line-clamp-2">
               ↩ {v.commentReplyText || "—"}
             </div>
@@ -570,9 +616,11 @@ function FlowCanvas({
 
         <Arrow />
 
-        {/* Message #1 — greeting + follow check */}
+        {/* Message #1 — greeting. Its button tap is what opens the messaging
+            window, which is the only reason a follow check is possible at all. */}
         <MessageNode
           title="Send Message #1"
+          subtitle="Greeting"
           onClick={() => onSelect("greeting")}
           reached={step("greeting")?.reached}
           metrics={[
@@ -587,22 +635,99 @@ function FlowCanvas({
 
         <Arrow />
 
-        {/* Message #2 — final details */}
-        <MessageNode
-          title="Send Message #2"
-          onClick={() => onSelect("details")}
-          reached={step("details")?.reached}
-          metrics={[{ label: "Sent", value: ev("details", "Sent")?.total ?? 0, pct: 100 }]}
-          text={v.detailsMessage}
-          button={v.detailsButtonText}
-          link={v.detailsUrl}
-        />
+        {/* The branch: everything after the tap depends on this one check. */}
+        <ConditionNode checked={step("greeting")?.events.find((e) => e.name === "Clicks")?.total ?? 0} />
+
+        {/* Branch connector: one line in, two out. */}
+        <div className="flex flex-col justify-center shrink-0 py-2">
+          <div className="flex-1 flex items-end"><div className="w-3 h-0.5 bg-gray-200" /></div>
+          <div className="w-0.5 bg-gray-200 h-full ml-3 -my-px" />
+          <div className="flex-1 flex items-start"><div className="w-3 h-0.5 bg-gray-200" /></div>
+        </div>
+
+        <div className="flex flex-col gap-3 shrink-0">
+          {/* YES → the payoff */}
+          <div className="flex items-center">
+            <BranchLabel kind="yes" />
+            <MessageNode
+              title="Send Message #2"
+              subtitle="Final details"
+              onClick={() => onSelect("details")}
+              reached={step("details")?.reached}
+              metrics={[{ label: "Sent", value: ev("details", "Sent")?.total ?? 0, pct: 100 }]}
+              text={v.detailsMessage}
+              button={v.detailsButtonEnabled === false ? "" : v.detailsButtonText}
+              link={v.detailsButtonEnabled === false ? "" : v.detailsUrl}
+            />
+          </div>
+
+          {/* NO → the gate, which loops back into the same check */}
+          <div className="flex items-center">
+            <BranchLabel kind="no" />
+            <MessageNode
+              title="Follow gate"
+              subtitle="Loops until they follow"
+              tone="amber"
+              onClick={() => onSelect("follow")}
+              reached={step("follow")?.reached}
+              metrics={[
+                { label: "Sent", value: ev("follow", "Sent")?.total ?? 0 },
+                { label: "Clicked", value: ev("follow", "Clicks")?.total ?? 0, pct: ev("follow", "Clicks")?.pct },
+              ]}
+              text={v.followMessage}
+              button={v.followButtonText}
+              footer={
+                <span className="flex items-center gap-1.5 text-[10px] text-amber-600">
+                  <RotateCcw className="w-3 h-3" />
+                  Tapping again re-runs the check — never reaches Message #2 until they follow
+                </span>
+              }
+            />
+          </div>
+        </div>
       </div>
 
       <p className="text-xs text-gray-400 mt-3">
-        Between #1 and #2, if they aren&apos;t following, the follow-gate DM is sent and loops until they
-        follow. Personalize any message with <code>{"{{first_name}}"}</code> or <code>{"{{username}}"}</code>.
+        Everyone gets Message #1 — Instagram only lets us check whether someone follows you once
+        they&apos;ve replied, and their button tap is that reply. Personalize any message with{" "}
+        <code>{"{{first_name}}"}</code> or <code>{"{{username}}"}</code>.
       </p>
+    </div>
+  );
+}
+
+/** The follow check — the fork the whole flow hinges on. */
+function ConditionNode({ checked }: { checked: number }) {
+  return (
+    <div className="shrink-0 w-52 self-center rounded-xl border border-amber-200 bg-white overflow-hidden">
+      <div className="bg-amber-50 px-4 py-2 flex items-center gap-2">
+        <GitBranch className="w-4 h-4 text-amber-600" />
+        <span className="text-sm font-semibold text-gray-800">Condition</span>
+      </div>
+      <div className="p-3">
+        <p className="text-xs font-medium text-gray-700">Do they follow you?</p>
+        <p className="text-[10px] text-gray-400 mt-1.5">
+          Checked on every button tap, never at comment time.
+        </p>
+        <p className="text-[10px] text-gray-400 mt-2">{checked} checks run</p>
+      </div>
+    </div>
+  );
+}
+
+function BranchLabel({ kind }: { kind: "yes" | "no" }) {
+  const yes = kind === "yes";
+  return (
+    <div className="flex items-center shrink-0">
+      <span
+        className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${
+          yes ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+        }`}
+      >
+        {yes ? "Yes" : "No"}
+      </span>
+      <div className="w-4 h-0.5 bg-gray-200" />
+      <div className="w-0 h-0 border-y-4 border-y-transparent border-l-[6px] border-l-gray-300" />
     </div>
   );
 }
@@ -617,9 +742,10 @@ function Arrow() {
 }
 
 function MessageNode({
-  title, onClick, reached, metrics, text, button, buttonCtr, link,
+  title, subtitle, onClick, reached, metrics, text, button, buttonCtr, link, tone = "brand", footer,
 }: {
   title: string;
+  subtitle?: string;
   onClick: () => void;
   reached?: number;
   metrics: { label: string; value: number; pct?: number }[];
@@ -627,15 +753,23 @@ function MessageNode({
   button: string;
   buttonCtr?: number;
   link?: string;
+  tone?: "brand" | "amber";
+  footer?: React.ReactNode;
 }) {
+  const amber = tone === "amber";
   return (
     <button
       onClick={onClick}
-      className="text-left shrink-0 w-72 rounded-xl border border-gray-200 bg-white overflow-hidden hover:border-brand-300 hover:shadow-md transition-all"
+      className={`text-left shrink-0 w-72 rounded-xl border bg-white overflow-hidden hover:shadow-md transition-all ${
+        amber ? "border-amber-200 hover:border-amber-300" : "border-gray-200 hover:border-brand-300"
+      }`}
     >
-      <div className="bg-brand-50 px-4 py-2 flex items-center justify-between">
-        <span className="text-sm font-semibold text-gray-800">{title}</span>
-        {typeof reached === "number" && <span className="text-xs text-gray-500">{reached} reached</span>}
+      <div className={`px-4 py-2 flex items-center justify-between ${amber ? "bg-amber-50" : "bg-brand-50"}`}>
+        <span className="text-sm font-semibold text-gray-800">
+          {title}
+          {subtitle && <span className="font-normal text-gray-500"> · {subtitle}</span>}
+        </span>
+        {typeof reached === "number" && <span className="text-xs text-gray-500 shrink-0 ml-2">{reached}</span>}
       </div>
       <div className="px-4 py-3 flex gap-5 border-b border-gray-100">
         {metrics.map((m) => (
@@ -652,15 +786,120 @@ function MessageNode({
         <div className="bg-gray-100 text-gray-800 text-xs rounded-2xl rounded-tl-sm p-3 leading-relaxed whitespace-pre-line mb-2 line-clamp-4">
           {text || "—"}
         </div>
-        <div className="border border-gray-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
-          <span className="text-xs font-medium text-brand-600 truncate">{button || "Button"}</span>
-          <span className="flex items-center gap-1 shrink-0">
-            {typeof buttonCtr === "number" && <span className="text-xs text-brand-500 font-medium">CTR {buttonCtr}%</span>}
-            {link ? <Link2 className="w-3 h-3 text-brand-400" /> : <ChevronRight className="w-3 h-3 text-brand-400" />}
-          </span>
-        </div>
+        {button ? (
+          <div className="border border-gray-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+            <span className={`text-xs font-medium truncate ${amber ? "text-amber-600" : "text-brand-600"}`}>{button}</span>
+            <span className="flex items-center gap-1 shrink-0">
+              {typeof buttonCtr === "number" && <span className="text-xs text-brand-500 font-medium">CTR {buttonCtr}%</span>}
+              {link ? <Link2 className="w-3 h-3 text-brand-400" /> : <ChevronRight className={`w-3 h-3 ${amber ? "text-amber-400" : "text-brand-400"}`} />}
+            </span>
+          </div>
+        ) : (
+          <p className="text-[10px] text-gray-400 italic px-1">Plain text — no button</p>
+        )}
+        {footer && <div className="mt-2 px-1">{footer}</div>}
       </div>
     </button>
+  );
+}
+
+/**
+ * Per-reel comment filter. Off by default, so an untouched reel keeps replying
+ * to everything — turning it on is what narrows the reel to a keyword.
+ */
+function KeywordFilter({
+  value, onChange, disabled,
+}: { value: string; onChange: (v: string) => void; disabled: boolean }) {
+  const on = value.trim().length > 0;
+  const words = value.split(",").map((k) => k.trim()).filter(Boolean);
+
+  return (
+    <div className={`rounded-lg border p-4 space-y-3 ${on ? "bg-violet-50 border-violet-200" : "bg-gray-50 border-gray-200"}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-2.5">
+          <Filter className={`w-4 h-4 mt-0.5 shrink-0 ${on ? "text-violet-600" : "text-gray-400"}`} />
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Only reply to specific comments</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {on
+                ? "Comments without one of these words are ignored — no reply, no DM."
+                : "Off — every comment on this reel gets a reply and a DM."}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => onChange(on ? "" : "prompt")}
+          disabled={disabled}
+          className="shrink-0 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          title={on ? "Reply to every comment instead" : "Restrict to keywords"}
+        >
+          {on
+            ? <ToggleRight className="w-8 h-8 text-violet-500" />
+            : <ToggleLeft className="w-8 h-8 text-gray-300" />}
+        </button>
+      </div>
+
+      {on && (
+        <>
+          <Input
+            label="Keywords"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={disabled}
+            placeholder="prompt, link, guide"
+            hint="Comma-separated. Not case-sensitive — PROMPT, Prompt and prompt all match."
+          />
+          {words.length > 0 && (
+            <div className="text-xs text-gray-600 bg-white border border-violet-100 rounded-lg p-3 space-y-1">
+              <p className="font-medium text-gray-700 mb-1.5">This reel will respond to:</p>
+              <p className="text-emerald-700">✓ &ldquo;{words[0]}&rdquo;</p>
+              <p className="text-emerald-700">✓ &ldquo;send me the {words[0]} pls&rdquo;</p>
+              <p className="text-gray-400">✗ &ldquo;nice reel 🔥&rdquo;</p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Opt-in button on the final message. Off → plain text. */
+function ButtonToggle({
+  enabled, onChange, disabled,
+}: { enabled: boolean; onChange: (v: boolean) => void; disabled: boolean }) {
+  return (
+    <div className={`rounded-lg border p-4 flex items-start justify-between gap-4 ${
+      enabled ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-200"
+    }`}>
+      <div className="flex items-start gap-2.5">
+        <Link2 className={`w-4 h-4 mt-0.5 shrink-0 ${enabled ? "text-emerald-600" : "text-gray-400"}`} />
+        <div>
+          <p className="text-sm font-semibold text-gray-900">Add a button with a link</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {enabled
+              ? "The final DM ends with a tappable button opening your link."
+              : "Off — the final DM is sent as plain text."}
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={() => onChange(!enabled)}
+        disabled={disabled}
+        className="shrink-0 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+      >
+        {enabled
+          ? <ToggleRight className="w-8 h-8 text-emerald-500" />
+          : <ToggleLeft className="w-8 h-8 text-gray-300" />}
+      </button>
+    </div>
+  );
+}
+
+function PlainDmBubble({ text }: { text: string }) {
+  return (
+    <div className="bg-white/10 text-white text-xs rounded-2xl rounded-tl-sm p-3 leading-relaxed whitespace-pre-line">
+      {text}
+    </div>
   );
 }
 

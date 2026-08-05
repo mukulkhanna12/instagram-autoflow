@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { replyToComment } from "@/lib/instagram";
 import { handleNewComment, handlePostback } from "@/lib/flow-engine";
 import { automationCreateFromTemplate } from "@/lib/templates";
+import { commentMatchesKeywords } from "@/lib/keywords";
 
 // ── Webhook verification ──────────────────────────────────────────────────────
 
@@ -92,6 +93,7 @@ async function handleCommentChange(accountId: string, value: Record<string, unkn
   const commentId = value.id as string;
   const senderIgUserId = (value.from as { id?: string })?.id;
   const senderUsername = (value.from as { username?: string })?.username;
+  const commentText = value.text as string | undefined;
 
   if (!mediaId || !commentId || !senderIgUserId) return;
 
@@ -116,6 +118,11 @@ async function handleCommentChange(accountId: string, value: Record<string, unkn
   // Our own public reply comes back as a new comment event. Without this the
   // account would keep replying to its own replies forever.
   if (senderIgUserId === igAccount.instagramId) return;
+
+  // A reel can be narrowed to specific keywords ("comment PROMPT to get it").
+  // When it is, comments that don't ask for the thing are left alone entirely —
+  // no public reply, no DM. An unfiltered reel responds to everything.
+  if (!commentMatchesKeywords(commentText, automation.keywords)) return;
 
   // Retries would otherwise post another public reply and re-send the greeting.
   const alreadyHandled = await db.conversation.findFirst({

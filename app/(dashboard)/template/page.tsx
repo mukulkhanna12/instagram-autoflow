@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  Loader2, MessageSquare, Zap, UserCheck, Link2, Save, ToggleLeft, ToggleRight, Wand2, AlertCircle,
+  Loader2, MessageSquare, Zap, UserCheck, Link2, Save, ToggleLeft, ToggleRight, Wand2, AlertCircle, Filter,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { MessageInput } from "@/components/message-input";
 interface Template {
   id: string;
   enabled: boolean;
+  keywords: string;
   commentReplyText: string;
   commentReplyText2?: string | null;
   commentReplyText3?: string | null;
@@ -20,15 +21,17 @@ interface Template {
   followButtonText: string;
   followRetryMessage: string;
   detailsMessage: string;
+  detailsButtonEnabled: boolean;
   detailsButtonText: string;
   detailsUrl: string;
 }
 
 const FIELDS = [
+  "keywords",
   "commentReplyText", "commentReplyText2", "commentReplyText3",
   "greetingMessage", "greetingButtonText",
   "followMessage", "followButtonText", "followRetryMessage",
-  "detailsMessage", "detailsButtonText", "detailsUrl",
+  "detailsMessage", "detailsButtonEnabled", "detailsButtonText", "detailsUrl",
 ] as const;
 
 export default function TemplatePage() {
@@ -49,7 +52,7 @@ export default function TemplatePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  function updateField(field: keyof Template, value: string) {
+  function updateField(field: keyof Template, value: string | boolean) {
     setTemplate((prev) => (prev ? { ...prev, [field]: value } : prev));
   }
 
@@ -153,6 +156,10 @@ export default function TemplatePage() {
       {/* Fields */}
       <div className="space-y-4">
         <Section icon={MessageSquare} color="text-blue-600 bg-blue-50 border-blue-200" title="Comment reply" desc="Public reply posted on the comment">
+          <KeywordFilter
+            value={template.keywords ?? ""}
+            onChange={(val) => updateField("keywords", val)}
+          />
           <p className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg p-3">
             Add up to 3 variants — a <strong>random one is posted each time</strong> so replies don&apos;t
             look automated.
@@ -220,21 +227,94 @@ export default function TemplatePage() {
             onChange={(val) => updateField("detailsMessage", val)}
             rows={3}
           />
-          <Input
-            label="Button text"
-            value={template.detailsButtonText}
-            onChange={(e) => updateField("detailsButtonText", e.target.value)}
+          <ButtonToggle
+            enabled={template.detailsButtonEnabled ?? true}
+            onChange={(on) => updateField("detailsButtonEnabled", on)}
           />
-          <Input
-            label="Link URL"
-            type="url"
-            value={template.detailsUrl}
-            onChange={(e) => updateField("detailsUrl", e.target.value)}
-            placeholder="https://yourwebsite.com"
-            hint="Opened when the user taps the final button. Leave blank to send just the message."
-          />
+          {(template.detailsButtonEnabled ?? true) && (
+            <>
+              <Input
+                label="Button text"
+                value={template.detailsButtonText}
+                onChange={(e) => updateField("detailsButtonText", e.target.value)}
+              />
+              <Input
+                label="Link URL"
+                type="url"
+                value={template.detailsUrl}
+                onChange={(e) => updateField("detailsUrl", e.target.value)}
+                placeholder="https://yourwebsite.com"
+                hint="Opened when the user taps the final button. Without a link the message goes out as plain text."
+              />
+            </>
+          )}
         </Section>
       </div>
+    </div>
+  );
+}
+
+/** Default comment filter for future reels. Off means "reply to everything". */
+function KeywordFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const on = value.trim().length > 0;
+  return (
+    <div className={`rounded-lg border p-4 space-y-3 ${on ? "bg-violet-50 border-violet-200" : "bg-gray-50 border-gray-200"}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-2.5">
+          <Filter className={`w-4 h-4 mt-0.5 shrink-0 ${on ? "text-violet-600" : "text-gray-400"}`} />
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Only reply to specific comments</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {on
+                ? "New reels ignore comments without one of these words — no reply, no DM."
+                : "Off — new reels reply to every comment."}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => onChange(on ? "" : "prompt")}
+          className="shrink-0 cursor-pointer"
+        >
+          {on
+            ? <ToggleRight className="w-8 h-8 text-violet-500" />
+            : <ToggleLeft className="w-8 h-8 text-gray-300" />}
+        </button>
+      </div>
+      {on && (
+        <Input
+          label="Keywords"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="prompt, link, guide"
+          hint="Comma-separated. Not case-sensitive — PROMPT, Prompt and prompt all match."
+        />
+      )}
+    </div>
+  );
+}
+
+/** Opt-in button on the final message. Off → plain text. */
+function ButtonToggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className={`rounded-lg border p-4 flex items-start justify-between gap-4 ${
+      enabled ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-200"
+    }`}>
+      <div className="flex items-start gap-2.5">
+        <Link2 className={`w-4 h-4 mt-0.5 shrink-0 ${enabled ? "text-emerald-600" : "text-gray-400"}`} />
+        <div>
+          <p className="text-sm font-semibold text-gray-900">Add a button with a link</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {enabled
+              ? "The final DM ends with a tappable button opening your link."
+              : "Off — the final DM is sent as plain text."}
+          </p>
+        </div>
+      </div>
+      <button onClick={() => onChange(!enabled)} className="shrink-0 cursor-pointer">
+        {enabled
+          ? <ToggleRight className="w-8 h-8 text-emerald-500" />
+          : <ToggleLeft className="w-8 h-8 text-gray-300" />}
+      </button>
     </div>
   );
 }

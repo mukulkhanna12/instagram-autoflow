@@ -4,6 +4,7 @@ import type { IgMedia } from "./instagram";
 // The message fields a template shares with a per-reel automation.
 export type TemplateFields = Pick<
   AutomationTemplate,
+  | "keywords"
   | "commentReplyText"
   | "commentReplyText2"
   | "commentReplyText3"
@@ -13,6 +14,7 @@ export type TemplateFields = Pick<
   | "followButtonText"
   | "followRetryMessage"
   | "detailsMessage"
+  | "detailsButtonEnabled"
   | "detailsButtonText"
   | "detailsUrl"
 >;
@@ -36,6 +38,7 @@ export function automationCreateFromTemplate(
     postUrl: media?.permalink,
     postCaption: media?.caption,
     postThumbnail: media?.thumbnail_url ?? media?.media_url,
+    keywords: template.keywords,
     commentReplyText: template.commentReplyText,
     commentReplyText2: template.commentReplyText2,
     commentReplyText3: template.commentReplyText3,
@@ -45,6 +48,7 @@ export function automationCreateFromTemplate(
     followButtonText: template.followButtonText,
     followRetryMessage: template.followRetryMessage,
     detailsMessage: template.detailsMessage,
+    detailsButtonEnabled: template.detailsButtonEnabled,
     detailsButtonText: template.detailsButtonText,
     detailsUrl: template.detailsUrl,
   };
