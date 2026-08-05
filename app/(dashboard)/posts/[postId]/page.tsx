@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Loader2, MessageSquare, UserCheck, Link2, ArrowLeft,
   Zap, ChevronRight, ToggleLeft, ToggleRight, Trash2, Pencil, X, Check,
-  Filter, GitBranch, RotateCcw,
+  Filter, GitBranch, RotateCcw, Plus, Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
@@ -31,8 +31,30 @@ interface Automation {
   followRetryMessage: string;
   detailsMessage: string;
   detailsButtonEnabled: boolean;
+  detailsButtons: DetailsButton[];
   detailsButtonText: string;
   detailsUrl: string;
+}
+
+interface DetailsButton {
+  title: string;
+  url: string;
+}
+
+const MAX_BUTTONS = 3;
+
+/**
+ * Buttons to render for a reel. Rows saved before multi-button support only
+ * have the old single-button pair, so fall back to it — matching what the
+ * server actually sends (lib/buttons.ts).
+ */
+function buttonsOf(a: Automation): DetailsButton[] {
+  if (Array.isArray(a.detailsButtons) && a.detailsButtons.length > 0) {
+    return a.detailsButtons.slice(0, MAX_BUTTONS);
+  }
+  const title = a.detailsButtonText?.trim();
+  const url = a.detailsUrl?.trim();
+  return title && url ? [{ title, url }] : [];
 }
 
 interface Conversation {
@@ -68,7 +90,7 @@ const CONTENT_FIELDS = [
   "commentReplyText", "commentReplyText2", "commentReplyText3",
   "greetingMessage", "greetingButtonText",
   "followMessage", "followButtonText", "followRetryMessage",
-  "detailsMessage", "detailsButtonEnabled", "detailsButtonText", "detailsUrl",
+  "detailsMessage", "detailsButtonEnabled", "detailsButtons", "detailsButtonText", "detailsUrl",
 ] as const;
 
 const STEPS = [
@@ -90,6 +112,8 @@ export default function FlowEditorPage() {
   const [toggling, setToggling] = useState(false);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [activeStep, setActiveStep] = useState("comment");
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copying, setCopying] = useState(false);
 
   useEffect(() => {
     fetch(`/api/automations/${postId}`)
@@ -106,14 +130,33 @@ export default function FlowEditorPage() {
   // What the fields render: the draft while editing, the saved copy otherwise.
   const v = editing ? draft : automation;
 
-  function updateField(field: keyof Automation, value: string | boolean) {
+  function updateField(field: keyof Automation, value: string | boolean | DetailsButton[]) {
     setDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
   }
 
   function startEdit() {
     if (!automation) return;
-    setDraft({ ...automation });
+    // Seed the buttons array from the legacy single-button fields so an older
+    // reel opens showing the button it actually sends, not an empty list.
+    setDraft({ ...automation, detailsButtons: buttonsOf(automation) });
     setMode("edit");
+  }
+
+  async function copyFrom(sourceId: string) {
+    setCopying(true);
+    const res = await fetch(`/api/automations/${postId}/copy-from`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sourceId }),
+    });
+    if (res.ok) {
+      const { automation: updated } = await res.json();
+      setAutomation(updated);
+      setDraft(null);
+      setMode("view");
+      setCopyOpen(false);
+    }
+    setCopying(false);
   }
 
   function cancelEdit() {
@@ -225,12 +268,26 @@ export default function FlowEditorPage() {
               </Button>
             </>
           ) : (
-            <Button size="sm" onClick={startEdit}>
-              <Pencil className="w-4 h-4" /> Edit
-            </Button>
+            <>
+              <Button variant="outline" size="sm" onClick={() => setCopyOpen(true)}>
+                <Copy className="w-4 h-4" /> Copy from reel
+              </Button>
+              <Button size="sm" onClick={startEdit}>
+                <Pencil className="w-4 h-4" /> Edit
+              </Button>
+            </>
           )}
         </div>
       </div>
+
+      {copyOpen && (
+        <CopyFromDialog
+          currentId={automation.id}
+          onCopy={copyFrom}
+          onClose={() => setCopyOpen(false)}
+          busy={copying}
+        />
+      )}
 
       {/* Key metrics */}
       {stats && (
@@ -402,37 +459,23 @@ export default function FlowEditorPage() {
                 />
 
                 {(v.detailsButtonEnabled ?? true) && (
-                  <>
-                    <Input
-                      label="Button text"
-                      value={v.detailsButtonText}
-                      onChange={(e) => updateField("detailsButtonText", e.target.value)}
-                      disabled={!editing}
-                    />
-                    <Input
-                      label="Link URL"
-                      type="url"
-                      value={v.detailsUrl}
-                      onChange={(e) => updateField("detailsUrl", e.target.value)}
-                      disabled={!editing}
-                      placeholder="https://yourwebsite.com"
-                      hint="The URL opened when user clicks the button"
-                    />
-                    {!v.detailsUrl?.trim() && (
-                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3">
-                        The button needs a link to do anything. Until you add one, this
-                        message goes out as <strong>plain text with no button</strong>.
-                      </p>
-                    )}
-                  </>
+                  <ButtonListEditor
+                    buttons={editing ? (v.detailsButtons ?? []) : buttonsOf(v)}
+                    onChange={(b) => updateField("detailsButtons", b)}
+                    disabled={!editing}
+                  />
                 )}
 
                 <DmPreview>
-                  {(v.detailsButtonEnabled ?? true) && v.detailsUrl?.trim() ? (
-                    <DmBubble text={v.detailsMessage} button={v.detailsButtonText} buttonColor="emerald" url={v.detailsUrl} />
-                  ) : (
-                    <PlainDmBubble text={v.detailsMessage} />
-                  )}
+                  <MultiButtonBubble
+                    text={v.detailsMessage}
+                    buttons={
+                      (v.detailsButtonEnabled ?? true)
+                        ? (editing ? (v.detailsButtons ?? []) : buttonsOf(v))
+                            .filter((b) => b.title.trim() && b.url.trim())
+                        : []
+                    }
+                  />
                 </DmPreview>
               </div>
             )}
@@ -562,6 +605,7 @@ function FlowCanvas({
 }) {
   const step = (k: string) => stats?.steps.find((s) => s.key === k);
   const ev = (k: string, name: string) => step(k)?.events.find((e) => e.name === name);
+  const detailsBtns = (v.detailsButtonEnabled ?? true) ? buttonsOf(v) : [];
 
   return (
     <div className={`bg-white rounded-xl border border-gray-100 p-5 shadow-sm ${className}`}>
@@ -656,8 +700,9 @@ function FlowCanvas({
               reached={step("details")?.reached}
               metrics={[{ label: "Sent", value: ev("details", "Sent")?.total ?? 0, pct: 100 }]}
               text={v.detailsMessage}
-              button={v.detailsButtonEnabled === false ? "" : v.detailsButtonText}
-              link={v.detailsButtonEnabled === false ? "" : v.detailsUrl}
+              button={detailsBtns[0]?.title ?? ""}
+              link={detailsBtns[0]?.url ?? ""}
+              extraButtons={detailsBtns.length - 1}
             />
           </div>
 
@@ -743,6 +788,7 @@ function Arrow() {
 
 function MessageNode({
   title, subtitle, onClick, reached, metrics, text, button, buttonCtr, link, tone = "brand", footer,
+  extraButtons = 0,
 }: {
   title: string;
   subtitle?: string;
@@ -755,6 +801,7 @@ function MessageNode({
   link?: string;
   tone?: "brand" | "amber";
   footer?: React.ReactNode;
+  extraButtons?: number;
 }) {
   const amber = tone === "amber";
   return (
@@ -796,6 +843,11 @@ function MessageNode({
           </div>
         ) : (
           <p className="text-[10px] text-gray-400 italic px-1">Plain text — no button</p>
+        )}
+        {extraButtons > 0 && (
+          <p className="text-[10px] text-gray-400 mt-1.5 px-1">
+            + {extraButtons} more button{extraButtons > 1 ? "s" : ""}
+          </p>
         )}
         {footer && <div className="mt-2 px-1">{footer}</div>}
       </div>
@@ -899,6 +951,197 @@ function PlainDmBubble({ text }: { text: string }) {
   return (
     <div className="bg-white/10 text-white text-xs rounded-2xl rounded-tl-sm p-3 leading-relaxed whitespace-pre-line">
       {text}
+    </div>
+  );
+}
+
+/** Up to three link buttons on the final message — Instagram's hard ceiling. */
+function ButtonListEditor({
+  buttons, onChange, disabled,
+}: {
+  buttons: DetailsButton[];
+  onChange: (b: DetailsButton[]) => void;
+  disabled: boolean;
+}) {
+  const full = buttons.length >= MAX_BUTTONS;
+
+  function set(i: number, patch: Partial<DetailsButton>) {
+    onChange(buttons.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
+  }
+
+  return (
+    <div className="space-y-3">
+      {buttons.length === 0 && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3">
+          No buttons yet — this message goes out as <strong>plain text</strong>. Add one below.
+        </p>
+      )}
+
+      {buttons.map((b, i) => (
+        <div key={i} className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Button {i + 1}
+            </span>
+            {!disabled && (
+              <button
+                onClick={() => onChange(buttons.filter((_, idx) => idx !== i))}
+                className="text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                title="Remove this button"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <Input
+            label="Button text"
+            value={b.title}
+            onChange={(e) => set(i, { title: e.target.value })}
+            disabled={disabled}
+            placeholder="Visit Page 🔗"
+          />
+          <Input
+            label="Link URL"
+            type="url"
+            value={b.url}
+            onChange={(e) => set(i, { url: e.target.value })}
+            disabled={disabled}
+            placeholder="https://yourwebsite.com"
+          />
+          {(!b.title.trim() || !b.url.trim()) && (
+            <p className="text-xs text-amber-700">
+              Needs both a label and a link, or it won&apos;t be sent.
+            </p>
+          )}
+        </div>
+      ))}
+
+      {!disabled && (
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onChange([...buttons, { title: "", url: "" }])}
+            disabled={full}
+          >
+            <Plus className="w-4 h-4" /> Add button
+          </Button>
+          <span className="text-xs text-gray-400">
+            {full
+              ? "Instagram allows a maximum of 3 buttons"
+              : `${MAX_BUTTONS - buttons.length} more allowed`}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MultiButtonBubble({ text, buttons }: { text: string; buttons: DetailsButton[] }) {
+  return (
+    <div>
+      <div className="bg-white/10 text-white text-xs rounded-2xl rounded-tl-sm p-3 leading-relaxed whitespace-pre-line mb-2">
+        {text}
+      </div>
+      {buttons.map((b, i) => (
+        <button
+          key={i}
+          className="w-full bg-emerald-500 text-white text-xs font-medium py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 cursor-default mb-1.5 last:mb-0"
+        >
+          {b.title} <ChevronRight className="w-3 h-3" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Pick another reel and clone its message setup onto this one. */
+function CopyFromDialog({
+  currentId, onCopy, onClose, busy,
+}: {
+  currentId: string;
+  onCopy: (sourceId: string) => void;
+  onClose: () => void;
+  busy: boolean;
+}) {
+  const [options, setOptions] = useState<Automation[] | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/automations")
+      .then((r) => r.json())
+      .then(({ automations }) =>
+        setOptions((automations ?? []).filter((a: Automation) => a.id !== currentId))
+      );
+  }, [currentId]);
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-5 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-900">Copy setup from another reel</h3>
+          <p className="text-xs text-gray-400 mt-1">
+            Copies every message, keyword and button. Leaves this reel&apos;s Live/Off switch
+            and its stats alone.
+          </p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3">
+          {options === null ? (
+            <div className="py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-brand-500" /></div>
+          ) : options.length === 0 ? (
+            <p className="py-10 text-center text-xs text-gray-400">
+              No other reels configured yet.
+            </p>
+          ) : (
+            options.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => setPicked(a.id)}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg border mb-2 text-left transition-all cursor-pointer ${
+                  picked === a.id
+                    ? "border-brand-400 bg-brand-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                {a.postThumbnail ? (
+                  <div className="relative w-10 h-10 rounded overflow-hidden shrink-0">
+                    <Image src={a.postThumbnail} alt="" fill className="object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center shrink-0">
+                    <MessageSquare className="w-4 h-4 text-gray-300" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-gray-800 truncate">
+                    {a.postCaption || "Untitled reel"}
+                  </p>
+                  <p className="text-[11px] text-gray-400 truncate">
+                    {a.keywords?.trim() ? `Keywords: ${a.keywords}` : "Replies to every comment"}
+                  </p>
+                </div>
+                {picked === a.id && <Check className="w-4 h-4 text-brand-600 shrink-0" />}
+              </button>
+            ))
+          )}
+        </div>
+
+        <div className="p-4 border-t border-gray-100 flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button
+            size="sm"
+            disabled={!picked}
+            loading={busy}
+            onClick={() => picked && onCopy(picked)}
+          >
+            <Copy className="w-4 h-4" /> Copy setup
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

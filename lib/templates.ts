@@ -15,6 +15,7 @@ export type TemplateFields = Pick<
   | "followRetryMessage"
   | "detailsMessage"
   | "detailsButtonEnabled"
+  | "detailsButtons"
   | "detailsButtonText"
   | "detailsUrl"
 >;
@@ -49,6 +50,7 @@ export function automationCreateFromTemplate(
     followRetryMessage: template.followRetryMessage,
     detailsMessage: template.detailsMessage,
     detailsButtonEnabled: template.detailsButtonEnabled,
+    detailsButtons: template.detailsButtons ?? [],
     detailsButtonText: template.detailsButtonText,
     detailsUrl: template.detailsUrl,
   };

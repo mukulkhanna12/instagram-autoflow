@@ -114,9 +114,13 @@ model AutomationTemplate {
   followButtonText   String @default("I've Followed ✓")
   followRetryMessage String @default("Hmm, I can't see you on my followers list yet 👀\n\nPlease follow the page first, then tap the button again.") @db.Text
   detailsMessage     String @default("Here are the details you asked for! 🎉\n\nClick below to visit the page.") @db.Text
-  // The final message's button is optional — turn it off to send plain text.
-  // A button only makes sense with a link, so it needs detailsUrl to be set.
+  // The final message's buttons are optional — turn them off to send plain text.
+  // detailsButtons holds up to 3 link buttons as [{ title, url }] — Instagram's
+  // button template allows no more than three. detailsButtonText/detailsUrl are
+  // the original single-button fields, kept as a fallback for rows written
+  // before detailsButtons existed; see lib/buttons.ts.
   detailsButtonEnabled Boolean @default(true)
+  detailsButtons       Json    @default("[]")
   detailsButtonText    String  @default("Visit Page 🔗")
   detailsUrl           String  @default("")
 
@@ -168,9 +172,13 @@ model PostAutomation {
   // Sent when they tap "I've followed" but still are not following. Loops until they do.
   followRetryMessage String @default("Hmm, I can't see you on my followers list yet 👀\n\nPlease follow the page first, then tap the button again.") @db.Text
   detailsMessage     String @default("Here are the details you asked for! 🎉\n\nClick below to visit the page.") @db.Text
-  // The final message's button is optional — turn it off to send plain text.
-  // A button only makes sense with a link, so it needs detailsUrl to be set.
+  // The final message's buttons are optional — turn them off to send plain text.
+  // detailsButtons holds up to 3 link buttons as [{ title, url }] — Instagram's
+  // button template allows no more than three. detailsButtonText/detailsUrl are
+  // the original single-button fields, kept as a fallback for rows written
+  // before detailsButtons existed; see lib/buttons.ts.
   detailsButtonEnabled Boolean @default(true)
+  detailsButtons       Json    @default("[]")
   detailsButtonText    String  @default("Visit Page 🔗")
   detailsUrl           String  @default("")
 

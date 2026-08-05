@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
+import { buttonsSchema } from "@/lib/schemas";
 
 const updateSchema = z.object({
   enabled: z.boolean().optional(),
@@ -16,6 +17,7 @@ const updateSchema = z.object({
   followRetryMessage: z.string().optional(),
   detailsMessage: z.string().optional(),
   detailsButtonEnabled: z.boolean().optional(),
+  detailsButtons: buttonsSchema.optional(),
   detailsButtonText: z.string().optional(),
   detailsUrl: z.string().optional(),
 });

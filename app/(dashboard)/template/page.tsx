@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  Loader2, MessageSquare, Zap, UserCheck, Link2, Save, ToggleLeft, ToggleRight, Wand2, AlertCircle, Filter,
+  Loader2, MessageSquare, Zap, UserCheck, Link2, Save, ToggleLeft, ToggleRight, Wand2, AlertCircle,
+  Filter, Plus, Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -22,8 +23,26 @@ interface Template {
   followRetryMessage: string;
   detailsMessage: string;
   detailsButtonEnabled: boolean;
+  detailsButtons: DetailsButton[];
   detailsButtonText: string;
   detailsUrl: string;
+}
+
+interface DetailsButton {
+  title: string;
+  url: string;
+}
+
+const MAX_BUTTONS = 3;
+
+/** Fall back to the legacy single-button pair for templates saved before this. */
+function buttonsOf(t: Template): DetailsButton[] {
+  if (Array.isArray(t.detailsButtons) && t.detailsButtons.length > 0) {
+    return t.detailsButtons.slice(0, MAX_BUTTONS);
+  }
+  const title = t.detailsButtonText?.trim();
+  const url = t.detailsUrl?.trim();
+  return title && url ? [{ title, url }] : [];
 }
 
 const FIELDS = [
@@ -31,7 +50,7 @@ const FIELDS = [
   "commentReplyText", "commentReplyText2", "commentReplyText3",
   "greetingMessage", "greetingButtonText",
   "followMessage", "followButtonText", "followRetryMessage",
-  "detailsMessage", "detailsButtonEnabled", "detailsButtonText", "detailsUrl",
+  "detailsMessage", "detailsButtonEnabled", "detailsButtons", "detailsButtonText", "detailsUrl",
 ] as const;
 
 export default function TemplatePage() {
@@ -52,7 +71,7 @@ export default function TemplatePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  function updateField(field: keyof Template, value: string | boolean) {
+  function updateField(field: keyof Template, value: string | boolean | DetailsButton[]) {
     setTemplate((prev) => (prev ? { ...prev, [field]: value } : prev));
   }
 
@@ -232,21 +251,10 @@ export default function TemplatePage() {
             onChange={(on) => updateField("detailsButtonEnabled", on)}
           />
           {(template.detailsButtonEnabled ?? true) && (
-            <>
-              <Input
-                label="Button text"
-                value={template.detailsButtonText}
-                onChange={(e) => updateField("detailsButtonText", e.target.value)}
-              />
-              <Input
-                label="Link URL"
-                type="url"
-                value={template.detailsUrl}
-                onChange={(e) => updateField("detailsUrl", e.target.value)}
-                placeholder="https://yourwebsite.com"
-                hint="Opened when the user taps the final button. Without a link the message goes out as plain text."
-              />
-            </>
+            <ButtonListEditor
+              buttons={buttonsOf(template)}
+              onChange={(b) => updateField("detailsButtons", b)}
+            />
           )}
         </Section>
       </div>
@@ -289,6 +297,78 @@ function KeywordFilter({ value, onChange }: { value: string; onChange: (v: strin
           hint="Comma-separated. Not case-sensitive — PROMPT, Prompt and prompt all match."
         />
       )}
+    </div>
+  );
+}
+
+/** Up to three link buttons on the final message — Instagram's hard ceiling. */
+function ButtonListEditor({
+  buttons, onChange,
+}: { buttons: DetailsButton[]; onChange: (b: DetailsButton[]) => void }) {
+  const full = buttons.length >= MAX_BUTTONS;
+
+  function set(i: number, patch: Partial<DetailsButton>) {
+    onChange(buttons.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
+  }
+
+  return (
+    <div className="space-y-3">
+      {buttons.length === 0 && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3">
+          No buttons yet — new reels would send this as <strong>plain text</strong>.
+        </p>
+      )}
+
+      {buttons.map((b, i) => (
+        <div key={i} className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Button {i + 1}
+            </span>
+            <button
+              onClick={() => onChange(buttons.filter((_, idx) => idx !== i))}
+              className="text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+              title="Remove this button"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <Input
+            label="Button text"
+            value={b.title}
+            onChange={(e) => set(i, { title: e.target.value })}
+            placeholder="Visit Page 🔗"
+          />
+          <Input
+            label="Link URL"
+            type="url"
+            value={b.url}
+            onChange={(e) => set(i, { url: e.target.value })}
+            placeholder="https://yourwebsite.com"
+          />
+          {(!b.title.trim() || !b.url.trim()) && (
+            <p className="text-xs text-amber-700">
+              Needs both a label and a link, or it won&apos;t be sent.
+            </p>
+          )}
+        </div>
+      ))}
+
+      <div className="flex items-center gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onChange([...buttons, { title: "", url: "" }])}
+          disabled={full}
+        >
+          <Plus className="w-4 h-4" /> Add button
+        </Button>
+        <span className="text-xs text-gray-400">
+          {full
+            ? "Instagram allows a maximum of 3 buttons"
+            : `${MAX_BUTTONS - buttons.length} more allowed`}
+        </span>
+      </div>
     </div>
   );
 }

@@ -17,6 +17,7 @@
 import { db } from "./db";
 import { sendDM, getUserProfile, type SendResult } from "./instagram";
 import { personalize, type Person } from "./personalize";
+import { resolveDetailsButtons } from "./buttons";
 
 export type FlowState = "greeted" | "follow_requested" | "completed";
 
@@ -188,28 +189,28 @@ async function sendDetailsMessage(
   automation: {
     detailsMessage: string;
     detailsButtonEnabled: boolean;
+    detailsButtons: unknown;
     detailsButtonText: string;
     detailsUrl: string;
   },
   opts: SendContext,
   person: Person = {}
 ): Promise<SendResult> {
-  const link = automation.detailsUrl?.trim();
   const text = personalize(automation.detailsMessage, person);
 
-  // The button is opt-in, and it only works as a link. With it switched off — or
-  // switched on but with no URL filled in — send plain text: a button template
-  // whose button does nothing is worse than no button at all.
-  const withButton = automation.detailsButtonEnabled && !!link;
+  // Up to three link buttons, capped in resolveDetailsButtons. None configured
+  // (or the toggle switched off) means plain text — a button template whose
+  // buttons do nothing is worse than no buttons at all.
+  const buttons = resolveDetailsButtons(automation);
 
   return sendDM(
     opts.igUserId,
     { id: opts.senderIgUserId },
-    withButton
+    buttons.length > 0
       ? {
           type: "button",
           text,
-          buttons: [{ kind: "url", title: automation.detailsButtonText, url: link! }],
+          buttons: buttons.map((b) => ({ kind: "url" as const, title: b.title, url: b.url })),
         }
       : { type: "text", text },
     opts.accessToken
