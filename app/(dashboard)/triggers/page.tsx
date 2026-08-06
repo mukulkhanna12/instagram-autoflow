@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Workflow, Trash2, MessageSquare, GitBranch, Filter, ImageIcon, Info } from "lucide-react";
+import { Plus, Workflow, Trash2, MessageSquare, GitBranch, Filter, ImageIcon, Info, Sliders } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,9 +47,14 @@ export default function TriggersListPage() {
             </p>
           </div>
         </div>
-        <Button size="sm" onClick={create}>
-          <Plus className="w-4 h-4" /> New trigger
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => router.push("/triggers/defaults")}>
+            <Sliders className="w-4 h-4" /> Default messages
+          </Button>
+          <Button size="sm" onClick={create}>
+            <Plus className="w-4 h-4" /> New trigger
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-start gap-2.5 bg-amber-50/70 border border-amber-100 rounded-xl p-3.5 my-5">

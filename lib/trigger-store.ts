@@ -10,6 +10,7 @@
  */
 
 export const STORAGE_KEY = "autoflow.triggers.preview.v1";
+export const DEFAULTS_KEY = "autoflow.triggers.defaults.v1";
 
 export interface TriggerReel {
   id: string;
@@ -54,10 +55,60 @@ export type TriggerSource =
       replies: string[];
     };
 
+/** Where a card sits once it has been dragged. Absent = auto-laid-out. */
+export interface NodePos { x: number; y: number }
+
 export type FlowNode =
-  | { id: string; type: "trigger"; sources: TriggerSource[]; next: string | null }
-  | { id: string; type: "message"; title: string; text: string; buttons: FlowButton[] }
-  | { id: string; type: "condition"; label: string; yes: string | null; no: string | null };
+  | { id: string; type: "trigger"; sources: TriggerSource[]; next: string | null; pos?: NodePos }
+  | { id: string; type: "message"; title: string; text: string; buttons: FlowButton[]; pos?: NodePos }
+  | { id: string; type: "condition"; label: string; yes: string | null; no: string | null; pos?: NodePos };
+
+/**
+ * The wording every new trigger starts from. Editing these doesn't touch
+ * triggers that already exist — they've been customised by then, and quietly
+ * rewriting them would be the opposite of a default.
+ */
+export interface TriggerDefaults {
+  opener: { text: string; button: string };
+  follow: { text: string; button: string };
+  payoff: { text: string; button: string };
+}
+
+export const FALLBACK_DEFAULTS: TriggerDefaults = {
+  opener: {
+    text: "Hey {{full_name}} 👋\n\nQuick check before I share the link — are you following this page? 😊",
+    button: "Yes, I'm following",
+  },
+  follow: {
+    text: "Almost there! Follow the page first, then tap below and I'll send it over 🙏",
+    button: "I've followed ✓",
+  },
+  payoff: {
+    text: "Awesome 🙌 Here's the link 👇",
+    button: "Click here",
+  },
+};
+
+export function loadDefaults(): TriggerDefaults {
+  if (typeof window === "undefined") return FALLBACK_DEFAULTS;
+  try {
+    const raw = window.localStorage.getItem(DEFAULTS_KEY);
+    if (!raw) return FALLBACK_DEFAULTS;
+    const parsed = JSON.parse(raw) as Partial<TriggerDefaults>;
+    return {
+      opener: { ...FALLBACK_DEFAULTS.opener, ...parsed.opener },
+      follow: { ...FALLBACK_DEFAULTS.follow, ...parsed.follow },
+      payoff: { ...FALLBACK_DEFAULTS.payoff, ...parsed.payoff },
+    };
+  } catch {
+    return FALLBACK_DEFAULTS;
+  }
+}
+
+export function saveDefaults(d: TriggerDefaults) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(DEFAULTS_KEY, JSON.stringify(d));
+}
 
 export interface Trigger {
   id: string;
@@ -90,6 +141,7 @@ export function dmSource(): Extract<TriggerSource, { kind: "dm" }> {
 
 /** A sensible starting graph: comment → opener → follow check → payoff. */
 export function starterNodes(): FlowNode[] {
+  const d = loadDefaults();
   const trigger = uid("trg");
   const m1 = uid("msg");
   const cond = uid("cnd");
@@ -101,14 +153,14 @@ export function starterNodes(): FlowNode[] {
     },
     {
       id: m1, type: "message", title: "Opening DM",
-      text: "Hey {{full_name}} 👋\n\nQuick check before I share the link — are you following this page? 😊",
-      buttons: [{ id: uid("btn"), label: "Yes, I'm following", kind: "next", next: cond }],
+      text: d.opener.text,
+      buttons: [{ id: uid("btn"), label: d.opener.button, kind: "next", next: cond }],
     },
     { id: cond, type: "condition", label: "Do they follow you?", yes: m2, no: null },
     {
       id: m2, type: "message", title: "The payoff",
-      text: "Awesome 🙌 Here's the link 👇",
-      buttons: [{ id: uid("btn"), label: "Click here", kind: "link", url: "" }],
+      text: d.payoff.text,
+      buttons: [{ id: uid("btn"), label: d.payoff.button, kind: "link", url: "" }],
     },
   ];
 }

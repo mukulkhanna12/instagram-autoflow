@@ -94,12 +94,23 @@ export function TriggerInspector({
           onAddButton={() => onAddButton(node.id)} onDelete={() => onDelete(node.id)}
         />
       ) : (
-        <div className="p-5">
-          <p className="text-xs text-gray-500 leading-relaxed">
-            Instagram only reveals whether someone follows you once they&apos;ve messaged you, and
-            their button tap is that message. So this check can only sit after a button — never
-            straight after the comment.
-          </p>
+        <div className="flex-1 flex flex-col">
+          <div className="p-5 space-y-3">
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Instagram only reveals whether someone follows you once they&apos;ve messaged you, and
+              their button tap is that message. So this check can only sit after a button — never
+              straight after the comment.
+            </p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Remove it and the flow still runs — everyone reaches the payoff without having to
+              follow first.
+            </p>
+          </div>
+          <div className="mt-auto border-t border-gray-100 p-4">
+            <Button variant="outline" size="sm" className="w-full" onClick={() => onDelete(node.id)}>
+              <Trash2 className="w-3.5 h-3.5 text-red-400" /> Remove the follow check
+            </Button>
+          </div>
         </div>
       )}
     </div>

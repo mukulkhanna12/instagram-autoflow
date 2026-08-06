@@ -24,13 +24,13 @@ function Port({
   id: string;
   registerPort: PortRegister;
   connected: boolean;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
   title?: string;
 }) {
   return (
     <button
       ref={(el) => registerPort(id, el)}
-      onClick={onClick}
+      onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
       title={title ?? (connected ? "Connected" : "Add the next step")}
       className={`absolute -right-[7px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 transition-all cursor-pointer z-10 ${
         connected
@@ -89,7 +89,7 @@ export function TriggerCard({
   selected: boolean;
   onSelect: () => void;
   registerPort: PortRegister;
-  onAddNext: () => void;
+  onAddNext: (e: React.MouseEvent) => void;
   onEditSource: (sourceId: string) => void;
   onAddSource: () => void;
 }) {
@@ -164,7 +164,7 @@ export function MessageCard({
   selected: boolean;
   onSelect: () => void;
   registerPort: PortRegister;
-  onAddFromButton: (buttonId: string) => void;
+  onAddFromButton: (buttonId: string, e: React.MouseEvent) => void;
   onAddButton: () => void;
   onDelete: () => void;
 }) {
@@ -191,7 +191,7 @@ export function MessageCard({
                 id={`${node.id}:btn:${b.id}`}
                 registerPort={registerPort}
                 connected={!!b.next}
-                onClick={() => onAddFromButton(b.id)}
+                onClick={(e) => onAddFromButton(b.id, e)}
                 title={b.next ? "Connected" : "Add the message this button opens"}
               />
             )}
@@ -226,7 +226,7 @@ export function ConditionCard({
   selected: boolean;
   onSelect: () => void;
   registerPort: PortRegister;
-  onAddBranch: (branch: "yes" | "no") => void;
+  onAddBranch: (branch: "yes" | "no", e: React.MouseEvent) => void;
   onDelete: () => void;
 }) {
   return (
@@ -263,7 +263,7 @@ export function ConditionCard({
               id={`${node.id}:${branch}`}
               registerPort={registerPort}
               connected={!!node[branch]}
-              onClick={() => onAddBranch(branch)}
+              onClick={(e) => onAddBranch(branch, e)}
             />
           </div>
         ))}

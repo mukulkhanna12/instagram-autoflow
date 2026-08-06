@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useParams, useRouter } from "next/navigation";
 import {
   Loader2, Plus, X, ArrowLeft, ImageIcon, Search, Minus, Maximize2,
-  Eye, Check, ChevronRight,
+  Eye, Check, ChevronRight, MessageSquare, GitBranch, Sliders,
 } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,9 @@ export default function TriggerBuilderPage() {
   const [saved, setSaved] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
-  const [showPreview, setShowPreview] = useState(true);
+  // An empty port that was clicked, waiting for a choice of what to add.
+  const [pendingPort, setPendingPort] = useState<{ attach: (id: string) => void; x: number; y: number } | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   // Reels are loaded once, the first time a wizard step asks for them.
   const [reels, setReels] = useState<TriggerReel[] | null>(null);
   const reelsRequested = useRef(false);
@@ -111,6 +113,8 @@ export default function TriggerBuilderPage() {
         y += (nodeEls.current.get(nid)?.offsetHeight ?? 210) + ROW_GAP;
       });
     });
+    // A card that has been dragged keeps where it was put.
+    nodes.forEach((n) => { if (n.pos) pos.set(n.id, n.pos); });
     return pos;
   }, [nodes, byId]);
 
@@ -202,6 +206,36 @@ export default function TriggerBuilderPage() {
     return () => vp.removeEventListener("wheel", onWheel);
   }, [trigger]);
 
+  // ── dragging a card ──────────────────────────────────────────────────────
+  const dragging = useRef<{ id: string; sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
+
+  function onNodePointerDown(e: React.PointerEvent, nid: string) {
+    // Let inputs, buttons and ports keep their own behaviour.
+    if ((e.target as HTMLElement).closest("button, input, textarea, a")) return;
+    const start = layout.get(nid) ?? { x: 0, y: 0 };
+    dragging.current = { id: nid, sx: e.clientX, sy: e.clientY, ox: start.x, oy: start.y, moved: false };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    e.stopPropagation();
+  }
+
+  function onNodePointerMove(e: React.PointerEvent) {
+    const d = dragging.current;
+    if (!d) return;
+    const dx = (e.clientX - d.sx) / zoom;
+    const dy = (e.clientY - d.sy) / zoom;
+    // A few pixels of slop so a click doesn't register as a drag.
+    if (!d.moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+    d.moved = true;
+    patch(d.id, { pos: { x: d.ox + dx, y: d.oy + dy } } as Partial<FlowNode>);
+  }
+
+  function onNodePointerUp(e: React.PointerEvent) {
+    const d = dragging.current;
+    dragging.current = null;
+    // Suppress the click that follows a real drag, so it doesn't also select.
+    if (d?.moved) e.stopPropagation();
+  }
+
   function onPointerDown(e: React.PointerEvent) {
     if ((e.target as HTMLElement).closest("[data-node]")) return; // dragging a card shouldn't pan
     panning.current = { x: pan.x, y: pan.y, px: e.clientX, py: e.clientY };
@@ -235,6 +269,17 @@ export default function TriggerBuilderPage() {
   const msgIndex = (nid: string) =>
     nodes.filter((n) => n.type === "message").findIndex((n) => n.id === nid) + 1;
 
+  /** Add a follow check, wired into whichever port was clicked. */
+  function addCondition(attach: (newId: string) => void) {
+    const nid = uid("cnd");
+    setNodes((prev) => [...prev, {
+      id: nid, type: "condition", label: "Do they follow you?", yes: null, no: null,
+    }]);
+    attach(nid);
+    setSelectedId(nid);
+    setDrawerOpen(true);
+  }
+
   function addMessage(attach: (newId: string) => void) {
     const nid = uid("msg");
     setNodes((prev) => [...prev, {
@@ -266,6 +311,13 @@ export default function TriggerBuilderPage() {
       n.type === "trigger" ? { ...n, sources: n.sources.filter((x) => x.id !== sourceId) } : n));
   }
 
+  function openAddMenu(e: React.MouseEvent, attach: (id: string) => void) {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const r = vp.getBoundingClientRect();
+    setPendingPort({ attach, x: e.clientX - r.left, y: e.clientY - r.top });
+  }
+
   function addButton(nid: string) {
     setNodes((prev) => prev.map((n) =>
       n.id === nid && n.type === "message"
@@ -273,13 +325,24 @@ export default function TriggerBuilderPage() {
         : n));
   }
 
+  /**
+   * Delete a card. Removing a follow check splices it out rather than cutting
+   * the flow in half: whatever pointed at it now points at its "yes" branch,
+   * so the payoff stays reachable and just loses the gate.
+   */
   function removeNode(nid: string) {
-    setNodes((prev) => prev.filter((n) => n.id !== nid).map((n) => {
-      if (n.type === "trigger" && n.next === nid) return { ...n, next: null };
-      if (n.type === "condition") return { ...n, yes: n.yes === nid ? null : n.yes, no: n.no === nid ? null : n.no };
-      if (n.type === "message") return { ...n, buttons: n.buttons.map((b) => (b.next === nid ? { ...b, next: null } : b)) };
-      return n;
-    }));
+    setNodes((prev) => {
+      const gone = prev.find((n) => n.id === nid);
+      const bypass = gone?.type === "condition" ? gone.yes : null;
+      const redirect = (target: string | null | undefined) =>
+        target === nid ? bypass : (target ?? null);
+
+      return prev.filter((n) => n.id !== nid).map((n) => {
+        if (n.type === "trigger") return { ...n, next: redirect(n.next) };
+        if (n.type === "condition") return { ...n, yes: redirect(n.yes), no: redirect(n.no) };
+        return { ...n, buttons: n.buttons.map((b) => ({ ...b, next: redirect(b.next) })) };
+      });
+    });
     if (selectedId === nid) setSelectedId(null);
   }
 
@@ -377,7 +440,10 @@ export default function TriggerBuilderPage() {
                   key={node.id}
                   data-node
                   ref={(el) => { if (el) nodeEls.current.set(node.id, el); else nodeEls.current.delete(node.id); }}
-                  className="absolute"
+                  onPointerDown={(e) => onNodePointerDown(e, node.id)}
+                  onPointerMove={onNodePointerMove}
+                  onPointerUp={onNodePointerUp}
+                  className="absolute touch-none"
                   style={{ left: pos.x, top: pos.y }}
                 >
                   {node.type === "trigger" && (
@@ -385,7 +451,7 @@ export default function TriggerBuilderPage() {
                       node={node} selected={selectedId === node.id}
                       onSelect={() => { setSelectedId(node.id); setDrawerOpen(true); }}
                       registerPort={registerPort}
-                      onAddNext={() => !node.next && addMessage((nid) => patch(node.id, { next: nid } as Partial<FlowNode>))}
+                      onAddNext={(e) => !node.next && openAddMenu(e, (nid) => patch(node.id, { next: nid } as Partial<FlowNode>))}
                       onEditSource={(sid) => { setSelectedId(node.id); setDrawerOpen(true); setEditingSourceId(sid); }}
                       onAddSource={() => { setSelectedId(node.id); setDrawerOpen(true); addSource("dm"); }}
                     />
@@ -395,9 +461,9 @@ export default function TriggerBuilderPage() {
                       node={node} index={msgIndex(node.id)} selected={selectedId === node.id}
                       onSelect={() => { setSelectedId(node.id); setDrawerOpen(true); }}
                       registerPort={registerPort}
-                      onAddFromButton={(bid) => {
+                      onAddFromButton={(bid, e) => {
                         if (node.buttons.find((b) => b.id === bid)?.next) return;
-                        addMessage((nid) => setNodes((prev) => prev.map((x) =>
+                        openAddMenu(e, (nid) => setNodes((prev) => prev.map((x) =>
                           x.id === node.id && x.type === "message"
                             ? { ...x, buttons: x.buttons.map((b) => (b.id === bid ? { ...b, next: nid } : b)) }
                             : x)));
@@ -411,7 +477,7 @@ export default function TriggerBuilderPage() {
                       node={node} selected={selectedId === node.id}
                       onSelect={() => { setSelectedId(node.id); setDrawerOpen(true); }}
                       registerPort={registerPort}
-                      onAddBranch={(b) => !node[b] && addMessage((nid) => patch(node.id, { [b]: nid } as unknown as Partial<FlowNode>))}
+                      onAddBranch={(b, e) => !node[b] && openAddMenu(e, (nid) => patch(node.id, { [b]: nid } as unknown as Partial<FlowNode>))}
                       onDelete={() => removeNode(node.id)}
                     />
                   )}
@@ -428,6 +494,40 @@ export default function TriggerBuilderPage() {
             >
               <ChevronRight className="w-4 h-4" />
             </button>
+          )}
+
+          {pendingPort && (
+            <>
+              <div className="absolute inset-0 z-20" onClick={() => setPendingPort(null)} />
+              <div
+                className="absolute z-30 bg-white rounded-xl shadow-lg ring-1 ring-gray-200 p-1 w-52"
+                style={{ left: Math.max(8, pendingPort.x - 100), top: pendingPort.y + 12 }}
+              >
+                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide px-2.5 pt-1.5 pb-1">
+                  Add next step
+                </p>
+                <button
+                  onClick={() => { addMessage(pendingPort.attach); setPendingPort(null); }}
+                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-gray-50 cursor-pointer flex items-center gap-2.5"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-brand-500 shrink-0" />
+                  <span>
+                    <span className="block text-xs font-medium text-gray-800">Send a message</span>
+                    <span className="block text-[11px] text-gray-400">A DM with optional buttons</span>
+                  </span>
+                </button>
+                <button
+                  onClick={() => { addCondition(pendingPort.attach); setPendingPort(null); }}
+                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-gray-50 cursor-pointer flex items-center gap-2.5"
+                >
+                  <GitBranch className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span>
+                    <span className="block text-xs font-medium text-gray-800">Follow check</span>
+                    <span className="block text-[11px] text-gray-400">Branch on whether they follow</span>
+                  </span>
+                </button>
+              </div>
+            </>
           )}
 
           {/* Zoom controls — a compact pill, bottom-left */}

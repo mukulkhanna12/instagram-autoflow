@@ -8,7 +8,7 @@ import { Input, Textarea } from "@/components/ui/input";
 import { PhonePreview } from "@/components/phone-preview";
 import { ReelStrip, ReelPickerModal } from "@/components/reel-picker";
 import {
-  upsertTrigger, uid, commentSource,
+  upsertTrigger, uid, commentSource, loadDefaults,
   type Trigger, type FlowNode, type TriggerReel,
 } from "@/lib/trigger-store";
 
@@ -44,14 +44,14 @@ export default function NewTriggerPage() {
   const [publicReply, setPublicReply] = useState(true);
   const [replies, setReplies] = useState<string[]>(["Sent you a DM! 📩"]);
 
+  // Seeded from the saved defaults, so a change there shows up on every new trigger.
+  const [defaults] = useState(() => loadDefaults());
   const [openerOn, setOpenerOn] = useState(true);
-  const [opener, setOpener] = useState(
-    "Hey {{full_name}} 👋\n\nClick below and I'll send you the link in just a sec ✨"
-  );
-  const [openerButton, setOpenerButton] = useState("Send me the link");
+  const [opener, setOpener] = useState(defaults.opener.text);
+  const [openerButton, setOpenerButton] = useState(defaults.opener.button);
 
-  const [payoff, setPayoff] = useState("Awesome 🙌 Here's the link 👇");
-  const [payoffButton, setPayoffButton] = useState("Click here");
+  const [payoff, setPayoff] = useState(defaults.payoff.text);
+  const [payoffButton, setPayoffButton] = useState(defaults.payoff.button);
   const [payoffUrl, setPayoffUrl] = useState("");
 
   useEffect(() => {
