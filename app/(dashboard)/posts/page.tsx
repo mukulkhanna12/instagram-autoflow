@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ImageIcon, Loader2, Heart, MessageCircle, Zap, AlertCircle, ExternalLink } from "lucide-react";
+import { ImageIcon, Loader2, Heart, MessageCircle, Zap, AlertCircle, ExternalLink, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
@@ -19,6 +19,12 @@ interface Post {
   comments_count?: number;
 }
 
+interface QueuedFlow {
+  id: string;
+  name: string;
+  position: number;
+}
+
 interface Automation {
   id: string;
   postId: string;
@@ -33,13 +39,17 @@ export default function PostsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState<string | null>(null);
+  const [flows, setFlows] = useState<QueuedFlow[]>([]);
+  const [attaching, setAttaching] = useState<string | null>(null);
+  const [attachError, setAttachError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const [postsRes, autoRes] = await Promise.all([
+        const [postsRes, autoRes, flowsRes] = await Promise.all([
           fetch("/api/instagram/posts"),
           fetch("/api/automations"),
+          fetch("/api/flows"),
         ]);
         if (!postsRes.ok) {
           const e = await postsRes.json();
@@ -48,8 +58,10 @@ export default function PostsPage() {
         }
         const { posts } = await postsRes.json();
         const { automations } = await autoRes.json();
+        const { flows } = await flowsRes.json();
         setPosts(posts ?? []);
         setAutomations(automations ?? []);
+        setFlows(flows ?? []);
       } catch {
         setError("Something went wrong");
       } finally {
@@ -58,6 +70,36 @@ export default function PostsPage() {
     }
     load();
   }, []);
+
+  // Front of the queue — what "Attach flow" would hand to a reel.
+  const nextFlow = flows[0] ?? null;
+
+  async function attachFlow(post: Post) {
+    setAttaching(post.id);
+    setAttachError(null);
+    try {
+      const res = await fetch("/api/automations/attach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          postId: post.id,
+          postUrl: post.permalink,
+          postCaption: post.caption,
+          postThumbnail: post.thumbnail_url ?? post.media_url,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAttachError(data.error ?? "Couldn't attach the flow");
+        return;
+      }
+      setAutomations((prev) => [...prev.filter((a) => a.postId !== post.id), data.automation]);
+      // It's been consumed — the next reel gets the one behind it.
+      setFlows((prev) => prev.slice(1));
+    } finally {
+      setAttaching(null);
+    }
+  }
 
   const getAutomation = (postId: string) => automations.find((a) => a.postId === postId);
 
@@ -109,10 +151,33 @@ export default function PostsPage() {
 
   return (
     <div className="p-8 max-w-6xl">
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Reels</h1>
         <p className="text-gray-500 text-sm mt-1">Select a reel to set up a comment-to-DM automation</p>
       </div>
+
+      {nextFlow && (
+        <div className="mb-6 flex items-start gap-3 bg-brand-50 border border-brand-200 rounded-xl p-4">
+          <Wand2 className="w-4 h-4 text-brand-600 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium text-brand-900">
+              &ldquo;{nextFlow.name || "Next prepared flow"}&rdquo; is waiting
+              {flows.length > 1 && <span className="font-normal"> ({flows.length - 1} more behind it)</span>}
+            </p>
+            <p className="text-xs text-brand-700 mt-0.5">
+              Press <strong>Attach flow</strong> on the reel you meant it for and it goes Live straight away.
+              Leave it and it attaches on its own when someone first comments.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {attachError && (
+        <div className="mb-6 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-800">{attachError}</p>
+        </div>
+      )}
 
       {posts.length === 0 ? (
         <div className="text-center py-20 text-gray-400">
@@ -176,6 +241,19 @@ export default function PostsPage() {
                       >
                         <Zap className="w-3 h-3" /> Configure
                       </Link>
+                    ) : nextFlow ? (
+                      // A flow is waiting. Attaching it here is the same thing
+                      // the first comment would do — this just doesn't make you
+                      // wait for one.
+                      <Button
+                        size="sm"
+                        className="flex-1 text-xs"
+                        loading={attaching === post.id}
+                        onClick={() => attachFlow(post)}
+                        title={`Attach "${nextFlow.name || "the next prepared flow"}" and go Live`}
+                      >
+                        <Wand2 className="w-3 h-3" /> Attach flow
+                      </Button>
                     ) : (
                       <Button
                         size="sm"
