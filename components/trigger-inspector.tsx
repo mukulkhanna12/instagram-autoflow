@@ -2,11 +2,11 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
-  ChevronLeft, ChevronRight, Pencil, Plus, X, ImageIcon, Check, Trash2, Loader2, Search,
+  ChevronLeft, ChevronRight, Plus, X, ImageIcon, Check, Trash2, Loader2, Search, Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
-import type { FlowNode, TriggerReel } from "@/lib/trigger-store";
+import type { FlowNode, TriggerReel, TriggerSource } from "@/lib/trigger-store";
 
 /**
  * The editing drawer for a selected card.
@@ -21,10 +21,10 @@ import type { FlowNode, TriggerReel } from "@/lib/trigger-store";
 type Patch = (id: string, up: Partial<FlowNode>) => void;
 
 export function TriggerInspector({
-  node, allNodes, msgIndex, patch, onClose, onDelete, onAddButton, setNodes, reels, loadReels,
+  node, msgIndex, patch, onClose, onDelete, onAddButton, setNodes, reels, loadReels,
+  editingSourceId, setEditingSourceId, patchSource, addSource, removeSource,
 }: {
   node: FlowNode;
-  allNodes: FlowNode[];
   msgIndex: (id: string) => number;
   patch: Patch;
   onClose: () => void;
@@ -33,14 +33,24 @@ export function TriggerInspector({
   setNodes: (fn: (prev: FlowNode[]) => FlowNode[]) => void;
   reels: TriggerReel[] | null;
   loadReels: () => void;
+  editingSourceId: string | null;
+  setEditingSourceId: (id: string | null) => void;
+  patchSource: (sourceId: string, up: Partial<TriggerSource>) => void;
+  addSource: (kind: "comment" | "dm") => void;
+  removeSource: (sourceId: string) => void;
 }) {
-  const [mode, setMode] = useState<"summary" | "edit">("summary");
   const [step, setStep] = useState(0);
 
+  const editingSource =
+    node.type === "trigger" ? node.sources.find((x) => x.id === editingSourceId) ?? null : null;
+
   const title =
-    node.type === "trigger" ? "When someone comments"
-    : node.type === "condition" ? "Follow check"
-    : `Message #${msgIndex(node.id)}`;
+    node.type === "trigger"
+      ? (editingSource
+          ? (editingSource.kind === "comment" ? "Reel comment trigger" : "DM trigger")
+          : "What starts this flow")
+      : node.type === "condition" ? "Follow check"
+      : `Message #${msgIndex(node.id)}`;
 
   return (
     <div className="w-[360px] shrink-0 bg-white border-r border-gray-200 flex flex-col h-full">
@@ -50,19 +60,31 @@ export function TriggerInspector({
           <ChevronLeft className="w-4 h-4" />
         </button>
         <p className="text-sm font-bold text-gray-900 truncate flex-1">{title}</p>
-        {node.type === "trigger" && mode === "summary" && (
-          <Pencil className="w-3.5 h-3.5 text-brand-700/50" />
+        {editingSource && (
+          <button
+            onClick={() => setEditingSourceId(null)}
+            className="text-[11px] text-brand-700/70 hover:text-brand-800 cursor-pointer shrink-0"
+          >
+            Done
+          </button>
         )}
       </div>
 
       {node.type === "trigger" ? (
-        mode === "summary" ? (
-          <TriggerSummary node={node} onEdit={() => { setMode("edit"); setStep(0); }} patch={patch} />
-        ) : (
-          <TriggerWizard
-            node={node} step={step} setStep={setStep} patch={patch}
-            onDone={() => setMode("summary")}
+        editingSource ? (
+          <SourceWizard
+            source={editingSource} step={step} setStep={setStep}
+            patchSource={patchSource}
+            onDone={() => setEditingSourceId(null)}
+            onRemove={() => { removeSource(editingSource.id); setEditingSourceId(null); }}
+            canRemove={node.sources.length > 1}
             reels={reels} loadReels={loadReels}
+          />
+        ) : (
+          <SourceList
+            node={node}
+            onEdit={(sid) => { setEditingSourceId(sid); setStep(0); }}
+            onAdd={addSource}
           />
         )
       ) : node.type === "message" ? (
@@ -83,150 +105,160 @@ export function TriggerInspector({
   );
 }
 
-/* ── Trigger: read-only summary ─────────────────────────────────────────── */
+/* ── Trigger: the list of things that start this flow ───────────────────── */
 
-function TriggerSummary({
-  node, onEdit, patch,
+function SourceList({
+  node, onEdit, onAdd,
 }: {
   node: Extract<FlowNode, { type: "trigger" }>;
-  onEdit: () => void;
-  patch: Patch;
+  onEdit: (sourceId: string) => void;
+  onAdd: (kind: "comment" | "dm") => void;
 }) {
+  const hasComment = node.sources.some((x) => x.kind === "comment");
+  const hasDm = node.sources.some((x) => x.kind === "dm");
+
   return (
-    <>
-      <div className="flex-1 overflow-y-auto p-5 space-y-6">
-        <Numbered n={1} label="When someone comments on">
-          <div className="rounded-xl border border-gray-200 p-3">
-            <p className="text-xs font-semibold text-gray-800 mb-2">A specific reel</p>
-            {node.reel ? (
-              <>
-                <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100">
-                  {node.reel.thumbnail
-                    ? <Image src={node.reel.thumbnail} alt="" fill className="object-cover" />
-                    : <div className="absolute inset-0 flex items-center justify-center"><ImageIcon className="w-6 h-6 text-gray-300" /></div>}
-                </div>
-                <p className="text-[11px] text-gray-500 mt-2 line-clamp-2">{node.reel.caption || "No caption"}</p>
-              </>
-            ) : (
-              <p className="text-[11px] text-gray-400">No reel chosen yet</p>
-            )}
-          </div>
-        </Numbered>
+    <div className="flex-1 overflow-y-auto p-5 space-y-5">
+      <p className="text-xs text-gray-500 leading-relaxed">
+        Any of these can start the flow. They all lead into the same messages.
+      </p>
 
-        <Numbered n={2} label="And their comment">
-          <div className="rounded-xl border border-gray-200 p-3 space-y-3">
-            {node.include.length > 0 ? (
-              <>
-                <p className="text-xs text-gray-600">
-                  Comments <strong>include</strong> these keywords:
+      <div className="space-y-2.5">
+        {node.sources.map((src, i) => (
+          <button
+            key={src.id}
+            onClick={() => onEdit(src.id)}
+            className="w-full text-left rounded-xl border border-gray-200 p-3.5 hover:border-brand-300 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5 mb-1.5">
+              <span className="w-6 h-6 rounded-full bg-gray-100 text-gray-600 text-[11px] font-bold flex items-center justify-center shrink-0">
+                {i + 1}
+              </span>
+              <p className="text-sm font-semibold text-gray-900">
+                {src.kind === "comment" ? "Someone comments on a reel" : "Someone sends you a DM"}
+              </p>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-300 ml-auto shrink-0" />
+            </div>
+            <div className="pl-[34px] space-y-1.5">
+              {src.kind === "comment" && (
+                <p className="text-[11px] text-gray-500">
+                  {src.reel ? (src.reel.caption || "Reel selected") : "No reel chosen yet"}
                 </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {node.include.map((k) => <Chip key={k}>{k}</Chip>)}
-                </div>
-              </>
-            ) : (
-              <p className="text-xs font-semibold text-gray-800">Any comment</p>
-            )}
-            {node.exclude.length > 0 && (
-              <>
-                <p className="text-xs text-gray-600">
-                  But <strong>never</strong> when it contains:
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {node.exclude.map((k) => <Chip key={k} tone="red">{k}</Chip>)}
-                </div>
-              </>
-            )}
-          </div>
-        </Numbered>
-
-        <Numbered n={3} label="And publicly you reply">
-          <div className="rounded-xl border border-gray-200 p-3 space-y-2">
-            {node.replyEnabled && node.replies.filter(Boolean).length > 0 ? (
-              <>
-                <p className="text-[11px] text-gray-500">One of these, picked at random:</p>
-                {node.replies.filter(Boolean).map((r, i) => (
-                  <p key={i} className="text-xs text-gray-800 bg-gray-50 rounded-lg px-2.5 py-1.5">{r}</p>
-                ))}
-              </>
-            ) : (
-              <p className="text-xs text-gray-500">No public reply</p>
-            )}
-          </div>
-        </Numbered>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                {src.include.length > 0
+                  ? src.include.map((k) => <Chip key={k}>{k}</Chip>)
+                  : <span className="text-[11px] text-gray-400">
+                      Any {src.kind === "comment" ? "comment" : "message"}
+                    </span>}
+                {src.exclude.map((k) => <Chip key={k} tone="red">not {k}</Chip>)}
+              </div>
+              <p className="text-[11px] text-gray-400">
+                {src.autoReply
+                  ? `Auto-replies ${src.kind === "comment" ? "in the feed" : "in the DM"}`
+                  : "No auto-reply"}
+              </p>
+            </div>
+          </button>
+        ))}
       </div>
 
-      <div className="border-t border-gray-100 p-4 flex items-center gap-3 shrink-0">
-        <label className="flex items-center gap-2 cursor-pointer mr-auto">
-          <input
-            type="checkbox"
-            checked={node.replyEnabled}
-            onChange={(e) => patch(node.id, { replyEnabled: e.target.checked } as Partial<FlowNode>)}
-            className="cursor-pointer"
-          />
-          <span className="text-[11px] text-gray-500">Public reply</span>
-        </label>
-        <Button size="sm" onClick={onEdit}>
-          <Pencil className="w-3.5 h-3.5" /> Edit
-        </Button>
+      <div className="space-y-2">
+        <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Add another</p>
+        <button
+          onClick={() => onAdd("comment")}
+          disabled={hasComment}
+          className="w-full rounded-xl border border-dashed border-gray-300 p-3 text-left flex items-center gap-2.5 hover:border-brand-400 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <ImageIcon className="w-4 h-4 text-emerald-500 shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-gray-800">Reel comment</p>
+            <p className="text-[11px] text-gray-400">
+              {hasComment ? "Already added" : "Reply in the feed and open a DM"}
+            </p>
+          </div>
+        </button>
+        <button
+          onClick={() => onAdd("dm")}
+          disabled={hasDm}
+          className="w-full rounded-xl border border-dashed border-gray-300 p-3 text-left flex items-center gap-2.5 hover:border-brand-400 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <Send className="w-4 h-4 text-sky-500 shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-gray-800">Direct message</p>
+            <p className="text-[11px] text-gray-400">
+              {hasDm ? "Already added" : "Someone DMs you a keyword"}
+            </p>
+          </div>
+        </button>
       </div>
-    </>
+    </div>
   );
 }
 
-/* ── Trigger: 3-step wizard ─────────────────────────────────────────────── */
+/* ── Trigger source: step wizard ────────────────────────────────────────── */
 
-const STEPS = [
-  "Which reel should this watch?",
-  "What in a comment starts it?",
-  "Reply publicly under the comment?",
-];
-
-function TriggerWizard({
-  node, step, setStep, patch, onDone, reels, loadReels,
+function SourceWizard({
+  source, step, setStep, patchSource, onDone, onRemove, canRemove, reels, loadReels,
 }: {
-  node: Extract<FlowNode, { type: "trigger" }>;
+  source: TriggerSource;
   step: number;
   setStep: (n: number) => void;
-  patch: Patch;
+  patchSource: (sourceId: string, up: Partial<TriggerSource>) => void;
   onDone: () => void;
+  onRemove: () => void;
+  canRemove: boolean;
   reels: TriggerReel[] | null;
   loadReels: () => void;
 }) {
+  const isComment = source.kind === "comment";
+  const steps = isComment
+    ? ["Which reel should this watch?", "What in a comment starts it?", "Reply publicly under the comment?"]
+    : ["What in a DM starts it?", "Reply automatically to that DM?"];
+  const at = Math.min(step, steps.length - 1);
+
   return (
     <>
       <div className="px-5 pt-4 shrink-0">
-        <p className="text-[11px] text-gray-400">Step {step + 1} of {STEPS.length}</p>
+        <p className="text-[11px] text-gray-400">Step {at + 1} of {steps.length}</p>
         <div className="h-1 rounded-full bg-gray-100 mt-1.5 overflow-hidden">
-          <div
-            className="h-full bg-brand-500 rounded-full transition-all"
-            style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-          />
+          <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${((at + 1) / steps.length) * 100}%` }} />
         </div>
-        <h3 className="text-base font-bold text-gray-900 mt-4 leading-snug">{STEPS[step]}</h3>
+        <h3 className="text-base font-bold text-gray-900 mt-4 leading-snug">{steps[at]}</h3>
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
-        {step === 0 && <StepReel node={node} patch={patch} reels={reels} loadReels={loadReels} />}
-        {step === 1 && <StepKeywords node={node} patch={patch} />}
-        {step === 2 && <StepReplies node={node} patch={patch} />}
+        {isComment && at === 0 && (
+          <StepReel source={source} patchSource={patchSource} reels={reels} loadReels={loadReels} />
+        )}
+        {((isComment && at === 1) || (!isComment && at === 0)) && (
+          <StepKeywords source={source} patchSource={patchSource} />
+        )}
+        {((isComment && at === 2) || (!isComment && at === 1)) && (
+          <StepReplies source={source} patchSource={patchSource} />
+        )}
       </div>
 
       <div className="border-t border-gray-100 p-4 flex items-center gap-2 shrink-0">
         <button
-          onClick={() => setStep(Math.max(0, step - 1))}
-          disabled={step === 0}
+          onClick={() => setStep(Math.max(0, at - 1))}
+          disabled={at === 0}
           className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed hover:border-gray-300 cursor-pointer"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
         <button
-          onClick={() => setStep(Math.min(STEPS.length - 1, step + 1))}
-          disabled={step === STEPS.length - 1}
+          onClick={() => setStep(Math.min(steps.length - 1, at + 1))}
+          disabled={at === steps.length - 1}
           className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed hover:border-gray-300 cursor-pointer"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
+        {canRemove && (
+          <button onClick={onRemove} className="text-gray-300 hover:text-red-500 ml-1 cursor-pointer" title="Remove this trigger">
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
         <Button size="sm" className="ml-auto" onClick={onDone}>
           <Check className="w-3.5 h-3.5" /> Done
         </Button>
@@ -236,17 +268,16 @@ function TriggerWizard({
 }
 
 function StepReel({
-  node, patch, reels, loadReels,
+  source, patchSource, reels, loadReels,
 }: {
-  node: Extract<FlowNode, { type: "trigger" }>;
-  patch: Patch;
+  source: Extract<TriggerSource, { kind: "comment" }>;
+  patchSource: (id: string, up: Partial<TriggerSource>) => void;
   reels: TriggerReel[] | null;
   loadReels: () => void;
 }) {
   const [showAll, setShowAll] = useState(false);
   const [q, setQ] = useState("");
 
-  // Fetched when this step is first reached — not on page load.
   useEffect(() => { if (reels === null) loadReels(); }, [reels, loadReels]);
 
   const filtered = (reels ?? []).filter((r) => !q || (r.caption ?? "").toLowerCase().includes(q.toLowerCase()));
@@ -270,22 +301,18 @@ function StepReel({
             )}
             <div className="grid grid-cols-3 gap-2">
               {shown.map((r) => {
-                const active = node.reel?.id === r.id;
+                const active = source.reel?.id === r.id;
                 return (
                   <button
                     key={r.id}
-                    onClick={() => patch(node.id, { reel: r } as Partial<FlowNode>)}
+                    onClick={() => patchSource(source.id, { reel: r } as Partial<TriggerSource>)}
                     className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer group"
                   >
                     {r.thumbnail
                       ? <Image src={r.thumbnail} alt="" fill className="object-cover" />
                       : <div className="absolute inset-0 flex items-center justify-center"><ImageIcon className="w-4 h-4 text-gray-300" /></div>}
-                    <span className={`absolute inset-0 ring-2 rounded-lg transition-all ${
-                      active ? "ring-brand-500" : "ring-transparent group-hover:ring-brand-300"
-                    }`} />
-                    <span className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full border-2 transition-all ${
-                      active ? "bg-brand-500 border-white" : "bg-white/70 border-white"
-                    }`} />
+                    <span className={`absolute inset-0 ring-2 rounded-lg transition-all ${active ? "ring-brand-500" : "ring-transparent group-hover:ring-brand-300"}`} />
+                    <span className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full border-2 ${active ? "bg-brand-500 border-white" : "bg-white/70 border-white"}`} />
                   </button>
                 );
               })}
@@ -306,24 +333,32 @@ function StepReel({
   );
 }
 
-function StepKeywords({ node, patch }: { node: Extract<FlowNode, { type: "trigger" }>; patch: Patch }) {
-  const anyComment = node.include.length === 0;
+function StepKeywords({
+  source, patchSource,
+}: {
+  source: TriggerSource;
+  patchSource: (id: string, up: Partial<TriggerSource>) => void;
+}) {
+  const anything = source.include.length === 0;
+  const noun = source.kind === "comment" ? "comment" : "message";
   return (
     <div className="space-y-3">
-      <OptionCard selected={!anyComment} title="Specific keywords" onClick={() => {
-        if (anyComment) patch(node.id, { include: ["prompt"] } as Partial<FlowNode>);
-      }}>
+      <OptionCard
+        selected={!anything}
+        title="Specific keywords"
+        onClick={() => { if (anything) patchSource(source.id, { include: ["prompt"] } as Partial<TriggerSource>); }}
+      >
         <div className="space-y-3">
           <KeywordBox
-            label={<>Comments <strong>include</strong> these keywords:</>}
-            words={node.include}
-            onChange={(w) => patch(node.id, { include: w } as Partial<FlowNode>)}
+            label={<>The {noun} <strong>includes</strong>:</>}
+            words={source.include}
+            onChange={(w) => patchSource(source.id, { include: w } as Partial<TriggerSource>)}
           />
           <KeywordBox
-            label={<>Comments <strong>exclude</strong> these keywords:</>}
-            words={node.exclude}
+            label={<>But <strong>never</strong> when it contains:</>}
+            words={source.exclude}
             tone="red"
-            onChange={(w) => patch(node.id, { exclude: w } as Partial<FlowNode>)}
+            onChange={(w) => patchSource(source.id, { exclude: w } as Partial<TriggerSource>)}
           />
           <p className="text-[11px] text-gray-400 leading-relaxed">
             Keywords aren&apos;t case-sensitive — &ldquo;Hello&rdquo; and &ldquo;hello&rdquo; are the same.
@@ -332,59 +367,64 @@ function StepKeywords({ node, patch }: { node: Extract<FlowNode, { type: "trigge
       </OptionCard>
 
       <OptionCard
-        selected={anyComment}
-        title="Any comment"
-        note="Every comment on the reel starts the flow"
-        onClick={() => patch(node.id, { include: [] } as Partial<FlowNode>)}
+        selected={anything}
+        title={`Any ${noun}`}
+        note={`Every ${noun} starts the flow`}
+        onClick={() => patchSource(source.id, { include: [] } as Partial<TriggerSource>)}
       />
     </div>
   );
 }
 
-function StepReplies({ node, patch }: { node: Extract<FlowNode, { type: "trigger" }>; patch: Patch }) {
-  const set = (replies: string[]) => patch(node.id, { replies } as Partial<FlowNode>);
+function StepReplies({
+  source, patchSource,
+}: {
+  source: TriggerSource;
+  patchSource: (id: string, up: Partial<TriggerSource>) => void;
+}) {
+  const set = (replies: string[]) => patchSource(source.id, { replies } as Partial<TriggerSource>);
+  const where = source.kind === "comment" ? "in the feed" : "in the DM";
   return (
     <div className="space-y-3">
       <OptionCard
-        selected={node.replyEnabled}
-        title="Yes — rotate several replies"
-        onClick={() => patch(node.id, { replyEnabled: true } as Partial<FlowNode>)}
+        selected={source.autoReply}
+        title={`Yes — auto-reply ${where}`}
+        onClick={() => patchSource(source.id, { autoReply: true } as Partial<TriggerSource>)}
       >
         <div className="space-y-2">
-          {node.replies.map((r, i) => (
+          {source.replies.map((r, i) => (
             <div key={i} className="flex gap-1.5">
               <Input
                 value={r}
-                onChange={(e) => set(node.replies.map((x, j) => (j === i ? e.target.value : x)))}
-                placeholder="Sent you a DM! 📩"
+                onChange={(e) => set(source.replies.map((x, j) => (j === i ? e.target.value : x)))}
+                placeholder={source.kind === "comment" ? "Sent you a DM! 📩" : "Got it — one sec 👀"}
               />
-              {node.replies.length > 1 && (
-                <button
-                  onClick={() => set(node.replies.filter((_, j) => j !== i))}
-                  className="text-gray-300 hover:text-red-500 shrink-0 cursor-pointer"
-                >
+              {source.replies.length > 1 && (
+                <button onClick={() => set(source.replies.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-500 shrink-0 cursor-pointer">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
           ))}
           <button
-            onClick={() => set([...node.replies, ""])}
+            onClick={() => set([...source.replies, ""])}
             className="w-full rounded-lg border border-dashed border-gray-300 py-2 text-xs text-gray-400 hover:border-brand-400 hover:text-brand-600 cursor-pointer flex items-center justify-center gap-1.5"
           >
             <Plus className="w-3 h-3" /> Add a reply
           </button>
           <p className="text-[11px] text-gray-400">
-            Identical replies can get flagged as spam, so one is picked at random each time.
+            {source.kind === "comment"
+              ? "Identical replies can get flagged as spam, so one is picked at random each time."
+              : "Sent the moment their DM arrives, before the rest of the flow runs."}
           </p>
         </div>
       </OptionCard>
 
       <OptionCard
-        selected={!node.replyEnabled}
-        title="No public reply"
-        note="Only the DM goes out"
-        onClick={() => patch(node.id, { replyEnabled: false } as Partial<FlowNode>)}
+        selected={!source.autoReply}
+        title="No auto-reply"
+        note={source.kind === "comment" ? "Only the DM goes out" : "Go straight into the flow"}
+        onClick={() => patchSource(source.id, { autoReply: false } as Partial<TriggerSource>)}
       />
     </div>
   );

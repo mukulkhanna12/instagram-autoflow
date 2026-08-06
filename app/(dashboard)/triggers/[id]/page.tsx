@@ -15,7 +15,8 @@ import {
   TriggerCard, MessageCard, ConditionCard, CARD_W,
 } from "@/components/trigger-nodes";
 import {
-  getTrigger, upsertTrigger, uid, type Trigger, type FlowNode, type FlowButton, type TriggerReel,
+  getTrigger, upsertTrigger, uid, commentSource, dmSource,
+  type Trigger, type FlowNode, type FlowButton, type TriggerReel, type TriggerSource,
 } from "@/lib/trigger-store";
 
 const COL_GAP = 130;
@@ -31,6 +32,7 @@ export default function TriggerBuilderPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);
+  const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(true);
   // Reels are loaded once, the first time a wizard step asks for them.
   const [reels, setReels] = useState<TriggerReel[] | null>(null);
@@ -235,6 +237,25 @@ export default function TriggerBuilderPage() {
     setDrawerOpen(true);
   }
 
+  function patchSource(sourceId: string, up: Partial<TriggerSource>) {
+    setNodes((prev) => prev.map((n) =>
+      n.type === "trigger"
+        ? { ...n, sources: n.sources.map((x) => (x.id === sourceId ? ({ ...x, ...up } as TriggerSource) : x)) }
+        : n));
+  }
+
+  function addSource(kind: "comment" | "dm") {
+    const src = kind === "comment" ? commentSource() : dmSource();
+    setNodes((prev) => prev.map((n) =>
+      n.type === "trigger" ? { ...n, sources: [...n.sources, src] } : n));
+    setEditingSourceId(src.id);
+  }
+
+  function removeSource(sourceId: string) {
+    setNodes((prev) => prev.map((n) =>
+      n.type === "trigger" ? { ...n, sources: n.sources.filter((x) => x.id !== sourceId) } : n));
+  }
+
   function addButton(nid: string) {
     setNodes((prev) => prev.map((n) =>
       n.id === nid && n.type === "message"
@@ -262,7 +283,6 @@ export default function TriggerBuilderPage() {
       {drawerOpen && selected && (
         <TriggerInspector
           node={selected}
-          allNodes={nodes}
           msgIndex={msgIndex}
           patch={patch}
           onClose={() => setDrawerOpen(false)}
@@ -271,6 +291,11 @@ export default function TriggerBuilderPage() {
           setNodes={setNodes}
           reels={reels}
           loadReels={loadReels}
+          editingSourceId={editingSourceId}
+          setEditingSourceId={setEditingSourceId}
+          patchSource={patchSource}
+          addSource={addSource}
+          removeSource={removeSource}
         />
       )}
 
@@ -351,7 +376,8 @@ export default function TriggerBuilderPage() {
                       onSelect={() => { setSelectedId(node.id); setDrawerOpen(true); }}
                       registerPort={registerPort}
                       onAddNext={() => !node.next && addMessage((nid) => patch(node.id, { next: nid } as Partial<FlowNode>))}
-                      onPickReel={() => { setSelectedId(node.id); setDrawerOpen(true); }}
+                      onEditSource={(sid) => { setSelectedId(node.id); setDrawerOpen(true); setEditingSourceId(sid); }}
+                      onAddSource={() => { setSelectedId(node.id); setDrawerOpen(true); addSource("dm"); }}
                     />
                   )}
                   {node.type === "message" && (

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Heart, MessageCircle, Send, Bookmark, ChevronLeft, ImageIcon } from "lucide-react";
-import type { FlowNode } from "@/lib/trigger-store";
+import type { FlowNode, TriggerSource } from "@/lib/trigger-store";
 import { renderMergeTags } from "./trigger-nodes";
 
 /**
@@ -20,7 +20,11 @@ export function PhonePreview({ nodes, username }: { nodes: FlowNode[]; username:
   const [tab, setTab] = useState<Tab>("dm");
 
   const trigger = nodes.find((n): n is Extract<FlowNode, { type: "trigger" }> => n.type === "trigger");
-  const reel = trigger?.reel ?? null;
+  // The Post and Comments views only make sense for the comment source.
+  const commentSrc = trigger?.sources.find(
+    (x): x is Extract<TriggerSource, { kind: "comment" }> => x.kind === "comment"
+  ) ?? null;
+  const reel = commentSrc?.reel ?? null;
 
   // Walk the graph the way a follower would: first message, then whichever
   // branch a "yes" leads to. Enough to make the thread feel real.
@@ -52,7 +56,7 @@ export function PhonePreview({ nodes, username }: { nodes: FlowNode[]; username:
           </div>
 
           {tab === "post" && <PostView reel={reel} username={username} />}
-          {tab === "comments" && <CommentsView trigger={trigger} username={username} />}
+          {tab === "comments" && <CommentsView source={commentSrc} username={username} />}
           {tab === "dm" && <DmView thread={thread} username={username} />}
         </div>
       </div>
@@ -114,14 +118,14 @@ function PostView({ reel, username }: { reel: { caption?: string; thumbnail?: st
 }
 
 function CommentsView({
-  trigger, username,
+  source, username,
 }: {
-  trigger?: Extract<FlowNode, { type: "trigger" }>;
+  source: Extract<TriggerSource, { kind: "comment" }> | null;
   username: string;
 }) {
-  const keyword = trigger?.include[0];
+  const keyword = source?.include[0];
   // A random one goes out each time; showing the first keeps the preview stable.
-  const reply = trigger?.replies.find(Boolean);
+  const reply = source?.replies.find(Boolean);
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <Header username={username} />
@@ -137,7 +141,7 @@ function CommentsView({
           </div>
         </div>
 
-        {trigger?.replyEnabled && reply !== undefined && (
+        {source?.autoReply && reply !== undefined && (
           <div className="flex gap-2 pl-6">
             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 via-pink-500 to-purple-600 shrink-0" />
             <div className="min-w-0">
@@ -148,8 +152,10 @@ function CommentsView({
             </div>
           </div>
         )}
-        {!trigger?.replyEnabled && (
-          <p className="text-[10px] text-white/30 pl-8">Public reply is switched off</p>
+        {!source?.autoReply && (
+          <p className="text-[10px] text-white/30 pl-8">
+            {source ? "Public reply is switched off" : "This flow starts from a DM, not a comment"}
+          </p>
         )}
       </div>
     </div>

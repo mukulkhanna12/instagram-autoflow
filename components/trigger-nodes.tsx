@@ -1,5 +1,5 @@
 "use client";
-import { Zap, Instagram, MessageSquare, GitBranch, Plus, Trash2, Link2, Image as ImageIcon } from "lucide-react";
+import { Zap, Instagram, MessageSquare, GitBranch, Plus, Trash2, Link2, Send, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
 
 /**
@@ -83,14 +83,15 @@ function NodeHeader({ title, icon }: { title: string; icon?: React.ReactNode }) 
 }
 
 export function TriggerCard({
-  node, selected, onSelect, registerPort, onAddNext, onPickReel,
+  node, selected, onSelect, registerPort, onAddNext, onEditSource, onAddSource,
 }: {
   node: Extract<FlowNode, { type: "trigger" }>;
   selected: boolean;
   onSelect: () => void;
   registerPort: PortRegister;
   onAddNext: () => void;
-  onPickReel: () => void;
+  onEditSource: (sourceId: string) => void;
+  onAddSource: () => void;
 }) {
   return (
     <CardShell selected={selected} onClick={onSelect}>
@@ -99,37 +100,52 @@ export function TriggerCard({
         <p className="text-sm font-semibold text-gray-900">When…</p>
       </div>
 
-      <div className="px-3 pb-3">
-        <button
-          onClick={(e) => { e.stopPropagation(); onPickReel(); }}
-          className="w-full text-left rounded-xl bg-emerald-50 border border-emerald-100 p-2.5 flex items-center gap-2.5 hover:border-emerald-300 transition-colors cursor-pointer"
-        >
-          {node.reel?.thumbnail ? (
-            <div className="relative w-9 h-9 rounded-lg overflow-hidden shrink-0">
-              <Image src={node.reel.thumbnail} alt="" fill className="object-cover" />
+      <div className="px-3 pb-3 space-y-2">
+        {node.sources.map((src) => (
+          <button
+            key={src.id}
+            onClick={(e) => { e.stopPropagation(); onEditSource(src.id); }}
+            className={`w-full text-left rounded-xl border p-2.5 flex items-center gap-2.5 transition-colors cursor-pointer ${
+              src.kind === "comment"
+                ? "bg-emerald-50 border-emerald-100 hover:border-emerald-300"
+                : "bg-sky-50 border-sky-100 hover:border-sky-300"
+            }`}
+          >
+            {src.kind === "comment" && src.reel?.thumbnail ? (
+              <div className="relative w-9 h-9 rounded-lg overflow-hidden shrink-0">
+                <Image src={src.reel.thumbnail} alt="" fill className="object-cover" />
+              </div>
+            ) : (
+              <div className={`w-9 h-9 rounded-lg bg-white border flex items-center justify-center shrink-0 ${
+                src.kind === "comment" ? "border-emerald-200" : "border-sky-200"
+              }`}>
+                {src.kind === "comment"
+                  ? <ImageIcon className="w-4 h-4 text-emerald-500" />
+                  : <Send className="w-4 h-4 text-sky-500" />}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-gray-800 leading-tight">
+                {src.kind === "comment" ? "Comments on a reel" : "Sends you a DM"}
+              </p>
+              <p className="text-[11px] text-gray-500 truncate">
+                {src.include.length > 0 ? src.include.join(", ") : "Any " + (src.kind === "comment" ? "comment" : "message")}
+              </p>
             </div>
-          ) : (
-            <div className="w-9 h-9 rounded-lg bg-white border border-emerald-200 flex items-center justify-center shrink-0">
-              <ImageIcon className="w-4 h-4 text-emerald-500" />
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-gray-800 leading-tight">
-              {node.reel ? "User comments on this reel" : "Choose a reel…"}
-            </p>
-            <p className="text-[11px] text-gray-500 truncate">
-              {node.reel ? (node.reel.caption || "No caption") : "Nothing selected yet"}
-            </p>
-          </div>
-        </button>
+            {src.autoReply && (
+              <span className="text-[9px] font-bold tracking-wide text-gray-500 bg-white/70 rounded px-1.5 py-0.5 shrink-0">
+                AUTO-REPLY
+              </span>
+            )}
+          </button>
+        ))}
 
-        <div className="mt-2 px-1">
-          <p className="text-[11px] text-gray-400">
-            {node.include.length > 0
-              ? <>Only when the comment contains <span className="font-medium text-violet-600">{node.include.join(", ")}</span></>
-              : "Any comment triggers it"}
-          </p>
-        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onAddSource(); }}
+          className="w-full rounded-xl border border-dashed border-gray-300 py-2 text-xs text-brand-600 hover:border-brand-400 transition-colors cursor-pointer"
+        >
+          + Add trigger
+        </button>
       </div>
 
       <div className="relative border-t border-gray-100 px-4 py-2 flex justify-end">

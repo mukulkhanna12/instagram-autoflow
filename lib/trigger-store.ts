@@ -25,19 +25,37 @@ export interface FlowButton {
   next?: string | null;
 }
 
-export type FlowNode =
+/**
+ * What starts the flow. A trigger can have several sources at once — a reel
+ * comment and an incoming DM both leading into the same messages.
+ *
+ * Only the comment source can reply in the feed; there is no public surface to
+ * reply on when the flow starts from a DM, so `autoReply` lives here rather
+ * than on the trigger.
+ */
+export type TriggerSource =
   | {
-      id: string; type: "trigger";
+      id: string; kind: "comment";
       reel: TriggerReel | null;
       /** Comment must contain one of these. Empty = any comment triggers it. */
       include: string[];
-      /** Comment containing any of these never triggers, even if it matches include. */
+      /** Containing any of these never triggers, even if include matches. */
       exclude: string[];
       /** Public reply under the comment; several are rotated at random. */
-      replyEnabled: boolean;
+      autoReply: boolean;
       replies: string[];
-      next: string | null;
     }
+  | {
+      id: string; kind: "dm";
+      include: string[];
+      exclude: string[];
+      /** Reply automatically to the incoming DM before the flow continues. */
+      autoReply: boolean;
+      replies: string[];
+    };
+
+export type FlowNode =
+  | { id: string; type: "trigger"; sources: TriggerSource[]; next: string | null }
   | { id: string; type: "message"; title: string; text: string; buttons: FlowButton[] }
   | { id: string; type: "condition"; label: string; yes: string | null; no: string | null };
 
@@ -52,6 +70,24 @@ export interface Trigger {
 let seq = 0;
 export const uid = (p: string) => `${p}_${Date.now().toString(36)}_${seq++}`;
 
+export function commentSource(): TriggerSource {
+  return {
+    id: uid("src"), kind: "comment", reel: null,
+    include: [], exclude: [],
+    autoReply: true,
+    replies: ["Sent you a DM! 📩", "Just DM'd you the details 🙌"],
+  };
+}
+
+export function dmSource(): TriggerSource {
+  return {
+    id: uid("src"), kind: "dm",
+    include: [], exclude: [],
+    autoReply: false,
+    replies: ["Got it — one sec 👀"],
+  };
+}
+
 /** A sensible starting graph: comment → opener → follow check → payoff. */
 export function starterNodes(): FlowNode[] {
   const trigger = uid("trg");
@@ -60,11 +96,8 @@ export function starterNodes(): FlowNode[] {
   const m2 = uid("msg");
   return [
     {
-      id: trigger, type: "trigger", reel: null,
-      include: [], exclude: [],
-      replyEnabled: true,
-      replies: ["Sent you a DM! 📩", "Just DM'd you the details 🙌"],
-      next: m1,
+      id: trigger, type: "trigger", next: m1,
+      sources: [commentSource()],
     },
     {
       id: m1, type: "message", title: "Opening DM",
@@ -84,11 +117,42 @@ export function newTrigger(name = "Untitled trigger"): Trigger {
   return { id: uid("tg"), name, status: "draft", updatedAt: Date.now(), nodes: starterNodes() };
 }
 
+/**
+ * Triggers saved before trigger nodes had a `sources` array would render as a
+ * broken card and throw on read, so older shapes are folded forward here.
+ */
+function migrate(list: Trigger[]): Trigger[] {
+  return list.map((t) => ({
+    ...t,
+    nodes: t.nodes.map((n) => {
+      if (n.type !== "trigger" || Array.isArray((n as { sources?: unknown }).sources)) return n;
+      const old = n as unknown as {
+        id: string; next: string | null; reel?: TriggerReel | null;
+        include?: string[]; exclude?: string[];
+        replyEnabled?: boolean; replies?: string[];
+        keywords?: string; commentReply?: string; replyToComment?: boolean;
+      };
+      const src = commentSource();
+      return {
+        id: old.id, type: "trigger" as const, next: old.next ?? null,
+        sources: [{
+          ...src,
+          reel: old.reel ?? null,
+          include: old.include ?? (old.keywords ? old.keywords.split(",").map((k) => k.trim()).filter(Boolean) : []),
+          exclude: old.exclude ?? [],
+          autoReply: old.replyEnabled ?? old.replyToComment ?? true,
+          replies: old.replies ?? (old.commentReply ? [old.commentReply] : src.replies),
+        }],
+      };
+    }),
+  }));
+}
+
 export function loadTriggers(): Trigger[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Trigger[]) : [];
+    return raw ? migrate(JSON.parse(raw) as Trigger[]) : [];
   } catch {
     return [];
   }
@@ -124,9 +188,11 @@ export function summarise(t: Trigger) {
     .filter((n): n is Extract<FlowNode, { type: "message" }> => n.type === "message")
     .reduce((sum, n) => sum + n.buttons.filter((b) => b.kind === "next").length, 0);
   const trigger = t.nodes.find((n): n is Extract<FlowNode, { type: "trigger" }> => n.type === "trigger");
+  const sources = trigger?.sources ?? [];
+  const comment = sources.find((x) => x.kind === "comment");
   return {
-    messages, branches,
-    reel: trigger?.reel ?? null,
-    keywords: (trigger?.include ?? []).join(", "),
+    messages, branches, sources,
+    reel: comment?.kind === "comment" ? comment.reel : null,
+    keywords: [...new Set(sources.flatMap((x) => x.include))].join(", "),
   };
 }
