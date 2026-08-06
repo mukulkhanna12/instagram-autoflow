@@ -125,8 +125,8 @@ export function TriggerCard({
 
         <div className="mt-2 px-1">
           <p className="text-[11px] text-gray-400">
-            {node.keywords.trim()
-              ? <>Only when the comment contains <span className="font-medium text-violet-600">{node.keywords}</span></>
+            {node.include.length > 0
+              ? <>Only when the comment contains <span className="font-medium text-violet-600">{node.include.join(", ")}</span></>
               : "Any comment triggers it"}
           </p>
         </div>

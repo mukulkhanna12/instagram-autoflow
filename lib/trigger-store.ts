@@ -26,7 +26,18 @@ export interface FlowButton {
 }
 
 export type FlowNode =
-  | { id: string; type: "trigger"; reel: TriggerReel | null; keywords: string; replyToComment: boolean; commentReply: string; next: string | null }
+  | {
+      id: string; type: "trigger";
+      reel: TriggerReel | null;
+      /** Comment must contain one of these. Empty = any comment triggers it. */
+      include: string[];
+      /** Comment containing any of these never triggers, even if it matches include. */
+      exclude: string[];
+      /** Public reply under the comment; several are rotated at random. */
+      replyEnabled: boolean;
+      replies: string[];
+      next: string | null;
+    }
   | { id: string; type: "message"; title: string; text: string; buttons: FlowButton[] }
   | { id: string; type: "condition"; label: string; yes: string | null; no: string | null };
 
@@ -49,8 +60,11 @@ export function starterNodes(): FlowNode[] {
   const m2 = uid("msg");
   return [
     {
-      id: trigger, type: "trigger", reel: null, keywords: "",
-      replyToComment: true, commentReply: "Sent you a DM! 📩", next: m1,
+      id: trigger, type: "trigger", reel: null,
+      include: [], exclude: [],
+      replyEnabled: true,
+      replies: ["Sent you a DM! 📩", "Just DM'd you the details 🙌"],
+      next: m1,
     },
     {
       id: m1, type: "message", title: "Opening DM",
@@ -110,5 +124,9 @@ export function summarise(t: Trigger) {
     .filter((n): n is Extract<FlowNode, { type: "message" }> => n.type === "message")
     .reduce((sum, n) => sum + n.buttons.filter((b) => b.kind === "next").length, 0);
   const trigger = t.nodes.find((n): n is Extract<FlowNode, { type: "trigger" }> => n.type === "trigger");
-  return { messages, branches, reel: trigger?.reel ?? null, keywords: trigger?.keywords ?? "" };
+  return {
+    messages, branches,
+    reel: trigger?.reel ?? null,
+    keywords: (trigger?.include ?? []).join(", "),
+  };
 }

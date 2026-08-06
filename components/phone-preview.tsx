@@ -119,7 +119,9 @@ function CommentsView({
   trigger?: Extract<FlowNode, { type: "trigger" }>;
   username: string;
 }) {
-  const keyword = trigger?.keywords.split(",")[0]?.trim();
+  const keyword = trigger?.include[0];
+  // A random one goes out each time; showing the first keeps the preview stable.
+  const reply = trigger?.replies.find(Boolean);
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <Header username={username} />
@@ -135,18 +137,18 @@ function CommentsView({
           </div>
         </div>
 
-        {trigger?.replyToComment && (
+        {trigger?.replyEnabled && reply !== undefined && (
           <div className="flex gap-2 pl-6">
             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 via-pink-500 to-purple-600 shrink-0" />
             <div className="min-w-0">
               <p className="text-[10px] text-white/50">{username}</p>
               <p className="text-[11px] text-white">
-                {trigger.commentReply || "Your public reply appears here"}
+                {reply || "Your public reply appears here"}
               </p>
             </div>
           </div>
         )}
-        {!trigger?.replyToComment && (
+        {!trigger?.replyEnabled && (
           <p className="text-[10px] text-white/30 pl-8">Public reply is switched off</p>
         )}
       </div>
