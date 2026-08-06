@@ -161,7 +161,14 @@ export default function TriggerBuilderPage() {
     return () => window.removeEventListener("resize", onResize);
   }, [drawEdges]);
 
+  // Current viewport, readable from the wheel handler without re-subscribing.
+  const view = useRef({ zoom: 1, pan: { x: 40, y: 40 } });
+  view.current = { zoom, pan };
+
   // ── mouse zoom (to cursor) + drag to pan ─────────────────────────────────
+  // Depends on `trigger` because the viewport isn't in the DOM until it loads —
+  // with an empty dep list this bailed out on the first render and the wheel
+  // listener was never attached.
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp) return;
@@ -171,26 +178,29 @@ export default function TriggerBuilderPage() {
       const rect = vp.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
+      const { zoom: z, pan: p } = view.current;
 
-      if (e.ctrlKey || e.metaKey || Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-        // Zoom about the pointer so the thing under the cursor stays put.
-        const factor = Math.exp(-e.deltaY * 0.0015);
-        setZoom((z) => {
-          const nz = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z * factor));
-          setPan((p) => ({
-            x: mx - ((mx - p.x) * nz) / z,
-            y: my - ((my - p.y) * nz) / z,
-          }));
-          return nz;
-        });
-      } else {
-        setPan((p) => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
+      // Trackpads send horizontal deltas for a two-finger swipe; treat those as
+      // panning and everything else as zoom.
+      const isPan = !e.ctrlKey && !e.metaKey && Math.abs(e.deltaX) > Math.abs(e.deltaY);
+      if (isPan) {
+        setPan({ x: p.x - e.deltaX, y: p.y - e.deltaY });
+        return;
       }
+
+      const nz = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z * Math.exp(-e.deltaY * 0.0015)));
+      if (nz === z) return;
+      // Keep whatever sits under the cursor pinned in place.
+      setZoom(nz);
+      setPan({
+        x: mx - ((mx - p.x) * nz) / z,
+        y: my - ((my - p.y) * nz) / z,
+      });
     };
 
     vp.addEventListener("wheel", onWheel, { passive: false });
     return () => vp.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [trigger]);
 
   function onPointerDown(e: React.PointerEvent) {
     if ((e.target as HTMLElement).closest("[data-node]")) return; // dragging a card shouldn't pan

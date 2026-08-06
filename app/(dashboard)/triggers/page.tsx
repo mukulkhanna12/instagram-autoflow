@@ -5,9 +5,7 @@ import { Plus, Workflow, Trash2, MessageSquare, GitBranch, Filter, ImageIcon, In
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  loadTriggers, newTrigger, upsertTrigger, deleteTrigger, summarise, type Trigger,
-} from "@/lib/trigger-store";
+import { loadTriggers, deleteTrigger, summarise, type Trigger } from "@/lib/trigger-store";
 
 /**
  * Triggers list. A trigger owns its reel, so this is the entry point rather
@@ -20,11 +18,8 @@ export default function TriggersListPage() {
 
   useEffect(() => setTriggers(loadTriggers()), []);
 
-  function create() {
-    const t = newTrigger(`Trigger ${(triggers?.length ?? 0) + 1}`);
-    upsertTrigger(t);
-    router.push(`/triggers/${t.id}`);
-  }
+  // Creating goes to the form, not the canvas — the canvas is for editing.
+  const create = () => router.push("/triggers/new");
 
   function remove(id: string, e: React.MouseEvent) {
     e.stopPropagation();

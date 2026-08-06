@@ -70,7 +70,7 @@ export interface Trigger {
 let seq = 0;
 export const uid = (p: string) => `${p}_${Date.now().toString(36)}_${seq++}`;
 
-export function commentSource(): TriggerSource {
+export function commentSource(): Extract<TriggerSource, { kind: "comment" }> {
   return {
     id: uid("src"), kind: "comment", reel: null,
     include: [], exclude: [],
@@ -79,7 +79,7 @@ export function commentSource(): TriggerSource {
   };
 }
 
-export function dmSource(): TriggerSource {
+export function dmSource(): Extract<TriggerSource, { kind: "dm" }> {
   return {
     id: uid("src"), kind: "dm",
     include: [], exclude: [],
@@ -148,11 +148,45 @@ function migrate(list: Trigger[]): Trigger[] {
   }));
 }
 
+/**
+ * Two examples on a first visit, so the list isn't an empty page and the two
+ * source kinds are both visible. Written once; deleting them sticks.
+ */
+function demoTriggers(): Trigger[] {
+  const link = "https://docs.google.com/document/d/example";
+  const mk = (name: string, kw: string[], payoff: string): Trigger => {
+    const trg = uid("trg"), m1 = uid("msg"), cond = uid("cnd"), m2 = uid("msg");
+    return {
+      id: uid("tg"), name, status: "draft", updatedAt: Date.now(),
+      nodes: [
+        { id: trg, type: "trigger", next: m1, sources: [{ ...commentSource(), include: kw }] },
+        {
+          id: m1, type: "message", title: "Opening DM",
+          text: "Hey {{full_name}} 👋\n\nQuick check before I share the link — are you following this page? 😊",
+          buttons: [{ id: uid("btn"), label: "Yes, I'm following", kind: "next", next: cond }],
+        },
+        { id: cond, type: "condition", label: "Do they follow you?", yes: m2, no: null },
+        {
+          id: m2, type: "message", title: "The payoff", text: payoff,
+          buttons: [{ id: uid("btn"), label: "Click here", kind: "link", url: link }],
+        },
+      ],
+    };
+  };
+  return [
+    mk("Logo prompts", ["logo", "prompt"], "Awesome 🙌 Here's the logo prompt pack 👇"),
+    mk("Banner prompts", ["banner"], "Here you go — the banner prompts 👇"),
+  ];
+}
+
 export function loadTriggers(): Trigger[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? migrate(JSON.parse(raw) as Trigger[]) : [];
+    if (raw !== null) return migrate(JSON.parse(raw) as Trigger[]);
+    const seeded = demoTriggers();
+    saveTriggers(seeded);
+    return seeded;
   } catch {
     return [];
   }
