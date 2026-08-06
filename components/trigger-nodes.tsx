@@ -11,26 +11,9 @@ import Image from "next/image";
  * its own port, which is what allows one message to branch into several.
  */
 
+import type { FlowNode } from "@/lib/trigger-store";
+
 export const CARD_W = 288;
-
-export interface TriggerReel {
-  id: string;
-  caption?: string;
-  thumbnail?: string;
-}
-
-export interface FlowButton {
-  id: string;
-  label: string;
-  kind: "next" | "link";
-  url?: string;
-  next?: string | null;
-}
-
-export type FlowNode =
-  | { id: string; type: "trigger"; reel: TriggerReel | null; keywords: string; next: string | null }
-  | { id: string; type: "message"; title: string; text: string; buttons: FlowButton[] }
-  | { id: string; type: "condition"; label: string; yes: string | null; no: string | null };
 
 type PortRegister = (id: string, el: HTMLElement | null) => void;
 
