@@ -2,10 +2,11 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
-  ChevronLeft, ChevronRight, Plus, X, ImageIcon, Check, Trash2, Loader2, Search, Send,
+  ChevronLeft, ChevronRight, Plus, X, ImageIcon, Check, Trash2, Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
+import { ReelStrip, ReelPickerModal } from "@/components/reel-picker";
 import type { FlowNode, TriggerReel, TriggerSource } from "@/lib/trigger-store";
 
 /**
@@ -275,60 +276,34 @@ function StepReel({
   reels: TriggerReel[] | null;
   loadReels: () => void;
 }) {
-  const [showAll, setShowAll] = useState(false);
-  const [q, setQ] = useState("");
+  const [browsing, setBrowsing] = useState(false);
 
+  // Fetched when this step is first reached — not on page load.
   useEffect(() => { if (reels === null) loadReels(); }, [reels, loadReels]);
-
-  const filtered = (reels ?? []).filter((r) => !q || (r.caption ?? "").toLowerCase().includes(q.toLowerCase()));
-  const shown = showAll || q ? filtered : filtered.slice(0, 6);
 
   return (
     <div className="space-y-3">
       <OptionCard selected title="A specific reel">
-        {reels === null ? (
-          <div className="py-8 flex justify-center"><Loader2 className="w-4 h-4 animate-spin text-brand-500" /></div>
-        ) : (
-          <>
-            {(reels.length > 6 || q) && (
-              <div className="relative mb-2.5">
-                <Search className="w-3.5 h-3.5 text-gray-300 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                <input
-                  value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search captions…"
-                  className="w-full pl-8 pr-2 py-1.5 text-xs rounded-lg border border-gray-200 focus:outline-none focus:border-brand-400"
-                />
-              </div>
-            )}
-            <div className="grid grid-cols-3 gap-2">
-              {shown.map((r) => {
-                const active = source.reel?.id === r.id;
-                return (
-                  <button
-                    key={r.id}
-                    onClick={() => patchSource(source.id, { reel: r } as Partial<TriggerSource>)}
-                    className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer group"
-                  >
-                    {r.thumbnail
-                      ? <Image src={r.thumbnail} alt="" fill className="object-cover" />
-                      : <div className="absolute inset-0 flex items-center justify-center"><ImageIcon className="w-4 h-4 text-gray-300" /></div>}
-                    <span className={`absolute inset-0 ring-2 rounded-lg transition-all ${active ? "ring-brand-500" : "ring-transparent group-hover:ring-brand-300"}`} />
-                    <span className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full border-2 ${active ? "bg-brand-500 border-white" : "bg-white/70 border-white"}`} />
-                  </button>
-                );
-              })}
-            </div>
-            {!showAll && !q && filtered.length > 6 && (
-              <button onClick={() => setShowAll(true)} className="text-xs text-brand-600 font-medium mt-2.5 cursor-pointer">
-                Show all {filtered.length}
-              </button>
-            )}
-            {filtered.length === 0 && <p className="text-xs text-gray-400 py-4 text-center">No reels found.</p>}
-          </>
-        )}
+        <ReelStrip
+          reels={reels}
+          selected={source.reel}
+          columns={3}
+          onSelect={(r) => patchSource(source.id, { reel: r } as Partial<TriggerSource>)}
+          onBrowse={() => setBrowsing(true)}
+        />
       </OptionCard>
 
       <OptionCard disabled title="Any reel" note="Every reel on the account runs this flow" />
       <OptionCard disabled title="Your next reel" note="Attaches to whatever you post next" />
+
+      {browsing && (
+        <ReelPickerModal
+          reels={reels}
+          selected={source.reel}
+          onPick={(r) => patchSource(source.id, { reel: r } as Partial<TriggerSource>)}
+          onClose={() => setBrowsing(false)}
+        />
+      )}
     </div>
   );
 }
