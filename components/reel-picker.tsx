@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { ImageIcon, Loader2, Search, X, Check } from "lucide-react";
+import { ImageIcon, Loader2, Search, X, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import type { TriggerReel } from "@/lib/trigger-store";
 
 /**
@@ -14,6 +14,9 @@ import type { TriggerReel } from "@/lib/trigger-store";
  */
 
 const INLINE_COUNT = 8;
+
+/** Thumbnails per page in the modal — one screenful of the 5-column grid. */
+const PAGE_SIZE = 25;
 
 export function ReelStrip({
   reels, selected, onSelect, onBrowse, columns = 4,
@@ -65,7 +68,10 @@ function Thumb({ reel, active, onClick }: { reel: TriggerReel; active: boolean; 
   return (
     <button onClick={onClick} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer group">
       {reel.thumbnail ? (
-        <Image src={reel.thumbnail} alt="" fill sizes="120px" className="object-cover" />
+        // unoptimized: see the note in app/(dashboard)/posts/page.tsx — these
+        // URLs are signed and change on every fetch, so optimizing them is
+        // both futile and expensive.
+        <Image src={reel.thumbnail} alt="" fill sizes="120px" unoptimized className="object-cover" />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center"><ImageIcon className="w-4 h-4 text-gray-300" /></div>
       )}
@@ -91,6 +97,7 @@ export function ReelPickerModal({
 }) {
   const [q, setQ] = useState("");
   const [choice, setChoice] = useState<TriggerReel | null>(selected);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -103,6 +110,20 @@ export function ReelPickerModal({
     [reels, q]
   );
 
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  // A search that shrinks the list can strand you past the end; clamping on
+  // render keeps the grid and the footer from disagreeing about the page.
+  const current = Math.min(page, pageCount - 1);
+  const visible = filtered.slice(current * PAGE_SIZE, current * PAGE_SIZE + PAGE_SIZE);
+
+  // Typing restarts at the first page — results you can't see aren't results.
+  useEffect(() => { setPage(0); }, [q]);
+
+  // Turning a page should start at the top of it, not wherever the last one
+  // was scrolled to.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [current]);
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
@@ -113,7 +134,12 @@ export function ReelPickerModal({
           <div className="min-w-0">
             <h3 className="text-sm font-bold text-gray-900">Choose a reel</h3>
             <p className="text-xs text-gray-400 mt-0.5">
-              {reels === null ? "Loading…" : `${filtered.length} of ${reels.length} reels`}
+              {reels === null
+                ? "Loading…"
+                : filtered.length === 0
+                  ? `0 of ${reels.length} reels`
+                  : `${current * PAGE_SIZE + 1}–${current * PAGE_SIZE + visible.length} of ${filtered.length}` +
+                    (filtered.length === reels.length ? " reels" : ` matching · ${reels.length} total`)}
             </p>
           </div>
           <div className="relative ml-auto w-64">
@@ -130,7 +156,7 @@ export function ReelPickerModal({
         </div>
 
         {/* The scrolling area — the whole point of the modal */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6">
           {reels === null ? (
             <div className="h-full flex items-center justify-center"><Loader2 className="w-5 h-5 animate-spin text-brand-500" /></div>
           ) : filtered.length === 0 ? (
@@ -139,7 +165,7 @@ export function ReelPickerModal({
             </p>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-              {filtered.map((r) => (
+              {visible.map((r) => (
                 <div key={r.id}>
                   <Thumb reel={r} active={choice?.id === r.id} onClick={() => setChoice(r)} />
                   <p className="text-[11px] text-gray-500 mt-1.5 line-clamp-2 leading-snug">
@@ -152,16 +178,43 @@ export function ReelPickerModal({
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 flex items-center gap-3 shrink-0">
-          <p className="text-xs text-gray-400 truncate">
+          <p className="text-xs text-gray-400 truncate min-w-0">
             {choice ? (choice.caption || "Reel selected") : "Nothing selected"}
           </p>
-          <button onClick={onClose} className="ml-auto text-xs text-gray-500 hover:text-gray-700 px-3 py-2 cursor-pointer">
+
+          {pageCount > 1 && (
+            // Paging doesn't touch `choice`, so a reel picked on page 1 is still
+            // selected after browsing to page 4.
+            <div className="ml-auto flex items-center gap-1 shrink-0">
+              <button
+                onClick={() => setPage(current - 1)}
+                disabled={current === 0}
+                aria-label="Previous page"
+                className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <span className="text-xs text-gray-400 tabular-nums px-1">
+                {current + 1} / {pageCount}
+              </span>
+              <button
+                onClick={() => setPage(current + 1)}
+                disabled={current >= pageCount - 1}
+                aria-label="Next page"
+                className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          <button onClick={onClose} className={`${pageCount > 1 ? "" : "ml-auto "}text-xs text-gray-500 hover:text-gray-700 px-3 py-2 cursor-pointer shrink-0`}>
             Cancel
           </button>
           <button
             onClick={() => { if (choice) { onPick(choice); onClose(); } }}
             disabled={!choice}
-            className="text-xs font-medium bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            className="text-xs font-medium bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
           >
             Use this reel
           </button>

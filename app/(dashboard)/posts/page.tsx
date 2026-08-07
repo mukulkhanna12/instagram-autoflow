@@ -203,7 +203,13 @@ export default function PostsPage() {
                 {/* Thumbnail */}
                 <div className="relative aspect-square bg-gray-100">
                   {thumb ? (
-                    <Image src={thumb} alt={post.caption ?? "Post"} fill className="object-cover" />
+                    // Instagram hands back a *signed* CDN URL that is different
+                    // on every API call and expires. Next's image optimizer
+                    // therefore never gets a cache hit — each page view mints a
+                    // fresh set of source images and burns the transformation
+                    // allowance, after which they stop rendering at all. They
+                    // arrive already thumbnail-sized, so serve them directly.
+                    <Image src={thumb} alt={post.caption ?? "Post"} fill unoptimized className="object-cover" />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <ImageIcon className="w-10 h-10 text-gray-300" />

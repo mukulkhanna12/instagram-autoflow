@@ -13,6 +13,9 @@ const DEMO_POSTS: IgMedia[] = [
   { id: "reel-portraits", caption: "How I edit moody portraits 🎞️ (comment EDIT)", media_type: "VIDEO", permalink: "#", timestamp: "2026-08-01T10:00:00Z", like_count: 980, comments_count: 33 },
 ];
 
+/** Enough to cover any realistic account without paging forever. */
+const MAX_POSTS = 200;
+
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -24,11 +27,16 @@ export async function GET() {
 
   const demoMode =
     process.env.NODE_ENV !== "production" && process.env.DEMO_SHOW_OTP === "1";
-  if (demoMode) return NextResponse.json({ posts: DEMO_POSTS });
+  if (demoMode) return NextResponse.json({ posts: DEMO_POSTS, complete: true });
 
   try {
-    const posts = await getInstagramPosts(igAccount.instagramId, igAccount.accessToken);
-    return NextResponse.json({ posts });
+    // Well past one page: the picker paginates, and a grid that stopped at the
+    // latest 20 couldn't reach an older reel at all.
+    const posts = await getInstagramPosts(igAccount.instagramId, igAccount.accessToken, MAX_POSTS);
+    // `complete` says this is the account's *whole* library, not just the most
+    // recent slice. Only then can a missing id be read as "deleted on
+    // Instagram" rather than "older than we looked".
+    return NextResponse.json({ posts, complete: posts.length < MAX_POSTS });
   } catch (err) {
     console.error("Fetch posts error:", err);
     return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 });

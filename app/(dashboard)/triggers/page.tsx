@@ -88,7 +88,7 @@ export default function TriggersListPage() {
               >
                 <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 shrink-0 ring-1 ring-gray-200">
                   {s.reel?.thumbnail ? (
-                    <Image src={s.reel.thumbnail} alt="" fill className="object-cover" />
+                    <Image src={s.reel.thumbnail} alt="" fill unoptimized className="object-cover" />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <ImageIcon className="w-5 h-5 text-gray-300" />

@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   Loader2, AlertCircle, Plus, ImageIcon, ToggleLeft, ToggleRight,
-  Users, MessageCircle, Send, UserPlus, MousePointerClick,
+  Users, MessageCircle, Send, UserPlus, MousePointerClick, Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { truncate } from "@/lib/utils";
@@ -33,6 +33,14 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [noAccount, setNoAccount] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
+  /**
+   * Ids of reels still on the account, or null when we couldn't establish the
+   * full library. An automation outlives the reel it points at — deleting a
+   * reel on Instagram leaves its row here, still switched Live, quietly
+   * unreachable. Null keeps every automation unflagged rather than guessing.
+   */
+  const [liveReelIds, setLiveReelIds] = useState<Set<string> | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -45,9 +53,35 @@ export default function DashboardPage() {
       const { automations } = await autoRes.json();
       setAutomations(automations ?? []);
       setLoading(false);
+
+      // Second, slower pass — it hits Instagram, so the list renders first and
+      // the "Deleted" badges appear a moment later.
+      try {
+        const res = await fetch("/api/instagram/posts");
+        const { posts, complete } = await res.json();
+        if (res.ok && complete && Array.isArray(posts)) {
+          setLiveReelIds(new Set(posts.map((p: { id: string }) => p.id)));
+        }
+      } catch {
+        // Leaving it null is the safe outcome: nothing gets flagged.
+      }
     }
     load();
   }, []);
+
+  /** The reel is gone from Instagram, so this automation can never fire again. */
+  const isOrphaned = (a: Automation) => !!liveReelIds && !liveReelIds.has(a.postId);
+
+  async function removeAutomation(a: Automation) {
+    if (!confirm("Remove this automation? Its reel no longer exists on Instagram.")) return;
+    setRemoving(a.id);
+    try {
+      const res = await fetch(`/api/automations/${a.id}`, { method: "DELETE" });
+      if (res.ok) setAutomations((prev) => prev.filter((x) => x.id !== a.id));
+    } finally {
+      setRemoving(null);
+    }
+  }
 
   async function toggle(a: Automation) {
     setToggling(a.id);
@@ -143,11 +177,16 @@ export default function DashboardPage() {
       ) : (
         <div className="space-y-3">
           {automations.map((a) => (
-            <div key={a.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-4">
+            <div
+              key={a.id}
+              className={`bg-white rounded-xl border shadow-sm p-4 flex items-center gap-4 ${
+                isOrphaned(a) ? "border-amber-200 bg-amber-50/40" : "border-gray-100"
+              }`}
+            >
               {/* Thumbnail */}
               <div className="relative w-14 h-14 rounded-lg bg-gray-100 overflow-hidden shrink-0">
                 {a.postThumbnail ? (
-                  <Image src={a.postThumbnail} alt="" fill className="object-cover" />
+                  <Image src={a.postThumbnail} alt="" fill unoptimized className="object-cover" />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <ImageIcon className="w-6 h-6 text-gray-300" />
@@ -162,6 +201,11 @@ export default function DashboardPage() {
                     {a.postCaption ? truncate(a.postCaption, 48) : "Untitled reel"}
                   </Link>
                   {a.fromTemplate && <Badge variant="info" className="bg-brand-100 text-brand-700 shrink-0">Auto</Badge>}
+                  {isOrphaned(a) && (
+                    <span title="This reel is no longer on the account" className="shrink-0">
+                      <Badge variant="warning">Reel deleted</Badge>
+                    </span>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-gray-500">
                   <Metric icon={Users} label="contacts" value={a.stats.contacts} />
@@ -172,7 +216,21 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* On/off */}
+              {/* A dead automation gets a way out instead of a toggle that
+                  would only ever switch on something with nothing to listen to. */}
+              {isOrphaned(a) ? (
+                <button
+                  onClick={() => removeAutomation(a)}
+                  disabled={removing === a.id}
+                  className="flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:text-red-600 disabled:opacity-50 cursor-pointer shrink-0"
+                  title="Remove this leftover automation"
+                >
+                  {removing === a.id
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <Trash2 className="w-4 h-4" />}
+                  Remove
+                </button>
+              ) : (
               <button
                 onClick={() => toggle(a)}
                 disabled={toggling === a.id}
@@ -185,6 +243,7 @@ export default function DashboardPage() {
                   <><ToggleLeft className="w-8 h-8 text-gray-300" /> <span className="text-gray-400 hidden sm:inline">Off</span></>
                 )}
               </button>
+              )}
             </div>
           ))}
         </div>

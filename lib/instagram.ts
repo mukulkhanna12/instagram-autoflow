@@ -143,19 +143,41 @@ export interface IgMedia {
   comments_count?: number;
 }
 
+/**
+ * Media on the account, newest first.
+ *
+ * A `max` above one page follows `paging.next` until it's reached or Instagram
+ * runs out. The default stays at a single page of 20 deliberately: the daily
+ * sync attaches queued flows to whatever it finds, so widening its window would
+ * hand prepared flows to old posts. Callers that only *display* media — the
+ * reels grid and the picker — ask for more.
+ */
 export async function getInstagramPosts(
   igUserId: string,
   accessToken: string,
-  limit = 20
+  max = 20
 ): Promise<IgMedia[]> {
   const fields =
     "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count";
-  const res = await fetch(
-    `${IG_GRAPH}/${igUserId}/media?fields=${fields}&limit=${limit}&access_token=${accessToken}`
-  );
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  return data.data ?? [];
+  const perPage = Math.min(max, 50);
+  let url = `${IG_GRAPH}/${igUserId}/media?fields=${fields}&limit=${perPage}&access_token=${accessToken}`;
+  const out: IgMedia[] = [];
+
+  while (url && out.length < max) {
+    const res = await fetch(url);
+    if (!res.ok) {
+      // A failed first page is a real error — bad token, revoked permission.
+      // A failed later page just means we show what we already have.
+      if (out.length === 0) throw new Error(await res.text());
+      console.error("getInstagramPosts paging error:", await res.text());
+      break;
+    }
+    const data = await res.json();
+    out.push(...((data.data ?? []) as IgMedia[]));
+    url = data.paging?.next ?? "";
+  }
+
+  return out.slice(0, max);
 }
 
 // ── Comments ─────────────────────────────────────────────────────────────────

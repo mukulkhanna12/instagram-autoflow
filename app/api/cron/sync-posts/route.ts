@@ -26,7 +26,9 @@ export async function GET(req: NextRequest) {
   let created = 0;
   for (const account of accounts) {
     try {
-      const posts = await getInstagramPosts(account.instagramId, account.accessToken);
+      // One page on purpose — see getInstagramPosts. Reaching further back
+      // would attach prepared flows to posts from before the queue existed.
+      const posts = await getInstagramPosts(account.instagramId, account.accessToken, 20);
 
       // getInstagramPosts returns newest-first; walk it backwards so the oldest
       // unhandled reel claims the front of the queue.
