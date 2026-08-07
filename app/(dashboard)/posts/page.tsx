@@ -30,7 +30,7 @@ interface Automation {
   postId: string;
   isActive: boolean;
   fromTemplate: boolean;
-  _count: { conversations: number };
+  _count?: { conversations: number };
 }
 
 export default function PostsPage() {
@@ -89,7 +89,7 @@ export default function PostsPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) {
+      if (!res.ok || !data.automation) {
         setAttachError(data.error ?? "Couldn't attach the flow");
         return;
       }
@@ -116,8 +116,12 @@ export default function PostsPage() {
           postThumbnail: post.thumbnail_url ?? post.media_url,
         }),
       });
-      const { automation } = await res.json();
-      setAutomations((prev) => [...prev.filter((a) => a.postId !== post.id), automation]);
+      const data = await res.json();
+      if (!res.ok || !data.automation) {
+        setAttachError(typeof data.error === "string" ? data.error : "Couldn't create the automation");
+        return;
+      }
+      setAutomations((prev) => [...prev.filter((a) => a.postId !== post.id), data.automation]);
     } finally {
       setCreating(null);
     }
@@ -165,8 +169,9 @@ export default function PostsPage() {
               {flows.length > 1 && <span className="font-normal"> ({flows.length - 1} more behind it)</span>}
             </p>
             <p className="text-xs text-brand-700 mt-0.5">
-              Press <strong>Attach flow</strong> on the reel you meant it for and it goes Live straight away.
-              Leave it and it attaches on its own when someone first comments.
+              Press the <Wand2 className="w-3 h-3 inline align-[-1px]" /> button on the reel you meant it for
+              and it goes Live straight away. Leave it and it attaches on its own when someone first comments.
+              <strong> Automate</strong> is the other button — that one starts a blank flow and leaves the queue alone.
             </p>
           </div>
         </div>
@@ -228,7 +233,7 @@ export default function PostsPage() {
                     {automation && (
                       <span className="flex items-center gap-1 ml-auto">
                         <Zap className="w-3 h-3 text-brand-400" />
-                        {automation._count.conversations}
+                        {automation._count?.conversations ?? 0}
                       </span>
                     )}
                   </div>
@@ -241,28 +246,37 @@ export default function PostsPage() {
                       >
                         <Zap className="w-3 h-3" /> Configure
                       </Link>
-                    ) : nextFlow ? (
-                      // A flow is waiting. Attaching it here is the same thing
-                      // the first comment would do — this just doesn't make you
-                      // wait for one.
-                      <Button
-                        size="sm"
-                        className="flex-1 text-xs"
-                        loading={attaching === post.id}
-                        onClick={() => attachFlow(post)}
-                        title={`Attach "${nextFlow.name || "the next prepared flow"}" and go Live`}
-                      >
-                        <Wand2 className="w-3 h-3" /> Attach flow
-                      </Button>
                     ) : (
-                      <Button
-                        size="sm"
-                        className="flex-1 text-xs"
-                        loading={creating === post.id}
-                        onClick={() => createAutomation(post)}
-                      >
-                        <Zap className="w-3 h-3" /> Automate
-                      </Button>
+                      <>
+                        {/* Automate stays put whether or not a flow is queued.
+                            It used to be *replaced* by Attach flow, so with
+                            anything in the queue there was no way to start a
+                            blank automation — and the button under the cursor
+                            silently did the other thing. */}
+                        <Button
+                          size="sm"
+                          className="flex-1 text-xs"
+                          loading={creating === post.id}
+                          onClick={() => createAutomation(post)}
+                        >
+                          <Zap className="w-3 h-3" /> Automate
+                        </Button>
+                        {nextFlow && (
+                          // Attaching here is the same thing the first comment
+                          // would do — this just doesn't make you wait for one.
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="text-xs px-2"
+                            loading={attaching === post.id}
+                            onClick={() => attachFlow(post)}
+                            aria-label={`Attach "${nextFlow.name || "the next prepared flow"}"`}
+                            title={`Attach "${nextFlow.name || "the next prepared flow"}" and go Live`}
+                          >
+                            <Wand2 className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </>
                     )}
                     <a
                       href={post.permalink}

@@ -60,9 +60,28 @@ export function isWithinPrivateReplyWindow(timestamp: string | undefined, now = 
   return now - t < PRIVATE_REPLY_WINDOW_MS;
 }
 
-/** Did the connected account already reply to this comment? */
-export function hasOwnReply(comment: IgComment, ownIgId: string): boolean {
-  return (comment.replies?.data ?? []).some((r) => r.from?.id === ownIgId);
+/**
+ * Did the connected account already reply to this comment?
+ *
+ * Fails *closed*: a reply whose author Instagram didn't tell us about counts as
+ * ours. `replies{id,from}` is a nested edge and `from` comes back missing often
+ * enough — deleted authors, permission trimming, restricted accounts — that
+ * trusting its absence meant DMing people whose comments had already been
+ * answered by hand. Skipping a stranger's reply now and then costs one missed
+ * DM; the other way round messages someone the account already talked to.
+ *
+ * `ownUsername` is matched as a fallback for the same reason: `from.username`
+ * is sometimes present when `from.id` is not.
+ */
+export function hasOwnReply(comment: IgComment, ownIgId: string, ownUsername?: string): boolean {
+  const own = ownUsername?.trim().toLowerCase();
+  return (comment.replies?.data ?? []).some((r) => {
+    const id = r.from?.id;
+    const username = r.from?.username?.trim().toLowerCase();
+    if (id) return id === ownIgId;
+    if (username) return !!own && username === own;
+    return true; // author unknown — assume it was us rather than risk a duplicate
+  });
 }
 
 type Automation = {
@@ -75,7 +94,7 @@ type Automation = {
   commentReplyText3: string | null;
 };
 
-type Account = { instagramId: string; accessToken: string };
+type Account = { instagramId: string; accessToken: string; username?: string };
 
 /** Pick a random non-empty reply variant, matching the webhook's behaviour. */
 function pickReply(a: Automation): string {
@@ -111,7 +130,7 @@ export async function backfillComments(
     // Cheapest checks first — no API or DB cost.
     if (!isWithinPrivateReplyWindow(c.timestamp)) { result.tooOld++; continue; }
     if (!commentMatchesKeywords(c.text, automation.keywords)) { result.keywordMiss++; continue; }
-    if (hasOwnReply(c, account.instagramId)) { result.alreadyReplied++; continue; }
+    if (hasOwnReply(c, account.instagramId, account.username)) { result.alreadyReplied++; continue; }
 
     const seen = await db.conversation.findFirst({
       where: { automationId: automation.id, commentId: c.id },

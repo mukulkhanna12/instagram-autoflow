@@ -166,7 +166,7 @@ export interface IgComment {
   timestamp?: string;
   from?: { id?: string; username?: string };
   /** Replies already posted on this comment, used to spot ones we've answered. */
-  replies?: { data?: Array<{ id: string; from?: { id?: string } }> };
+  replies?: { data?: Array<{ id: string; from?: { id?: string; username?: string } }> };
 }
 
 /**
@@ -181,7 +181,9 @@ export async function getMediaComments(
   accessToken: string,
   max = 200
 ): Promise<IgComment[]> {
-  const fields = "id,text,timestamp,from,replies{id,from}";
+  // `username` on replies as well as `id`: the backfill matches on either,
+  // because `from.id` is not always returned on the nested replies edge.
+  const fields = "id,text,timestamp,from,replies{id,from{id,username}}";
   let url = `${IG_GRAPH}/${mediaId}/comments?fields=${fields}&limit=50&access_token=${accessToken}`;
   const out: IgComment[] = [];
 

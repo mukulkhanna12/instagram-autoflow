@@ -63,10 +63,14 @@ export async function POST(req: NextRequest) {
   const body = createSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: body.error.flatten() }, { status: 400 });
 
+  // `_count` matters: the reels grid drops this straight into the list it
+  // renders, and reads `_count.conversations` on every card. Returning a bare
+  // automation crashed the page the moment it was created.
   const automation = await db.postAutomation.upsert({
     where: { igAccountId_postId: { igAccountId: igAccount.id, postId: body.data.postId } },
     create: { igAccountId: igAccount.id, ...body.data },
     update: body.data,
+    include: { _count: { select: { conversations: true } } },
   });
 
   return NextResponse.json({ automation });

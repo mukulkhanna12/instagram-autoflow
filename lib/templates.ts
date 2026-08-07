@@ -88,7 +88,9 @@ export async function attachNextQueuedFlow(
 
     const automation = await tx.postAutomation.create({
       data: automationCreateFromTemplate(igAccountId, postId, next, media),
-      include: { igAccount: true },
+      // `_count` so callers can hand this straight to the reels grid, which
+      // reads `_count.conversations` on every card.
+      include: { igAccount: true, _count: { select: { conversations: true } } },
     });
 
     // Used up — each prepared flow belongs to exactly one reel.

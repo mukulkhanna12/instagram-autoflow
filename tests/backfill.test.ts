@@ -48,6 +48,7 @@ describe("the 7-day private reply window", () => {
 describe("spotting comments we already answered", () => {
   const OWN = "17841400000000000";
   const OTHER = "99999999";
+  const NAME = "mkexplores_";
   const reply = (fromId?: string) => ({ id: "r", ...(fromId ? { from: { id: fromId } } : {}) });
 
   it("says no when nobody has replied", () => {
@@ -64,8 +65,21 @@ describe("spotting comments we already answered", () => {
     expect(hasOwnReply({ id: "c", replies: { data: [reply(OTHER), reply(OWN)] } }, OWN)).toBe(true);
   });
 
+  it("matches on username when the id is missing", () => {
+    const c = { id: "c", replies: { data: [{ id: "r", from: { username: "MKExplores_" } }] } };
+    expect(hasOwnReply(c, OWN, NAME)).toBe(true);
+    expect(hasOwnReply(c, OWN, "someone_else")).toBe(false);
+    expect(hasOwnReply(c, OWN)).toBe(false);
+  });
+
+  // Sending twice is the expensive mistake: it DMs someone the account already
+  // answered by hand. Skipping a stranger's reply just costs one missed DM.
+  it("assumes a reply with no author at all is ours", () => {
+    expect(hasOwnReply({ id: "c", replies: { data: [reply()] } }, OWN)).toBe(true);
+    expect(hasOwnReply({ id: "c", replies: { data: [{ id: "r", from: {} }] } }, OWN)).toBe(true);
+  });
+
   it("tolerates malformed reply data", () => {
-    expect(hasOwnReply({ id: "c", replies: { data: [reply()] } }, OWN)).toBe(false);
     expect(hasOwnReply({ id: "c", replies: {} }, OWN)).toBe(false);
   });
 });
