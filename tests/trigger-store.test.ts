@@ -1,9 +1,23 @@
 import { describe, it, expect } from "vitest";
 import {
-  hasCondition, commentSource, dmSource, starterNodes,
+  hasCondition, commentSource, dmSource, starterNodes, FALLBACK_DEFAULTS,
   DEFAULT_COMMENT_REPLIES, DEFAULT_DM_REPLIES,
   type FlowNode,
 } from "@/lib/trigger-store";
+
+describe("message defaults", () => {
+  it("covers every message a flow can send, including the retry", () => {
+    for (const key of ["opener", "follow", "followRetry", "payoff"] as const) {
+      expect(FALLBACK_DEFAULTS[key].text.trim()).not.toBe("");
+      expect(FALLBACK_DEFAULTS[key].button.trim()).not.toBe("");
+    }
+  });
+
+  it("words the retry differently from the first nudge — that is its whole point", () => {
+    expect(FALLBACK_DEFAULTS.followRetry.text).not.toBe(FALLBACK_DEFAULTS.follow.text);
+    expect(FALLBACK_DEFAULTS.followRetry.button).not.toBe(FALLBACK_DEFAULTS.follow.button);
+  });
+});
 
 describe("reply defaults", () => {
   it("ships three distinct variants for each source kind", () => {

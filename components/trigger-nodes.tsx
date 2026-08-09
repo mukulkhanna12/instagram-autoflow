@@ -12,6 +12,7 @@ import Image from "next/image";
  */
 
 import type { FlowNode } from "@/lib/trigger-store";
+import { MAX_BUTTONS } from "@/lib/buttons";
 
 export const CARD_W = 288;
 
@@ -104,14 +105,13 @@ function NodeHeader({ title, icon }: { title: string; icon?: React.ReactNode }) 
 }
 
 export function TriggerCard({
-  node, selected, onSelect, ports, onEditSource, onAddSource,
+  node, selected, onSelect, ports, onEditSource,
 }: {
   node: Extract<FlowNode, { type: "trigger" }>;
   selected: boolean;
   onSelect: () => void;
   ports: PortHandlers;
   onEditSource: (sourceId: string) => void;
-  onAddSource: () => void;
 }) {
   return (
     <CardShell selected={selected} onClick={onSelect}>
@@ -167,12 +167,6 @@ export function TriggerCard({
           </button>
         ))}
 
-        <button
-          onClick={(e) => { e.stopPropagation(); onAddSource(); }}
-          className="w-full rounded-xl border border-dashed border-gray-300 py-2 text-xs text-brand-600 hover:border-brand-400 transition-colors cursor-pointer"
-        >
-          + Add trigger
-        </button>
       </div>
 
       <div className="relative border-t border-gray-100 px-4 py-2 flex justify-end">
@@ -218,12 +212,19 @@ export function MessageCard({
           </div>
         ))}
 
-        <button
-          onClick={(e) => { e.stopPropagation(); onAddButton(); }}
-          className="mt-1.5 w-full rounded-xl border border-dashed border-gray-300 px-3 py-2 text-xs text-gray-400 hover:border-brand-400 hover:text-brand-600 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-        >
-          <Plus className="w-3 h-3" /> Add button
-        </button>
+        {/* Instagram takes three buttons at most; a fourth is rejected. */}
+        {node.buttons.length < MAX_BUTTONS ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); onAddButton(); }}
+            className="mt-1.5 w-full rounded-xl border border-dashed border-gray-300 px-3 py-2 text-xs text-gray-400 hover:border-brand-400 hover:text-brand-600 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <Plus className="w-3 h-3" /> Add button
+          </button>
+        ) : (
+          <p className="mt-1.5 text-center text-[11px] text-gray-400">
+            Instagram allows a maximum of 3 buttons
+          </p>
+        )}
       </div>
 
       <DeleteBadge selected={selected} onDelete={onDelete} label="Remove this message" />

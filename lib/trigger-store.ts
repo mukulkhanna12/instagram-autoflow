@@ -29,8 +29,11 @@ export interface FlowButton {
 }
 
 /**
- * What starts the flow. A trigger can have several sources at once — a reel
- * comment and an incoming DM both leading into the same messages.
+ * What starts the flow. One per trigger: a trigger owns a reel, a keyword set
+ * and a public reply, and a second way in needs its own — which makes it a
+ * second trigger, not a second source on this one. The array survives because
+ * older saved triggers hold two, and the builder switches between kinds rather
+ * than appending.
  *
  * Only the comment source can reply in the feed; there is no public surface to
  * reply on when the flow starts from a DM, so `autoReply` lives here rather
@@ -73,6 +76,8 @@ export type FlowNode =
 export interface TriggerDefaults {
   opener: { text: string; button: string };
   follow: { text: string; button: string };
+  /** Shown on a repeat tap, when the first nudge didn't land. */
+  followRetry: { text: string; button: string };
   payoff: { text: string; button: string };
 }
 
@@ -84,6 +89,10 @@ export const FALLBACK_DEFAULTS: TriggerDefaults = {
   follow: {
     text: "Almost there! Follow the page first, then tap below and I'll send it over 🙏",
     button: "I've followed ✓",
+  },
+  followRetry: {
+    text: "Still not showing as a follow on my side 🤔\n\nTap Follow at the top of the page, give it a second, then try again — I'll send it straight over 🙌",
+    button: "Check again",
   },
   payoff: {
     text: "Awesome 🙌 Here's the link 👇",
@@ -100,6 +109,7 @@ export function loadDefaults(): TriggerDefaults {
     return {
       opener: { ...FALLBACK_DEFAULTS.opener, ...parsed.opener },
       follow: { ...FALLBACK_DEFAULTS.follow, ...parsed.follow },
+      followRetry: { ...FALLBACK_DEFAULTS.followRetry, ...parsed.followRetry },
       payoff: { ...FALLBACK_DEFAULTS.payoff, ...parsed.payoff },
     };
   } catch {
@@ -311,23 +321,10 @@ function demoTriggers(): Trigger[] {
     ]);
   };
 
-  /* 6 — two ways in, one set of messages. */
-  const bothSources = () => {
-    const m1 = uid("msg"), m2 = uid("msg");
-    return wrap("6 · Comment or DM — both start it", [
-      trigger(m1, [
-        { ...commentSource(), include: ["guide"] },
-        { ...dmSource(), include: ["guide"], autoReply: true },
-      ]),
-      message(m1, "Opening DM", "Hey {{first_name}} 👋 want the guide?", [nextBtn("Yes please", m2)]),
-      message(m2, "The payoff", "Here it is 👇", [linkBtn()]),
-    ]);
-  };
-
-  /* 7 — one message, two buttons, two different endings. */
+  /* 6 — one message, two buttons, two different endings. */
   const branching = () => {
     const m1 = uid("msg"), a = uid("msg"), b = uid("msg");
-    return wrap("7 · Two buttons, two paths", [
+    return wrap("6 · Two buttons, two paths", [
       trigger(m1, [{ ...commentSource(), include: ["price", "info"] }]),
       message(m1, "Opening DM", "Hey {{first_name}} 👋 what are you after?", [
         nextBtn("The pricing", a),
@@ -341,7 +338,7 @@ function demoTriggers(): Trigger[] {
   /* 8 — the "no" branch used, so non-followers get nudged instead of dropped. */
   const nudge = () => {
     const m1 = uid("msg"), cond = uid("cnd"), yes = uid("msg"), no = uid("msg");
-    return wrap("8 · Follow gate with a nudge for non-followers", [
+    return wrap("7 · Follow gate with a nudge for non-followers", [
       trigger(m1, [{ ...commentSource(), include: ["pack"] }]),
       message(m1, "Opening DM", OPENER, [nextBtn("Yes, I'm following", cond)]),
       { id: cond, type: "condition", label: "Do they follow you?", yes, no },
@@ -352,7 +349,7 @@ function demoTriggers(): Trigger[] {
     ]);
   };
 
-  return [full(), silent(), ungated(), instant(), fromDm(), bothSources(), branching(), nudge()];
+  return [full(), silent(), ungated(), instant(), fromDm(), branching(), nudge()];
 }
 
 export function loadTriggers(): Trigger[] {

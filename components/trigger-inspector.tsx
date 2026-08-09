@@ -7,6 +7,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { ReelStrip, ReelPickerModal } from "@/components/reel-picker";
+import { MAX_BUTTONS } from "@/lib/buttons";
+import { loadDefaults, uid } from "@/lib/trigger-store";
 import type { FlowNode, TriggerReel, TriggerSource } from "@/lib/trigger-store";
 
 /**
@@ -22,23 +24,24 @@ import type { FlowNode, TriggerReel, TriggerSource } from "@/lib/trigger-store";
 type Patch = (id: string, up: Partial<FlowNode>) => void;
 
 export function TriggerInspector({
-  node, msgIndex, patch, onClose, onDelete, onAddButton, setNodes, reels, loadReels,
-  editingSourceId, setEditingSourceId, patchSource, addSource, removeSource,
+  node, nodes, msgIndex, patch, onClose, onDelete, onAddButton, setNodes, reels, loadReels,
+  editingSourceId, setEditingSourceId, patchSource, switchSourceKind, onSelectNode,
 }: {
   node: FlowNode;
+  nodes: FlowNode[];
   msgIndex: (id: string) => number;
   patch: Patch;
   onClose: () => void;
   onDelete: (id: string) => void;
   onAddButton: (id: string) => void;
+  onSelectNode: (id: string) => void;
   setNodes: (fn: (prev: FlowNode[]) => FlowNode[]) => void;
   reels: TriggerReel[] | null;
   loadReels: () => void;
   editingSourceId: string | null;
   setEditingSourceId: (id: string | null) => void;
   patchSource: (sourceId: string, up: Partial<TriggerSource>) => void;
-  addSource: (kind: "comment" | "dm") => void;
-  removeSource: (sourceId: string) => void;
+  switchSourceKind: (kind: "comment" | "dm") => void;
 }) {
   const [step, setStep] = useState(0);
 
@@ -77,15 +80,13 @@ export function TriggerInspector({
             source={editingSource} step={step} setStep={setStep}
             patchSource={patchSource}
             onDone={() => setEditingSourceId(null)}
-            onRemove={() => { removeSource(editingSource.id); setEditingSourceId(null); }}
-            canRemove={node.sources.length > 1}
             reels={reels} loadReels={loadReels}
           />
         ) : (
           <SourceList
             node={node}
             onEdit={(sid) => { setEditingSourceId(sid); setStep(0); }}
-            onAdd={addSource}
+            onSwitchKind={switchSourceKind}
           />
         )
       ) : node.type === "message" ? (
@@ -94,28 +95,10 @@ export function TriggerInspector({
           onAddButton={() => onAddButton(node.id)} onDelete={() => onDelete(node.id)}
         />
       ) : (
-        <div className="flex-1 flex flex-col">
-          <div className="p-5 space-y-3">
-            <p className="text-xs text-gray-500 leading-relaxed">
-              Instagram only reveals whether someone follows you once they&apos;ve messaged you, and
-              their button tap is that message. So this check can only sit after a button — never
-              straight after the comment.
-            </p>
-            <p className="text-xs text-gray-500 leading-relaxed">
-              Remove it and the flow still runs — everyone reaches the payoff without having to
-              follow first.
-            </p>
-            <p className="text-xs text-gray-500 leading-relaxed">
-              A flow gets one of these. Instagram answers the follow question once, when they tap,
-              so a second check further down would only re-ask something already known.
-            </p>
-          </div>
-          <div className="mt-auto border-t border-gray-100 p-4">
-            <Button variant="outline" size="sm" className="w-full" onClick={() => onDelete(node.id)}>
-              <Trash2 className="w-3.5 h-3.5 text-red-400" /> Remove the follow check
-            </Button>
-          </div>
-        </div>
+        <ConditionEditor
+          node={node} nodes={nodes} patch={patch} setNodes={setNodes}
+          onDelete={() => onDelete(node.id)} onSelectNode={onSelectNode}
+        />
       )}
     </div>
   );
@@ -124,19 +107,18 @@ export function TriggerInspector({
 /* ── Trigger: the list of things that start this flow ───────────────────── */
 
 function SourceList({
-  node, onEdit, onAdd,
+  node, onEdit, onSwitchKind,
 }: {
   node: Extract<FlowNode, { type: "trigger" }>;
   onEdit: (sourceId: string) => void;
-  onAdd: (kind: "comment" | "dm") => void;
+  onSwitchKind: (kind: "comment" | "dm") => void;
 }) {
-  const hasComment = node.sources.some((x) => x.kind === "comment");
-  const hasDm = node.sources.some((x) => x.kind === "dm");
+  const kind = node.sources[0]?.kind ?? "comment";
 
   return (
     <div className="flex-1 overflow-y-auto p-5 space-y-5">
       <p className="text-xs text-gray-500 leading-relaxed">
-        Any of these can start the flow. They all lead into the same messages.
+        One trigger, one way in. Everything below leads into the same messages.
       </p>
 
       <div className="space-y-2.5">
@@ -183,34 +165,38 @@ function SourceList({
         ))}
       </div>
 
+      {/*
+        Switch, don't accumulate. A trigger owns one reel and one keyword set;
+        a second way in would need its own reel and its own public reply, which
+        makes it a second trigger, not a second row on this one.
+      */}
       <div className="space-y-2">
-        <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Add another</p>
-        <button
-          onClick={() => onAdd("comment")}
-          disabled={hasComment}
-          className="w-full rounded-xl border border-dashed border-gray-300 p-3 text-left flex items-center gap-2.5 hover:border-brand-400 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-        >
-          <ImageIcon className="w-4 h-4 text-emerald-500 shrink-0" />
-          <div>
-            <p className="text-xs font-medium text-gray-800">Reel comment</p>
-            <p className="text-[11px] text-gray-400">
-              {hasComment ? "Already added" : "Reply in the feed and open a DM"}
-            </p>
-          </div>
-        </button>
-        <button
-          onClick={() => onAdd("dm")}
-          disabled={hasDm}
-          className="w-full rounded-xl border border-dashed border-gray-300 p-3 text-left flex items-center gap-2.5 hover:border-brand-400 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-        >
-          <Send className="w-4 h-4 text-sky-500 shrink-0" />
-          <div>
-            <p className="text-xs font-medium text-gray-800">Direct message</p>
-            <p className="text-[11px] text-gray-400">
-              {hasDm ? "Already added" : "Someone DMs you a keyword"}
-            </p>
-          </div>
-        </button>
+        <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
+          Start it from something else
+        </p>
+        {([
+          { k: "comment" as const, icon: <ImageIcon className="w-4 h-4 text-emerald-500 shrink-0" />,
+            title: "Reel comment", note: "Reply in the feed and open a DM" },
+          { k: "dm" as const, icon: <Send className="w-4 h-4 text-sky-500 shrink-0" />,
+            title: "Direct message", note: "Someone DMs you a keyword" },
+        ]).map(({ k, icon, title, note }) => (
+          <button
+            key={k}
+            onClick={() => { if (k !== kind && confirm(`Switch this trigger to start from a ${title.toLowerCase()}? The keywords and replies are kept.`)) onSwitchKind(k); }}
+            disabled={k === kind}
+            className="w-full rounded-xl border border-dashed border-gray-300 p-3 text-left flex items-center gap-2.5 hover:border-brand-400 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {icon}
+            <div>
+              <p className="text-xs font-medium text-gray-800">{title}</p>
+              <p className="text-[11px] text-gray-400">{k === kind ? "Currently in use" : note}</p>
+            </div>
+          </button>
+        ))}
+        <p className="text-[11px] text-gray-400 leading-relaxed pt-1">
+          Want a reel and a DM keyword both running? Make a second trigger — each one owns its own
+          reel, keywords and public reply.
+        </p>
       </div>
     </div>
   );
@@ -219,15 +205,13 @@ function SourceList({
 /* ── Trigger source: step wizard ────────────────────────────────────────── */
 
 function SourceWizard({
-  source, step, setStep, patchSource, onDone, onRemove, canRemove, reels, loadReels,
+  source, step, setStep, patchSource, onDone, reels, loadReels,
 }: {
   source: TriggerSource;
   step: number;
   setStep: (n: number) => void;
   patchSource: (sourceId: string, up: Partial<TriggerSource>) => void;
   onDone: () => void;
-  onRemove: () => void;
-  canRemove: boolean;
   reels: TriggerReel[] | null;
   loadReels: () => void;
 }) {
@@ -274,11 +258,6 @@ function SourceWizard({
         >
           <ChevronRight className="w-4 h-4" />
         </button>
-        {canRemove && (
-          <button onClick={onRemove} className="text-gray-300 hover:text-red-500 ml-1 cursor-pointer" title="Remove this trigger">
-            <Trash2 className="w-4 h-4" />
-          </button>
-        )}
         <Button size="sm" className="ml-auto" onClick={onDone}>
           <Check className="w-3.5 h-3.5" /> Done
         </Button>
@@ -424,6 +403,192 @@ function StepReplies({
   );
 }
 
+/* ── Follow check ───────────────────────────────────────────────────────── */
+
+/**
+ * The follow gate.
+ *
+ * The gate itself sends nothing — it only picks a branch. The wording people
+ * actually read lives on the two messages it points at, so this panel's job is
+ * to get you to them, and to offer the "not following yet" nudge if the no
+ * branch is still empty, which is the case that silently drops people.
+ *
+ * That nudge's button points back at the gate, and the loop is the retry: tap
+ * without having followed and the same nudge comes round again.
+ */
+function ConditionEditor({
+  node, nodes, patch, setNodes, onDelete, onSelectNode,
+}: {
+  node: Extract<FlowNode, { type: "condition" }>;
+  nodes: FlowNode[];
+  patch: Patch;
+  setNodes: (fn: (prev: FlowNode[]) => FlowNode[]) => void;
+  onDelete: () => void;
+  onSelectNode: (id: string) => void;
+}) {
+  function addNudge() {
+    if (node.no) return;
+    const d = loadDefaults();
+    const nid = uid("msg");
+    setNodes((prev) => [
+      ...prev.map((n) => (n.id === node.id && n.type === "condition" ? { ...n, no: nid } : n)),
+      {
+        id: nid, type: "message", title: "Not following yet",
+        text: d.follow.text,
+        // Back to the gate: tapping re-checks, so this doubles as the retry.
+        buttons: [{ id: uid("btn"), label: d.follow.button, kind: "next", next: node.id }],
+      },
+    ]);
+    onSelectNode(nid);
+  }
+
+  /**
+   * Splice a second, differently-worded message into the loop.
+   *
+   * The gate cannot tell a first tap from a fifth, so a distinct retry has to
+   * come from the shape of the graph: the nudge's button now opens this message
+   * instead of re-checking, and its button is what returns to the gate. People
+   * who keep tapping without following see the two alternate.
+   */
+  function addRetry() {
+    const d = loadDefaults();
+    const rid = uid("msg");
+    setNodes((prev) => {
+      const nudge = prev.find((n) => n.id === node.no);
+      if (!nudge || nudge.type !== "message") return prev;
+      return [
+        ...prev.map((n) => (n.id === nudge.id && n.type === "message"
+          ? { ...n, buttons: n.buttons.map((b) => (b.next === node.id ? { ...b, next: rid } : b)) }
+          : n)),
+        {
+          id: rid, type: "message", title: "Still not following",
+          text: d.followRetry.text,
+          buttons: [{ id: uid("btn"), label: d.followRetry.button, kind: "next", next: node.id }],
+        },
+      ];
+    });
+    onSelectNode(rid);
+  }
+
+  // Offer the retry only while the nudge still loops straight back to the gate —
+  // once something else sits on the loop, this would be rewriting their graph.
+  const nudge = nodes.find((n) => n.id === node.no);
+  const nudgeLoopsBack =
+    nudge?.type === "message" && nudge.buttons.some((b) => b.next === node.id);
+
+  return (
+    <div className="flex-1 flex flex-col overflow-y-auto">
+      <div className="p-5 space-y-4">
+        <Input
+          label="Question shown on the card"
+          value={node.label}
+          onChange={(e) => patch(node.id, { label: e.target.value } as Partial<FlowNode>)}
+          hint="A label for you — it is never sent to anyone."
+        />
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-gray-500">What each answer leads to</p>
+
+          <BranchRow
+            tone="yes" title="They follow you" target={node.yes}
+            empty="Nothing yet — followers reach a dead end."
+            onOpen={onSelectNode}
+          />
+
+          {node.no ? (
+            <>
+              <BranchRow
+                tone="no" title="Not following yet" target={node.no}
+                empty="" onOpen={onSelectNode}
+              />
+              {nudgeLoopsBack && (
+                <div className="rounded-lg border border-gray-200 p-3 space-y-2">
+                  <p className="text-[11px] text-gray-500 leading-relaxed">
+                    Right now a repeat tap shows that same message again. Add a second one and the
+                    two alternate, so the wording changes when the first didn&apos;t land.
+                  </p>
+                  <Button variant="outline" size="sm" className="w-full" onClick={addRetry}>
+                    <Plus className="w-3.5 h-3.5" /> Add a retry message
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                Non-followers currently get <strong>nothing</strong> — the flow stops for them
+                without a word. Add the nudge and they get asked to follow, with a button that
+                re-checks.
+              </p>
+              <Button variant="outline" size="sm" className="w-full" onClick={addNudge}>
+                <Plus className="w-3.5 h-3.5" /> Add the &ldquo;please follow&rdquo; message
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-lg bg-gray-50 p-3 space-y-2">
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            <strong>Where the wording lives:</strong> the gate sends nothing itself. Open the
+            message on a branch to change what people read.
+          </p>
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            <strong>The retry:</strong> the last message on the loop points back here, so tapping
+            re-checks. The gate can&apos;t tell a first tap from a fifth — different wording the
+            second time comes from putting a second message on the loop.
+          </p>
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            Instagram only reveals whether someone follows you once they&apos;ve messaged you, and
+            their tap is that message — so this can only sit after a button, never straight after
+            the comment.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-auto border-t border-gray-100 p-4">
+        <Button variant="outline" size="sm" className="w-full" onClick={onDelete}>
+          <Trash2 className="w-3.5 h-3.5 text-red-400" /> Remove the follow check
+        </Button>
+        <p className="text-[11px] text-gray-400 mt-1.5 text-center">
+          Everyone then reaches the payoff without following.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function BranchRow({
+  tone, title, target, empty, onOpen,
+}: {
+  tone: "yes" | "no";
+  title: string;
+  target: string | null;
+  empty: string;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 p-3 flex items-center gap-2.5">
+      <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
+        tone === "yes" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+      }`}>
+        {tone}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-gray-700 truncate">{title}</p>
+        {!target && empty && <p className="text-[11px] text-amber-700 mt-0.5">{empty}</p>}
+      </div>
+      {target && (
+        <button
+          onClick={() => onOpen(target)}
+          className="text-[11px] font-medium text-brand-600 hover:text-brand-700 cursor-pointer shrink-0"
+        >
+          Edit message
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ── Message editor ─────────────────────────────────────────────────────── */
 
 function MessageEditor({
@@ -511,9 +676,18 @@ function MessageEditor({
               )}
             </div>
           ))}
-          <Button variant="outline" size="sm" className="w-full" onClick={onAddButton}>
+          <Button
+            variant="outline" size="sm" className="w-full"
+            onClick={onAddButton}
+            disabled={node.buttons.length >= MAX_BUTTONS}
+          >
             <Plus className="w-3.5 h-3.5" /> Add button
           </Button>
+          <p className="text-[11px] text-gray-400 mt-1.5">
+            {node.buttons.length >= MAX_BUTTONS
+              ? "Instagram allows a maximum of 3 buttons."
+              : `${MAX_BUTTONS - node.buttons.length} more allowed.`}
+          </p>
         </div>
       </div>
       <div className="border-t border-gray-100 p-4 shrink-0">

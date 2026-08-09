@@ -97,6 +97,18 @@ export default function TriggerDefaultsPage() {
         />
 
         <Block
+          icon={RotateCcw}
+          tone="text-orange-600 bg-orange-50 border-orange-200"
+          title="Retry follow message"
+          desc="For a repeat tap, when the first nudge didn't land"
+          text={d.followRetry.text}
+          button={d.followRetry.button}
+          onText={(v) => set("followRetry", "text", v)}
+          onButton={(v) => set("followRetry", "button", v)}
+          note="Optional second step on the loop — add it from the follow check on the canvas. Without it, someone who taps again just sees the follow message a second time."
+        />
+
+        <Block
           icon={Link2}
           tone="text-emerald-600 bg-emerald-50 border-emerald-200"
           title="Send Message #2"

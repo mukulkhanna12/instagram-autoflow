@@ -3,13 +3,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useParams, useRouter } from "next/navigation";
 import {
   Loader2, Plus, X, ArrowLeft, ImageIcon, Search, Minus, Maximize2,
-  Eye, Check, ChevronRight, MessageSquare, GitBranch, Sliders,
+  Eye, Check, ChevronRight, MessageSquare, GitBranch, Sliders, Unlink,
 } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { PhonePreview } from "@/components/phone-preview";
+import { MAX_BUTTONS } from "@/lib/buttons";
 import { TriggerInspector } from "@/components/trigger-inspector";
 import {
   TriggerCard, MessageCard, ConditionCard, CARD_W,
@@ -17,6 +18,7 @@ import {
 import {
   getTrigger, upsertTrigger, uid, commentSource, dmSource, hasCondition,
   type Trigger, type FlowNode, type FlowButton, type TriggerReel, type TriggerSource,
+  type NodePos,
 } from "@/lib/trigger-store";
 
 const COL_GAP = 130;
@@ -34,7 +36,9 @@ export default function TriggerBuilderPage() {
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
   // An empty port that was clicked, waiting for a choice of what to add.
-  const [pendingPort, setPendingPort] = useState<{ attach: (id: string) => void; x: number; y: number } | null>(null);
+  const [pendingPort, setPendingPort] = useState<
+    { attach: (id: string) => void; detach?: () => void; x: number; y: number; at: NodePos } | null
+  >(null);
   const [showPreview, setShowPreview] = useState(false);
   // Reels are loaded once, the first time a wizard step asks for them.
   const [reels, setReels] = useState<TriggerReel[] | null>(null);
@@ -292,23 +296,23 @@ export default function TriggerBuilderPage() {
    * At most one per flow: Instagram answers the follow question once, when they
    * tap, so a second check downstream would only re-ask something already known.
    */
-  function addCondition(attach: (newId: string) => void) {
+  function addCondition(attach: (newId: string) => void, pos: NodePos) {
     if (hasCondition(nodes)) return;
     const nid = uid("cnd");
     setNodes((prev) => [...prev, {
-      id: nid, type: "condition", label: "Do they follow you?", yes: null, no: null,
+      id: nid, type: "condition", label: "Do they follow you?", yes: null, no: null, pos,
     }]);
     attach(nid);
     setSelectedId(nid);
     setDrawerOpen(true);
   }
 
-  function addMessage(attach: (newId: string) => void) {
+  function addMessage(attach: (newId: string) => void, pos: NodePos) {
     const nid = uid("msg");
     setNodes((prev) => [...prev, {
       id: nid, type: "message",
       title: `Send Message #${prev.filter((n) => n.type === "message").length + 1}`,
-      text: "", buttons: [],
+      text: "", buttons: [], pos,
     }]);
     attach(nid);
     setSelectedId(nid);
@@ -322,16 +326,22 @@ export default function TriggerBuilderPage() {
         : n));
   }
 
-  function addSource(kind: "comment" | "dm") {
-    const src = kind === "comment" ? commentSource() : dmSource();
-    setNodes((prev) => prev.map((n) =>
-      n.type === "trigger" ? { ...n, sources: [...n.sources, src] } : n));
-    setEditingSourceId(src.id);
-  }
-
-  function removeSource(sourceId: string) {
-    setNodes((prev) => prev.map((n) =>
-      n.type === "trigger" ? { ...n, sources: n.sources.filter((x) => x.id !== sourceId) } : n));
+  /**
+   * Change what starts this trigger, keeping the one source rather than adding
+   * a second. Keywords and replies carry over — they're about the wording, not
+   * about which surface it arrived on. The reel does not: a DM has none.
+   */
+  function switchSourceKind(kind: "comment" | "dm") {
+    setNodes((prev) => prev.map((n) => {
+      if (n.type !== "trigger") return n;
+      const old = n.sources[0];
+      const base = kind === "comment" ? commentSource() : dmSource();
+      const src: TriggerSource = old
+        ? { ...base, include: old.include, exclude: old.exclude, autoReply: old.autoReply, replies: old.replies }
+        : base;
+      return { ...n, sources: [src] };
+    }));
+    setEditingSourceId(null);
   }
 
   /**
@@ -341,15 +351,24 @@ export default function TriggerBuilderPage() {
    * bottom or right edge used to render outside it — visible as a popup that
    * appeared to do nothing and couldn't be dismissed.
    */
-  function openAddMenuAt(clientX: number, clientY: number, attach: (id: string) => void) {
+  function openAddMenuAt(
+    clientX: number, clientY: number,
+    attach: (id: string) => void,
+    detach?: () => void,
+  ) {
     const vp = viewportRef.current;
-    if (!vp) return;
+    const world = worldRef.current;
+    if (!vp || !world) return;
     const r = vp.getBoundingClientRect();
-    const W = 208, H = 140;
+    const o = world.getBoundingClientRect();
+    const W = 208, H = detach ? 186 : 140;
     setPendingPort({
-      attach,
+      attach, detach,
       x: Math.min(Math.max(8, clientX - r.left - W / 2), Math.max(8, r.width - W - 8)),
       y: Math.min(Math.max(8, clientY - r.top + 12), Math.max(8, r.height - H - 8)),
+      // Where the new card should land, in world coordinates. Without an
+      // explicit position it inherits {0,0} and stacks on the trigger card.
+      at: { x: (clientX - o.left) / zoom, y: (clientY - o.top) / zoom - 24 },
     });
   }
 
@@ -364,7 +383,11 @@ export default function TriggerBuilderPage() {
       // Pin every auto-placed card where it currently sits. Rewiring changes
       // the depths the layout is derived from, and a detached card drops to
       // depth 0 — landing on top of the trigger, which reads as a crash.
-      const held: FlowNode = n.pos ? n : { ...n, pos: layout.get(n.id) ?? { x: 0, y: 0 } };
+      //
+      // A card added in this same batch has no layout entry yet, and pinning it
+      // to a {0,0} fallback is exactly that bug: it carries its own position.
+      const at = layout.get(n.id);
+      const held: FlowNode = n.pos || !at ? n : { ...n, pos: at };
       if (held.id !== nid) return held;
       if (held.type === "trigger") return { ...held, next: targetId };
       if (held.type === "condition") return { ...held, [slot as "yes" | "no"]: targetId };
@@ -372,8 +395,10 @@ export default function TriggerBuilderPage() {
     }));
   }
 
-  // The arrow being dragged out of a port, in world coordinates.
+  // The arrow being dragged out of a port, in world coordinates, and the card
+  // currently under the cursor while that drag is in flight.
   const [linkLine, setLinkLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
 
   /**
    * Drag an arrow off a port and drop it on the card it should point at.
@@ -399,17 +424,25 @@ export default function TriggerBuilderPage() {
     const y1 = (r.top - o.top + r.height / 2) / zoom;
     let moved = false;
 
+    const owner = portId.split(":")[0];
+
     const move = (ev: PointerEvent) => {
       const w = worldRef.current;
       if (!w) return;
       moved = true;
       const oo = w.getBoundingClientRect();
       setLinkLine({ x1, y1, x2: (ev.clientX - oo.left) / zoom, y2: (ev.clientY - oo.top) / zoom });
+
+      // Ring the card under the cursor, so it's clear where the arrow will land.
+      const over = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)
+        ?.closest("[data-node-id]")?.getAttribute("data-node-id") ?? null;
+      setDropTarget(over && over !== owner ? over : null);
     };
 
     const up = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", move);
       setLinkLine(null);
+      setDropTarget(null);
       if (!moved) return; // A tap, not a drag — the port's own click handles it.
       suppressPortClick.current = true;
 
@@ -418,7 +451,7 @@ export default function TriggerBuilderPage() {
       const targetId = dropped?.getAttribute("data-node-id") ?? null;
 
       // Dropping a card on itself would draw an arrow into its own head.
-      if (targetId && targetId !== portId.split(":")[0]) connectPort(portId, targetId);
+      if (targetId && targetId !== owner) connectPort(portId, targetId);
       else if (!targetId) openAddMenuAt(ev.clientX, ev.clientY, (nid) => connectPort(portId, nid));
     };
 
@@ -426,20 +459,36 @@ export default function TriggerBuilderPage() {
     window.addEventListener("pointerup", up, { once: true });
   }
 
-  /** Tap an open port to add a step; tap a connected one to cut the arrow. */
+  /**
+   * Every port answers a tap the same way — with the menu of what can come
+   * next — whether or not it already points somewhere. Two buttons in one
+   * message can therefore each be pointed at the same follow check, and the
+   * gesture doesn't change meaning depending on what is already wired.
+   *
+   * Detach lives in that menu rather than on the tap itself, where it was both
+   * undiscoverable and easy to trigger by accident.
+   */
   const ports = {
     register: registerPort,
     onPointerDown: startLink,
     onClick: (portId: string, connected: boolean, e: React.MouseEvent) => {
       if (suppressPortClick.current) { suppressPortClick.current = false; return; }
-      if (connected) connectPort(portId, null);
-      else openAddMenuAt(e.clientX, e.clientY, (nid) => connectPort(portId, nid));
+      openAddMenuAt(
+        e.clientX, e.clientY,
+        (nid) => connectPort(portId, nid),
+        connected ? () => connectPort(portId, null) : undefined,
+      );
     },
   };
 
+  /**
+   * Instagram's button template takes at most three buttons and rejects a
+   * fourth outright, so the canvas stops at the same ceiling rather than
+   * letting a flow be drawn that could never send.
+   */
   function addButton(nid: string) {
     setNodes((prev) => prev.map((n) =>
-      n.id === nid && n.type === "message"
+      n.id === nid && n.type === "message" && n.buttons.length < MAX_BUTTONS
         ? { ...n, buttons: [...n.buttons, { id: uid("btn"), label: "New button", kind: "next", next: null } as FlowButton] }
         : n));
   }
@@ -475,6 +524,7 @@ export default function TriggerBuilderPage() {
       {drawerOpen && selected && (
         <TriggerInspector
           node={selected}
+          nodes={nodes}
           msgIndex={msgIndex}
           patch={patch}
           onClose={() => setDrawerOpen(false)}
@@ -486,8 +536,8 @@ export default function TriggerBuilderPage() {
           editingSourceId={editingSourceId}
           setEditingSourceId={setEditingSourceId}
           patchSource={patchSource}
-          addSource={addSource}
-          removeSource={removeSource}
+          switchSourceKind={switchSourceKind}
+          onSelectNode={(nid) => { setSelectedId(nid); setDrawerOpen(true); }}
         />
       )}
 
@@ -570,7 +620,9 @@ export default function TriggerBuilderPage() {
                   onPointerDown={(e) => onNodePointerDown(e, node.id)}
                   onPointerMove={onNodePointerMove}
                   onPointerUp={onNodePointerUp}
-                  className="absolute touch-none"
+                  className={`absolute touch-none rounded-2xl ${
+                    dropTarget === node.id ? "ring-2 ring-violet-500 ring-offset-2" : ""
+                  }`}
                   style={{ left: pos.x, top: pos.y }}
                 >
                   {node.type === "trigger" && (
@@ -579,7 +631,6 @@ export default function TriggerBuilderPage() {
                       onSelect={() => { setSelectedId(node.id); setDrawerOpen(true); }}
                       ports={ports}
                       onEditSource={(sid) => { setSelectedId(node.id); setDrawerOpen(true); setEditingSourceId(sid); }}
-                      onAddSource={() => { setSelectedId(node.id); setDrawerOpen(true); addSource("dm"); }}
                     />
                   )}
                   {node.type === "message" && (
@@ -625,7 +676,7 @@ export default function TriggerBuilderPage() {
                   Add next step
                 </p>
                 <button
-                  onClick={() => { addMessage(pendingPort.attach); setPendingPort(null); }}
+                  onClick={() => { addMessage(pendingPort.attach, pendingPort.at); setPendingPort(null); }}
                   className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-gray-50 cursor-pointer flex items-center gap-2.5"
                 >
                   <MessageSquare className="w-3.5 h-3.5 text-brand-500 shrink-0" />
@@ -635,7 +686,7 @@ export default function TriggerBuilderPage() {
                   </span>
                 </button>
                 <button
-                  onClick={() => { addCondition(pendingPort.attach); setPendingPort(null); }}
+                  onClick={() => { addCondition(pendingPort.attach, pendingPort.at); setPendingPort(null); }}
                   disabled={hasCondition(nodes)}
                   className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-gray-50 cursor-pointer flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
@@ -649,6 +700,23 @@ export default function TriggerBuilderPage() {
                     </span>
                   </span>
                 </button>
+
+                {pendingPort.detach && (
+                  <button
+                    onClick={() => { pendingPort.detach?.(); setPendingPort(null); }}
+                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-red-50 cursor-pointer flex items-center gap-2.5 border-t border-gray-100 mt-1 pt-2"
+                  >
+                    <Unlink className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                    <span>
+                      <span className="block text-xs font-medium text-gray-800">Detach</span>
+                      <span className="block text-[11px] text-gray-400">Leave this branch empty</span>
+                    </span>
+                  </button>
+                )}
+
+                <p className="text-[10px] text-gray-400 px-2.5 pt-1.5 pb-1 leading-relaxed border-t border-gray-100 mt-1">
+                  Or drag this dot onto any existing card — several buttons can point at the same one.
+                </p>
               </div>
             </>
           )}
