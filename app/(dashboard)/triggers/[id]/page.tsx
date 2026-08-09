@@ -32,6 +32,9 @@ export default function TriggerBuilderPage() {
 
   const [trigger, setTrigger] = useState<Trigger | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // What the panel is editing. Deliberately separate from what is selected:
+  // selection follows the pointer, the panel only ever follows a pencil.
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
@@ -74,9 +77,17 @@ export default function TriggerBuilderPage() {
   const nodes = trigger?.nodes ?? [];
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const selected = selectedId ? byId.get(selectedId) ?? null : null;
+  const editing = editingId ? byId.get(editingId) ?? null : null;
 
   const setNodes = useCallback((fn: (prev: FlowNode[]) => FlowNode[]) => {
     setTrigger((prev) => (prev ? { ...prev, nodes: fn(prev.nodes) } : prev));
+  }, []);
+
+  /** Open the panel on a card. The one route in, so drags can't trigger it. */
+  const openEditor = useCallback((nid: string) => {
+    setSelectedId(nid);
+    setEditingId(nid);
+    setDrawerOpen(true);
   }, []);
 
   function save() {
@@ -313,8 +324,7 @@ export default function TriggerBuilderPage() {
       id: nid, type: "condition", label: "Do they follow you?", yes: null, no: null, pos,
     }]);
     attach(nid);
-    setSelectedId(nid);
-    setDrawerOpen(true);
+    openEditor(nid);
   }
 
   function addMessage(attach: (newId: string) => void, pos: NodePos) {
@@ -325,8 +335,7 @@ export default function TriggerBuilderPage() {
       text: "", buttons: [], pos,
     }]);
     attach(nid);
-    setSelectedId(nid);
-    setDrawerOpen(true);
+    openEditor(nid);
   }
 
   function patchSource(sourceId: string, up: Partial<TriggerSource>) {
@@ -522,6 +531,7 @@ export default function TriggerBuilderPage() {
       });
     });
     if (selectedId === nid) setSelectedId(null);
+    if (editingId === nid) setEditingId(null);
   }
 
   if (!trigger) {
@@ -531,9 +541,9 @@ export default function TriggerBuilderPage() {
   return (
     <div className="flex h-screen">
       {/* Editing drawer — left of the canvas, like a step inspector */}
-      {drawerOpen && selected && (
+      {drawerOpen && editing && (
         <TriggerInspector
-          node={selected}
+          node={editing}
           nodes={nodes}
           msgIndex={msgIndex}
           patch={patch}
@@ -547,7 +557,7 @@ export default function TriggerBuilderPage() {
           setEditingSourceId={setEditingSourceId}
           patchSource={patchSource}
           switchSourceKind={switchSourceKind}
-          onSelectNode={(nid) => { setSelectedId(nid); setDrawerOpen(true); }}
+          onSelectNode={openEditor}
         />
       )}
 
@@ -639,16 +649,16 @@ export default function TriggerBuilderPage() {
                     <TriggerCard
                       node={node} selected={selectedId === node.id}
                       onSelect={() => setSelectedId(node.id)}
-                      onEdit={() => { setSelectedId(node.id); setDrawerOpen(true); setEditingSourceId(null); }}
+                      onEdit={() => { openEditor(node.id); setEditingSourceId(null); }}
                       ports={ports}
-                      onEditSource={(sid) => { setSelectedId(node.id); setDrawerOpen(true); setEditingSourceId(sid); }}
+                      onEditSource={(sid) => { openEditor(node.id); setEditingSourceId(sid); }}
                     />
                   )}
                   {node.type === "message" && (
                     <MessageCard
                       node={node} index={msgIndex(node.id)} selected={selectedId === node.id}
                       onSelect={() => setSelectedId(node.id)}
-                      onEdit={() => { setSelectedId(node.id); setDrawerOpen(true); setEditingSourceId(null); }}
+                      onEdit={() => { openEditor(node.id); setEditingSourceId(null); }}
                       ports={ports}
                       onAddButton={() => addButton(node.id)}
                       onDelete={() => removeNode(node.id)}
@@ -658,7 +668,7 @@ export default function TriggerBuilderPage() {
                     <ConditionCard
                       node={node} selected={selectedId === node.id}
                       onSelect={() => setSelectedId(node.id)}
-                      onEdit={() => { setSelectedId(node.id); setDrawerOpen(true); setEditingSourceId(null); }}
+                      onEdit={() => { openEditor(node.id); setEditingSourceId(null); }}
                       ports={ports}
                       onDelete={() => removeNode(node.id)}
                     />
@@ -668,7 +678,7 @@ export default function TriggerBuilderPage() {
             })}
           </div>
 
-          {!drawerOpen && selected && (
+          {!drawerOpen && editing && (
             <button
               data-canvas-ui
               onClick={() => setDrawerOpen(true)}
