@@ -257,8 +257,20 @@ export default function TriggerBuilderPage() {
     if (d?.moved) e.stopPropagation();
   }
 
+  /**
+   * Start panning — but only on the canvas itself.
+   *
+   * The capture below is what makes a pan survive the pointer leaving the
+   * viewport, and it is also a trap: while an element holds pointer capture the
+   * browser retargets the following `click` to that element. Any control drawn
+   * inside the viewport therefore lost its click entirely — the add-step menu
+   * did nothing, its backdrop wouldn't dismiss, and the zoom buttons were dead.
+   *
+   * So chrome drawn over the canvas is marked `data-canvas-ui` and excluded
+   * here, exactly as cards are.
+   */
   function onPointerDown(e: React.PointerEvent) {
-    if ((e.target as HTMLElement).closest("[data-node]")) return; // dragging a card shouldn't pan
+    if ((e.target as HTMLElement).closest("[data-node], [data-canvas-ui]")) return;
     panning.current = { x: pan.x, y: pan.y, px: e.clientX, py: e.clientY };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setSelectedId(null);
@@ -657,6 +669,7 @@ export default function TriggerBuilderPage() {
 
           {!drawerOpen && selected && (
             <button
+              data-canvas-ui
               onClick={() => setDrawerOpen(true)}
               className="absolute left-0 top-1/2 -translate-y-1/2 w-6 h-16 bg-white rounded-r-lg shadow-md ring-1 ring-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 cursor-pointer"
               title="Show the editing panel"
@@ -667,8 +680,9 @@ export default function TriggerBuilderPage() {
 
           {pendingPort && (
             <>
-              <div className="absolute inset-0 z-20" onClick={() => setPendingPort(null)} />
+              <div data-canvas-ui className="absolute inset-0 z-20" onClick={() => setPendingPort(null)} />
               <div
+                data-canvas-ui
                 className="absolute z-30 bg-white rounded-xl shadow-lg ring-1 ring-gray-200 p-1 w-52"
                 style={{ left: Math.max(8, pendingPort.x - 100), top: pendingPort.y + 12 }}
               >
@@ -722,7 +736,7 @@ export default function TriggerBuilderPage() {
           )}
 
           {/* Zoom controls — a compact pill, bottom-left */}
-          <div className="absolute bottom-5 left-5 flex items-center gap-0.5 bg-white rounded-full shadow-md ring-1 ring-gray-200 px-1 py-1">
+          <div data-canvas-ui className="absolute bottom-5 left-5 flex items-center gap-0.5 bg-white rounded-full shadow-md ring-1 ring-gray-200 px-1 py-1">
             <button onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z - 0.15))} className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 cursor-pointer" title="Zoom out">
               <Minus className="w-3.5 h-3.5" />
             </button>
