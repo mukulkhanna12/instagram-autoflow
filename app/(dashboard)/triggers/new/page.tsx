@@ -4,29 +4,30 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronLeft, ChevronRight, Check, Plus, Trash2, Info } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Input, Textarea } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { PhonePreview } from "@/components/phone-preview";
 import { ReelStrip, ReelPickerModal } from "@/components/reel-picker";
 import {
-  upsertTrigger, uid, commentSource, loadDefaults,
+  upsertTrigger, uid, commentSource, loadDefaults, DEFAULT_COMMENT_REPLIES,
   type Trigger, type FlowNode, type TriggerReel,
 } from "@/lib/trigger-store";
 
 /**
- * Creating a trigger, one question at a time.
+ * Creating a trigger: only the three questions that can't be guessed.
  *
- * The questions are linear and each needs room, so this is a stepped form
- * rather than one long scroll — you answer, arrow forward, and watch the phone
- * beside it change. The canvas takes over once the trigger exists, which is
- * when branching and rearranging start to matter.
+ * Which reel, which keyword and what gets posted publicly are decisions unique
+ * to this trigger. The messages that follow are not — they come from the saved
+ * defaults, and the canvas is a better place to change them because that's
+ * where you can see them in context and branch off them.
+ *
+ * So this form stops at three steps and hands over. The trigger it creates is a
+ * draft, never live, so an unfinished flow can't start DMing anyone.
  */
 
 const STEPS = [
   { title: "Which reel should this watch?", hint: "The flow runs when someone comments on it." },
   { title: "What in a comment starts it?", hint: "Narrow it to a keyword, or respond to everything." },
   { title: "Reply publicly under the comment?", hint: "Optional, but it shows others the flow is live." },
-  { title: "What's the opening DM?", hint: "Their tap on this button is what opens the conversation." },
-  { title: "And what do they finally get?", hint: "The payoff, once the follow check passes." },
 ];
 
 export default function NewTriggerPage() {
@@ -42,17 +43,11 @@ export default function NewTriggerPage() {
   const [keywordMode, setKeywordMode] = useState<"specific" | "any">("specific");
   const [keywords, setKeywords] = useState("");
   const [publicReply, setPublicReply] = useState(true);
-  const [replies, setReplies] = useState<string[]>(["Sent you a DM! 📩"]);
+  const [replies, setReplies] = useState<string[]>([...DEFAULT_COMMENT_REPLIES]);
 
-  // Seeded from the saved defaults, so a change there shows up on every new trigger.
+  // The messages aren't asked for here — they come from the saved defaults and
+  // are edited on the canvas, where they can be seen in context.
   const [defaults] = useState(() => loadDefaults());
-  const [openerOn, setOpenerOn] = useState(true);
-  const [opener, setOpener] = useState(defaults.opener.text);
-  const [openerButton, setOpenerButton] = useState(defaults.opener.button);
-
-  const [payoff, setPayoff] = useState(defaults.payoff.text);
-  const [payoffButton, setPayoffButton] = useState(defaults.payoff.button);
-  const [payoffUrl, setPayoffUrl] = useState("");
 
   useEffect(() => {
     fetch("/api/instagram/posts").then((r) => r.json())
@@ -62,44 +57,46 @@ export default function NewTriggerPage() {
       .catch(() => setReels([]));
   }, []);
 
-  /** The graph this form describes — also what feeds the live preview. */
+  /**
+   * The graph this form describes — also what feeds the live preview.
+   *
+   * The three messages come straight from the defaults so the trigger lands on
+   * the canvas already complete and sendable; the payoff link is the one thing
+   * left blank, because only you know where it points.
+   */
   function buildNodes(): FlowNode[] {
     const trg = uid("trg"), m1 = uid("msg"), cond = uid("cnd"), m2 = uid("msg");
     const words = keywordMode === "specific"
       ? keywords.split(",").map((k) => k.trim()).filter(Boolean)
       : [];
 
-    const nodes: FlowNode[] = [
+    return [
       {
-        id: trg, type: "trigger", next: openerOn ? m1 : m2,
+        id: trg, type: "trigger", next: m1,
         sources: [{
           ...commentSource(),
           reel, include: words, exclude: [],
           autoReply: publicReply,
-          replies: replies.filter(Boolean),
+          replies: publicReply ? replies.filter(Boolean) : [],
         }],
+      },
+      {
+        id: m1, type: "message", title: "Opening DM", text: defaults.opener.text,
+        buttons: [{ id: uid("btn"), label: defaults.opener.button, kind: "next", next: cond }],
       },
       { id: cond, type: "condition", label: "Do they follow you?", yes: m2, no: null },
       {
-        id: m2, type: "message", title: "The payoff", text: payoff,
-        buttons: payoffUrl.trim()
-          ? [{ id: uid("btn"), label: payoffButton, kind: "link", url: payoffUrl }]
-          : [],
+        id: m2, type: "message", title: "The payoff", text: defaults.payoff.text,
+        buttons: [{ id: uid("btn"), label: defaults.payoff.button, kind: "link", url: "" }],
       },
     ];
-    if (openerOn) {
-      nodes.splice(1, 0, {
-        id: m1, type: "message", title: "Opening DM", text: opener,
-        buttons: [{ id: uid("btn"), label: openerButton, kind: "next", next: cond }],
-      });
-    }
-    return nodes;
   }
 
   function save() {
     setSaving(true);
     const t: Trigger = {
       id: uid("tg"), name: name.trim() || "Untitled trigger",
+      // Always a draft: the payoff link is still empty at this point.
       status: "draft", updatedAt: Date.now(), nodes: buildNodes(),
     };
     upsertTrigger(t);
@@ -205,34 +202,16 @@ export default function NewTriggerPage() {
                   </div>
                 </Choice>
                 <Choice selected={!publicReply} label="No public reply" note="Only the DM goes out" onClick={() => setPublicReply(false)} />
-              </div>
-            )}
 
-            {step === 3 && (
-              <div className="space-y-2.5">
-                <Choice selected={openerOn} label="Send an opening DM" onClick={() => setOpenerOn(true)}>
-                  <div className="space-y-2.5">
-                    <Textarea value={opener} onChange={(e) => setOpener(e.target.value)} rows={4} />
-                    <Input label="Button label" value={openerButton} onChange={(e) => setOpenerButton(e.target.value)} />
-                    <div className="flex items-start gap-2 text-[11px] text-gray-500 bg-gray-50 rounded-lg p-2.5">
-                      <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-gray-400" />
-                      <span>
-                        Their tap is what opens the DM window — and the only moment Instagram will
-                        tell us whether they follow you.
-                      </span>
-                    </div>
-                  </div>
-                </Choice>
-                <Choice selected={!openerOn} label="Skip it" note="Go straight to the payoff — the follow check won't run" onClick={() => setOpenerOn(false)} />
-              </div>
-            )}
-
-            {step === 4 && (
-              <div className="rounded-xl border border-gray-200 p-4 space-y-3">
-                <p className="text-sm font-medium text-gray-900">A DM with a link</p>
-                <Textarea value={payoff} onChange={(e) => setPayoff(e.target.value)} rows={3} placeholder="Write a message" />
-                <Input label="Button label" value={payoffButton} onChange={(e) => setPayoffButton(e.target.value)} />
-                <Input label="Link" value={payoffUrl} onChange={(e) => setPayoffUrl(e.target.value)} placeholder="https://…" hint="Leave empty to send plain text with no button" />
+                <div className="flex items-start gap-2 text-[11px] text-gray-500 bg-gray-50 rounded-lg p-3 mt-4">
+                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-gray-400" />
+                  <span>
+                    That&apos;s everything this form needs. Saving creates the trigger as a
+                    <strong> draft</strong> with the standard opening DM, follow check and payoff
+                    already in place — you finish the wording and add the payoff link on the canvas,
+                    then set it live.
+                  </span>
+                </div>
               </div>
             )}
           </div>
@@ -260,7 +239,7 @@ export default function NewTriggerPage() {
             <Button variant="outline" size="sm" onClick={() => router.push("/triggers")}>Cancel</Button>
             {last ? (
               <Button size="sm" onClick={save} loading={saving}>
-                <Check className="w-4 h-4" /> Save trigger
+                <Check className="w-4 h-4" /> Create draft &amp; open canvas
               </Button>
             ) : (
               <Button size="sm" onClick={() => setStep(step + 1)}>

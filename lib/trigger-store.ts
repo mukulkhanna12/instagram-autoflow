@@ -9,7 +9,9 @@
  * existing per-reel flows are unaffected.
  */
 
-export const STORAGE_KEY = "autoflow.triggers.preview.v1";
+// v2 reseeds the scenario set. Preview triggers live only in this browser and
+// nothing downstream reads them, so a fresh key is cheaper than a migration.
+export const STORAGE_KEY = "autoflow.triggers.preview.v2";
 export const DEFAULTS_KEY = "autoflow.triggers.defaults.v1";
 
 export interface TriggerReel {
@@ -121,12 +123,34 @@ export interface Trigger {
 let seq = 0;
 export const uid = (p: string) => `${p}_${Date.now().toString(36)}_${seq++}`;
 
+/**
+ * Three starting replies rather than one.
+ *
+ * Instagram flags repetition, and the automation guides are unanimous that a
+ * public reply should vary — Manychat's own advice is several variations so it
+ * doesn't read as a bot. Three is the floor that makes the rotation meaningful;
+ * they are deliberately different in shape, not three rewordings of one line,
+ * because near-identical variants defeat the point.
+ */
+export const DEFAULT_COMMENT_REPLIES = [
+  "Just sent it to your DMs! 📩",
+  "Check your inbox — it's on the way 🙌",
+  "Sent! Give your messages a look 👀",
+];
+
+/** The DM equivalent: an instant acknowledgement while the flow starts. */
+export const DEFAULT_DM_REPLIES = [
+  "Got it — one sec 👀",
+  "On it! Sending that over now 🙌",
+  "Thanks for reaching out — coming right up 📩",
+];
+
 export function commentSource(): Extract<TriggerSource, { kind: "comment" }> {
   return {
     id: uid("src"), kind: "comment", reel: null,
     include: [], exclude: [],
     autoReply: true,
-    replies: ["Sent you a DM! 📩", "Just DM'd you the details 🙌"],
+    replies: [...DEFAULT_COMMENT_REPLIES],
   };
 }
 
@@ -135,8 +159,17 @@ export function dmSource(): Extract<TriggerSource, { kind: "dm" }> {
     id: uid("src"), kind: "dm",
     include: [], exclude: [],
     autoReply: false,
-    replies: ["Got it — one sec 👀"],
+    replies: [...DEFAULT_DM_REPLIES],
   };
+}
+
+/**
+ * Instagram tells us whether someone follows only when they message us, and one
+ * answer is all a flow can act on — a second check further down would re-ask a
+ * question already answered. So the canvas allows exactly one.
+ */
+export function hasCondition(nodes: FlowNode[]): boolean {
+  return nodes.some((n) => n.type === "condition");
 }
 
 /** A sensible starting graph: comment → opener → follow check → payoff. */
@@ -201,34 +234,125 @@ function migrate(list: Trigger[]): Trigger[] {
 }
 
 /**
- * Two examples on a first visit, so the list isn't an empty page and the two
- * source kinds are both visible. Written once; deleting them sticks.
+ * One trigger per shape the builder can currently express, seeded on a first
+ * visit so every scenario can be opened and compared side by side rather than
+ * rebuilt by hand. Deleting them sticks.
+ *
+ * The list doubles as the honest inventory of what the canvas supports today —
+ * if a shape isn't here, it isn't buildable yet.
  */
 function demoTriggers(): Trigger[] {
   const link = "https://docs.google.com/document/d/example";
-  const mk = (name: string, kw: string[], payoff: string): Trigger => {
-    const trg = uid("trg"), m1 = uid("msg"), cond = uid("cnd"), m2 = uid("msg");
-    return {
-      id: uid("tg"), name, status: "draft", updatedAt: Date.now(),
-      nodes: [
-        { id: trg, type: "trigger", next: m1, sources: [{ ...commentSource(), include: kw }] },
-        {
-          id: m1, type: "message", title: "Opening DM",
-          text: "Hey {{full_name}} 👋\n\nQuick check before I share the link — are you following this page? 😊",
-          buttons: [{ id: uid("btn"), label: "Yes, I'm following", kind: "next", next: cond }],
-        },
-        { id: cond, type: "condition", label: "Do they follow you?", yes: m2, no: null },
-        {
-          id: m2, type: "message", title: "The payoff", text: payoff,
-          buttons: [{ id: uid("btn"), label: "Click here", kind: "link", url: link }],
-        },
-      ],
-    };
+  const OPENER = "Hey {{full_name}} 👋\n\nQuick check before I share the link — are you following this page? 😊";
+
+  const trigger = (next: string, sources: TriggerSource[]): FlowNode =>
+    ({ id: uid("trg"), type: "trigger", next, sources });
+  const message = (id: string, title: string, text: string, buttons: FlowButton[]): FlowNode =>
+    ({ id, type: "message", title, text, buttons });
+  const linkBtn = (label = "Click here"): FlowButton =>
+    ({ id: uid("btn"), label, kind: "link", url: link });
+  const nextBtn = (label: string, next: string | null): FlowButton =>
+    ({ id: uid("btn"), label, kind: "next", next });
+
+  const wrap = (name: string, nodes: FlowNode[]): Trigger =>
+    ({ id: uid("tg"), name, status: "draft", updatedAt: Date.now(), nodes });
+
+  /* 1 — the full flow: public reply, opener, follow gate, payoff. */
+  const full = () => {
+    const m1 = uid("msg"), cond = uid("cnd"), m2 = uid("msg");
+    return wrap("1 · Full flow — reply, opener, follow gate", [
+      trigger(m1, [{ ...commentSource(), include: ["logo", "prompt"] }]),
+      message(m1, "Opening DM", OPENER, [nextBtn("Yes, I'm following", cond)]),
+      { id: cond, type: "condition", label: "Do they follow you?", yes: m2, no: null },
+      message(m2, "The payoff", "Awesome 🙌 Here's the logo prompt pack 👇", [linkBtn()]),
+    ]);
   };
-  return [
-    mk("Logo prompts", ["logo", "prompt"], "Awesome 🙌 Here's the logo prompt pack 👇"),
-    mk("Banner prompts", ["banner"], "Here you go — the banner prompts 👇"),
-  ];
+
+  /* 2 — same, but nothing is posted publicly under the comment. */
+  const silent = () => {
+    const m1 = uid("msg"), cond = uid("cnd"), m2 = uid("msg");
+    return wrap("2 · No public reply — DM only", [
+      trigger(m1, [{ ...commentSource(), include: ["banner"], autoReply: false, replies: [] }]),
+      message(m1, "Opening DM", OPENER, [nextBtn("Yes, I'm following", cond)]),
+      { id: cond, type: "condition", label: "Do they follow you?", yes: m2, no: null },
+      message(m2, "The payoff", "Here you go — the banner prompts 👇", [linkBtn()]),
+    ]);
+  };
+
+  /* 3 — the gate removed: everyone reaches the payoff. */
+  const ungated = () => {
+    const m1 = uid("msg"), m2 = uid("msg");
+    return wrap("3 · No follow check — open to everyone", [
+      trigger(m1, [{ ...commentSource(), include: ["free"] }]),
+      message(m1, "Opening DM", "Hey {{first_name}} 👋 here's what you asked for 👇", [
+        nextBtn("Send it over", m2),
+      ]),
+      message(m2, "The payoff", "Enjoy! 🙌", [linkBtn()]),
+    ]);
+  };
+
+  /* 4 — the shortest possible flow: comment straight to the link. */
+  const instant = () => {
+    const m2 = uid("msg");
+    return wrap("4 · Straight to the link — no opener", [
+      trigger(m2, [{ ...commentSource(), include: ["link"] }]),
+      message(m2, "The payoff", "Here's the link you asked for 👇", [linkBtn()]),
+    ]);
+  };
+
+  /* 5 — started by a DM instead of a comment; no feed to reply in. */
+  const fromDm = () => {
+    const m1 = uid("msg"), cond = uid("cnd"), m2 = uid("msg");
+    return wrap("5 · Starts from a DM keyword", [
+      trigger(m1, [{ ...dmSource(), include: ["prompt"], autoReply: true }]),
+      message(m1, "Opening DM", OPENER, [nextBtn("Yes, I'm following", cond)]),
+      { id: cond, type: "condition", label: "Do they follow you?", yes: m2, no: null },
+      message(m2, "The payoff", "Here you go 👇", [linkBtn()]),
+    ]);
+  };
+
+  /* 6 — two ways in, one set of messages. */
+  const bothSources = () => {
+    const m1 = uid("msg"), m2 = uid("msg");
+    return wrap("6 · Comment or DM — both start it", [
+      trigger(m1, [
+        { ...commentSource(), include: ["guide"] },
+        { ...dmSource(), include: ["guide"], autoReply: true },
+      ]),
+      message(m1, "Opening DM", "Hey {{first_name}} 👋 want the guide?", [nextBtn("Yes please", m2)]),
+      message(m2, "The payoff", "Here it is 👇", [linkBtn()]),
+    ]);
+  };
+
+  /* 7 — one message, two buttons, two different endings. */
+  const branching = () => {
+    const m1 = uid("msg"), a = uid("msg"), b = uid("msg");
+    return wrap("7 · Two buttons, two paths", [
+      trigger(m1, [{ ...commentSource(), include: ["price", "info"] }]),
+      message(m1, "Opening DM", "Hey {{first_name}} 👋 what are you after?", [
+        nextBtn("The pricing", a),
+        nextBtn("The free guide", b),
+      ]),
+      message(a, "Pricing", "Here's the pricing page 👇", [linkBtn("See pricing")]),
+      message(b, "Free guide", "All yours — enjoy 🙌", [linkBtn("Get the guide")]),
+    ]);
+  };
+
+  /* 8 — the "no" branch used, so non-followers get nudged instead of dropped. */
+  const nudge = () => {
+    const m1 = uid("msg"), cond = uid("cnd"), yes = uid("msg"), no = uid("msg");
+    return wrap("8 · Follow gate with a nudge for non-followers", [
+      trigger(m1, [{ ...commentSource(), include: ["pack"] }]),
+      message(m1, "Opening DM", OPENER, [nextBtn("Yes, I'm following", cond)]),
+      { id: cond, type: "condition", label: "Do they follow you?", yes, no },
+      message(yes, "The payoff", "Awesome 🙌 Here's the pack 👇", [linkBtn()]),
+      message(no, "Not following yet", "Almost there! Follow the page, then tap below 🙏", [
+        nextBtn("I've followed ✓", cond),
+      ]),
+    ]);
+  };
+
+  return [full(), silent(), ungated(), instant(), fromDm(), bothSources(), branching(), nudge()];
 }
 
 export function loadTriggers(): Trigger[] {

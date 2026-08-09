@@ -105,6 +105,10 @@ export function TriggerInspector({
               Remove it and the flow still runs — everyone reaches the payoff without having to
               follow first.
             </p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              A flow gets one of these. Instagram answers the follow question once, when they tap,
+              so a second check further down would only re-ask something already known.
+            </p>
           </div>
           <div className="mt-auto border-t border-gray-100 p-4">
             <Button variant="outline" size="sm" className="w-full" onClick={() => onDelete(node.id)}>
@@ -165,10 +169,14 @@ function SourceList({
                     </span>}
                 {src.exclude.map((k) => <Chip key={k} tone="red">not {k}</Chip>)}
               </div>
-              <p className="text-[11px] text-gray-400">
+              <p className={`text-[11px] ${src.autoReply ? "text-emerald-600" : "text-gray-400"}`}>
                 {src.autoReply
-                  ? `Auto-replies ${src.kind === "comment" ? "in the feed" : "in the DM"}`
-                  : "No auto-reply"}
+                  ? src.kind === "comment"
+                    ? `Replies publicly — ${src.replies.filter(Boolean).length} variant${src.replies.filter(Boolean).length === 1 ? "" : "s"} rotated`
+                    : "Auto-replies in the DM"
+                  : src.kind === "comment"
+                    ? "No public reply — only the DM goes out"
+                    : "No auto-reply"}
               </p>
             </div>
           </button>
@@ -453,9 +461,27 @@ function MessageEditor({
           {node.buttons.length === 0 && (
             <p className="text-[11px] text-gray-400 mb-2">No buttons — sends as plain text.</p>
           )}
-          {node.buttons.map((b) => (
-            <div key={b.id} className="rounded-lg border border-gray-200 p-3 mb-2 space-y-2">
-              <Input value={b.label} onChange={(e) => editButton(b.id, { label: e.target.value })} />
+          {node.buttons.map((b, i) => (
+            <div key={b.id} className="rounded-lg border border-gray-200 p-3 mb-2 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                  Button {i + 1}
+                </span>
+                <button
+                  onClick={() => setNodes((prev) => prev.map((n) =>
+                    n.id === node.id && n.type === "message" ? { ...n, buttons: n.buttons.filter((x) => x.id !== b.id) } : n))}
+                  className="text-gray-300 hover:text-red-500 cursor-pointer"
+                  title="Remove this button"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <Input
+                label="Button text"
+                value={b.label}
+                placeholder="Click here"
+                onChange={(e) => editButton(b.id, { label: e.target.value })}
+              />
               <div className="flex gap-1.5">
                 {(["next", "link"] as const).map((k) => (
                   <button
@@ -469,16 +495,20 @@ function MessageEditor({
                   </button>
                 ))}
               </div>
-              {b.kind === "link" && (
-                <Input value={b.url ?? ""} placeholder="https://…" onChange={(e) => editButton(b.id, { url: e.target.value })} />
+              {b.kind === "link" ? (
+                <Input
+                  label="Link URL"
+                  type="url"
+                  value={b.url ?? ""}
+                  placeholder="https://…"
+                  onChange={(e) => editButton(b.id, { url: e.target.value })}
+                  hint={b.url?.trim() ? undefined : "Without a link this button does nothing"}
+                />
+              ) : (
+                <p className="text-[11px] text-gray-400">
+                  Drag this button&apos;s dot on the card to the message it should open.
+                </p>
               )}
-              <button
-                onClick={() => setNodes((prev) => prev.map((n) =>
-                  n.id === node.id && n.type === "message" ? { ...n, buttons: n.buttons.filter((x) => x.id !== b.id) } : n))}
-                className="text-[11px] text-gray-400 hover:text-red-500 cursor-pointer"
-              >
-                Remove button
-              </button>
             </div>
           ))}
           <Button variant="outline" size="sm" className="w-full" onClick={onAddButton}>
@@ -488,7 +518,7 @@ function MessageEditor({
       </div>
       <div className="border-t border-gray-100 p-4 shrink-0">
         <Button variant="outline" size="sm" className="w-full" onClick={onDelete}>
-          <Trash2 className="w-3.5 h-3.5 text-red-400" /> Delete this step
+          <Trash2 className="w-3.5 h-3.5 text-red-400" /> Remove this message
         </Button>
       </div>
     </>
@@ -496,20 +526,6 @@ function MessageEditor({
 }
 
 /* ── bits ───────────────────────────────────────────────────────────────── */
-
-function Numbered({ n, label, children }: { n: number; label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="flex items-center gap-2.5 mb-2.5">
-        <span className="w-6 h-6 rounded-full bg-gray-100 text-gray-600 text-[11px] font-bold flex items-center justify-center shrink-0">
-          {n}
-        </span>
-        <p className="text-sm font-semibold text-gray-900">{label}</p>
-      </div>
-      <div className="pl-[34px]">{children}</div>
-    </div>
-  );
-}
 
 function Chip({ children, tone = "brand" }: { children: React.ReactNode; tone?: "brand" | "red" }) {
   return (

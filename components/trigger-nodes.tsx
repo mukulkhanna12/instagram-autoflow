@@ -17,24 +17,45 @@ export const CARD_W = 288;
 
 type PortRegister = (id: string, el: HTMLElement | null) => void;
 
-/** An outgoing connection point. Filled when connected, hollow when open. */
+/**
+ * Everything a port needs from the canvas. Bundled rather than threaded through
+ * each card as three separate props, because every card wires them identically
+ * and only the port id differs.
+ */
+export interface PortHandlers {
+  register: PortRegister;
+  /** Tap: connect an open port, or cut the arrow from a connected one. */
+  onClick: (portId: string, connected: boolean, e: React.MouseEvent) => void;
+  /** Drag: pull an arrow out and drop it on the card it should point at. */
+  onPointerDown: (portId: string, e: React.PointerEvent) => void;
+}
+
+/**
+ * An outgoing connection point — filled when connected, hollow when open.
+ *
+ * It answers to both gestures because both are natural here: drag it onto a
+ * card to rewire, or click it to detach and leave the branch dangling. A
+ * connected port turns red on hover to say the click will cut, not connect.
+ */
 function Port({
-  id, registerPort, connected, onClick, title,
+  id, ports, connected, title,
 }: {
   id: string;
-  registerPort: PortRegister;
+  ports: PortHandlers;
   connected: boolean;
-  onClick?: (e: React.MouseEvent) => void;
   title?: string;
 }) {
   return (
     <button
-      ref={(el) => registerPort(id, el)}
-      onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
-      title={title ?? (connected ? "Connected" : "Add the next step")}
-      className={`absolute -right-[7px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 transition-all cursor-pointer z-10 ${
+      ref={(el) => ports.register(id, el)}
+      onPointerDown={(e) => ports.onPointerDown(id, e)}
+      onClick={(e) => { e.stopPropagation(); ports.onClick(id, connected, e); }}
+      title={title ?? (connected
+        ? "Drag to another card to move this arrow · click to detach"
+        : "Drag onto a card to connect · click to add the next step")}
+      className={`absolute -right-[7px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 transition-all cursor-crosshair z-10 touch-none ${
         connected
-          ? "bg-gray-400 border-white"
+          ? "bg-gray-400 border-white hover:bg-red-500 hover:scale-125"
           : "bg-white border-gray-300 hover:border-brand-500 hover:scale-125"
       }`}
     />
@@ -53,7 +74,7 @@ function CardShell({
     <div
       onClick={onClick}
       style={{ width: CARD_W }}
-      className={`relative rounded-2xl bg-white shadow-sm cursor-pointer transition-all ${
+      className={`group relative rounded-2xl bg-white shadow-sm cursor-pointer transition-all ${
         selected
           ? "ring-2 ring-brand-400 shadow-md"
           : tone === "amber"
@@ -83,13 +104,12 @@ function NodeHeader({ title, icon }: { title: string; icon?: React.ReactNode }) 
 }
 
 export function TriggerCard({
-  node, selected, onSelect, registerPort, onAddNext, onEditSource, onAddSource,
+  node, selected, onSelect, ports, onEditSource, onAddSource,
 }: {
   node: Extract<FlowNode, { type: "trigger" }>;
   selected: boolean;
   onSelect: () => void;
-  registerPort: PortRegister;
-  onAddNext: (e: React.MouseEvent) => void;
+  ports: PortHandlers;
   onEditSource: (sourceId: string) => void;
   onAddSource: () => void;
 }) {
@@ -132,11 +152,18 @@ export function TriggerCard({
                 {src.include.length > 0 ? src.include.join(", ") : "Any " + (src.kind === "comment" ? "comment" : "message")}
               </p>
             </div>
-            {src.autoReply && (
-              <span className="text-[9px] font-bold tracking-wide text-gray-500 bg-white/70 rounded px-1.5 py-0.5 shrink-0">
-                AUTO-REPLY
-              </span>
-            )}
+            {/* Both states are labelled — "no public reply" is a deliberate
+                choice, and silence on the card looks like an unset one. */}
+            <span
+              className={`text-[9px] font-bold tracking-wide rounded px-1.5 py-0.5 shrink-0 ${
+                src.autoReply ? "text-gray-500 bg-white/70" : "text-gray-400 bg-white/50 line-through"
+              }`}
+              title={src.autoReply
+                ? `Replies publicly, rotating ${src.replies.filter(Boolean).length} variant(s)`
+                : "Nothing is posted publicly — only the DM goes out"}
+            >
+              {src.kind === "comment" ? "PUBLIC REPLY" : "AUTO-REPLY"}
+            </span>
           </button>
         ))}
 
@@ -150,21 +177,20 @@ export function TriggerCard({
 
       <div className="relative border-t border-gray-100 px-4 py-2 flex justify-end">
         <span className="text-[11px] text-gray-400">Then</span>
-        <Port id={`${node.id}:out`} registerPort={registerPort} connected={!!node.next} onClick={onAddNext} />
+        <Port id={`${node.id}:out`} ports={ports} connected={!!node.next} />
       </div>
     </CardShell>
   );
 }
 
 export function MessageCard({
-  node, index, selected, onSelect, registerPort, onAddFromButton, onAddButton, onDelete,
+  node, index, selected, onSelect, ports, onAddButton, onDelete,
 }: {
   node: Extract<FlowNode, { type: "message" }>;
   index: number;
   selected: boolean;
   onSelect: () => void;
-  registerPort: PortRegister;
-  onAddFromButton: (buttonId: string, e: React.MouseEvent) => void;
+  ports: PortHandlers;
   onAddButton: () => void;
   onDelete: () => void;
 }) {
@@ -187,13 +213,7 @@ export function MessageCard({
             </span>
             {b.kind === "link" && <Link2 className="w-3 h-3 text-brand-400 shrink-0" />}
             {b.kind === "next" && (
-              <Port
-                id={`${node.id}:btn:${b.id}`}
-                registerPort={registerPort}
-                connected={!!b.next}
-                onClick={(e) => onAddFromButton(b.id, e)}
-                title={b.next ? "Connected" : "Add the message this button opens"}
-              />
+              <Port id={`${node.id}:btn:${b.id}`} ports={ports} connected={!!b.next} />
             )}
           </div>
         ))}
@@ -206,27 +226,18 @@ export function MessageCard({
         </button>
       </div>
 
-      {selected && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="absolute -top-2.5 -right-2.5 w-6 h-6 rounded-full bg-white ring-1 ring-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-red-500 cursor-pointer"
-          title="Delete this step"
-        >
-          <Trash2 className="w-3 h-3" />
-        </button>
-      )}
+      <DeleteBadge selected={selected} onDelete={onDelete} label="Remove this message" />
     </CardShell>
   );
 }
 
 export function ConditionCard({
-  node, selected, onSelect, registerPort, onAddBranch, onDelete,
+  node, selected, onSelect, ports, onDelete,
 }: {
   node: Extract<FlowNode, { type: "condition" }>;
   selected: boolean;
   onSelect: () => void;
-  registerPort: PortRegister;
-  onAddBranch: (branch: "yes" | "no", e: React.MouseEvent) => void;
+  ports: PortHandlers;
   onDelete: () => void;
 }) {
   return (
@@ -259,26 +270,39 @@ export function ConditionCard({
             <span className="text-xs text-gray-500">
               {branch === "yes" ? "They follow you" : "Not following yet"}
             </span>
-            <Port
-              id={`${node.id}:${branch}`}
-              registerPort={registerPort}
-              connected={!!node[branch]}
-              onClick={(e) => onAddBranch(branch, e)}
-            />
+            <Port id={`${node.id}:${branch}`} ports={ports} connected={!!node[branch]} />
           </div>
         ))}
       </div>
 
-      {selected && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="absolute -top-2.5 -right-2.5 w-6 h-6 rounded-full bg-white ring-1 ring-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-red-500 cursor-pointer"
-          title="Delete this step"
-        >
-          <Trash2 className="w-3 h-3" />
-        </button>
-      )}
+      <DeleteBadge selected={selected} onDelete={onDelete} label="Remove the follow check" />
     </CardShell>
+  );
+}
+
+/**
+ * The remove control on a card.
+ *
+ * Shown on hover as well as on selection: when it only appeared once a card was
+ * selected, there was no way to discover that a step could be removed at all.
+ */
+function DeleteBadge({
+  selected, onDelete, label,
+}: {
+  selected: boolean;
+  onDelete: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onDelete(); }}
+      className={`absolute -top-2.5 -right-2.5 w-6 h-6 rounded-full bg-white ring-1 ring-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-red-500 hover:ring-red-200 cursor-pointer transition-opacity ${
+        selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+      }`}
+      title={label}
+    >
+      <Trash2 className="w-3 h-3" />
+    </button>
   );
 }
 

@@ -15,7 +15,7 @@ import {
   TriggerCard, MessageCard, ConditionCard, CARD_W,
 } from "@/components/trigger-nodes";
 import {
-  getTrigger, upsertTrigger, uid, commentSource, dmSource,
+  getTrigger, upsertTrigger, uid, commentSource, dmSource, hasCondition,
   type Trigger, type FlowNode, type FlowButton, type TriggerReel, type TriggerSource,
 } from "@/lib/trigger-store";
 
@@ -159,6 +159,15 @@ export default function TriggerBuilderPage() {
   }, [nodes, zoom]);
 
   useLayoutEffect(() => { drawEdges(); }, [drawEdges, layout, pan]);
+
+  // Escape closes the add-step menu — the overlay alone left it stuck whenever
+  // a click landed on a card instead of the backdrop.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPendingPort(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   useEffect(() => {
     const onResize = () => drawEdges();
     window.addEventListener("resize", onResize);
@@ -212,6 +221,14 @@ export default function TriggerBuilderPage() {
   function onNodePointerDown(e: React.PointerEvent, nid: string) {
     // Let inputs, buttons and ports keep their own behaviour.
     if ((e.target as HTMLElement).closest("button, input, textarea, a")) return;
+
+    // Select here rather than on the click that follows. A card is also its own
+    // drag handle, so any pointer drift past the slop threshold used to swallow
+    // that click and the card never opened — which is why message cards looked
+    // uneditable while the trigger card, whose rows are real buttons, worked.
+    setSelectedId(nid);
+    setDrawerOpen(true);
+
     const start = layout.get(nid) ?? { x: 0, y: 0 };
     dragging.current = { id: nid, sx: e.clientX, sy: e.clientY, ox: start.x, oy: start.y, moved: false };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -269,8 +286,14 @@ export default function TriggerBuilderPage() {
   const msgIndex = (nid: string) =>
     nodes.filter((n) => n.type === "message").findIndex((n) => n.id === nid) + 1;
 
-  /** Add a follow check, wired into whichever port was clicked. */
+  /**
+   * Add a follow check, wired into whichever port was clicked.
+   *
+   * At most one per flow: Instagram answers the follow question once, when they
+   * tap, so a second check downstream would only re-ask something already known.
+   */
   function addCondition(attach: (newId: string) => void) {
+    if (hasCondition(nodes)) return;
     const nid = uid("cnd");
     setNodes((prev) => [...prev, {
       id: nid, type: "condition", label: "Do they follow you?", yes: null, no: null,
@@ -311,12 +334,108 @@ export default function TriggerBuilderPage() {
       n.type === "trigger" ? { ...n, sources: n.sources.filter((x) => x.id !== sourceId) } : n));
   }
 
-  function openAddMenu(e: React.MouseEvent, attach: (id: string) => void) {
+  /**
+   * The "add next step" menu, kept inside the canvas.
+   *
+   * The viewport clips its overflow, so a menu opened from a port near the
+   * bottom or right edge used to render outside it — visible as a popup that
+   * appeared to do nothing and couldn't be dismissed.
+   */
+  function openAddMenuAt(clientX: number, clientY: number, attach: (id: string) => void) {
     const vp = viewportRef.current;
     if (!vp) return;
     const r = vp.getBoundingClientRect();
-    setPendingPort({ attach, x: e.clientX - r.left, y: e.clientY - r.top });
+    const W = 208, H = 140;
+    setPendingPort({
+      attach,
+      x: Math.min(Math.max(8, clientX - r.left - W / 2), Math.max(8, r.width - W - 8)),
+      y: Math.min(Math.max(8, clientY - r.top + 12), Math.max(8, r.height - H - 8)),
+    });
   }
+
+  /**
+   * Point a port at a node, or at nothing. Port ids carry everything needed to
+   * find the field that holds the arrow: `<node>:out`, `<node>:yes|no`, or
+   * `<node>:btn:<buttonId>`.
+   */
+  function connectPort(portId: string, targetId: string | null) {
+    const [nid, slot, bid] = portId.split(":");
+    setNodes((prev) => prev.map((n) => {
+      // Pin every auto-placed card where it currently sits. Rewiring changes
+      // the depths the layout is derived from, and a detached card drops to
+      // depth 0 — landing on top of the trigger, which reads as a crash.
+      const held: FlowNode = n.pos ? n : { ...n, pos: layout.get(n.id) ?? { x: 0, y: 0 } };
+      if (held.id !== nid) return held;
+      if (held.type === "trigger") return { ...held, next: targetId };
+      if (held.type === "condition") return { ...held, [slot as "yes" | "no"]: targetId };
+      return { ...held, buttons: held.buttons.map((b) => (b.id === bid ? { ...b, next: targetId } : b)) };
+    }));
+  }
+
+  // The arrow being dragged out of a port, in world coordinates.
+  const [linkLine, setLinkLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+
+  /**
+   * Drag an arrow off a port and drop it on the card it should point at.
+   *
+   * Listeners go on the window rather than the canvas because the pointer
+   * leaves the port immediately, and the cards capture their own pointer events
+   * for dragging. A drop on empty space offers to create the next step there.
+   */
+  // A drag that ends back on its own port would otherwise fire the port's click
+  // too, running the rewire and then immediately undoing it.
+  const suppressPortClick = useRef(false);
+
+  function startLink(portId: string, e: React.PointerEvent) {
+    const world = worldRef.current;
+    const el = portEls.current.get(portId);
+    if (!world || !el) return;
+    e.stopPropagation();
+    suppressPortClick.current = false;
+
+    const o = world.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const x1 = (r.left - o.left + r.width / 2) / zoom;
+    const y1 = (r.top - o.top + r.height / 2) / zoom;
+    let moved = false;
+
+    const move = (ev: PointerEvent) => {
+      const w = worldRef.current;
+      if (!w) return;
+      moved = true;
+      const oo = w.getBoundingClientRect();
+      setLinkLine({ x1, y1, x2: (ev.clientX - oo.left) / zoom, y2: (ev.clientY - oo.top) / zoom });
+    };
+
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      setLinkLine(null);
+      if (!moved) return; // A tap, not a drag — the port's own click handles it.
+      suppressPortClick.current = true;
+
+      const dropped = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)
+        ?.closest("[data-node-id]");
+      const targetId = dropped?.getAttribute("data-node-id") ?? null;
+
+      // Dropping a card on itself would draw an arrow into its own head.
+      if (targetId && targetId !== portId.split(":")[0]) connectPort(portId, targetId);
+      else if (!targetId) openAddMenuAt(ev.clientX, ev.clientY, (nid) => connectPort(portId, nid));
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up, { once: true });
+  }
+
+  /** Tap an open port to add a step; tap a connected one to cut the arrow. */
+  const ports = {
+    register: registerPort,
+    onPointerDown: startLink,
+    onClick: (portId: string, connected: boolean, e: React.MouseEvent) => {
+      if (suppressPortClick.current) { suppressPortClick.current = false; return; }
+      if (connected) connectPort(portId, null);
+      else openAddMenuAt(e.clientX, e.clientY, (nid) => connectPort(portId, nid));
+    },
+  };
 
   function addButton(nid: string) {
     setNodes((prev) => prev.map((n) =>
@@ -431,6 +550,13 @@ export default function TriggerBuilderPage() {
               {paths.map((d, i) => (
                 <path key={i} d={d} fill="none" stroke="#a1a1aa" strokeWidth="1.5" markerEnd="url(#tarrow)" />
               ))}
+              {/* The arrow currently being dragged out of a port. */}
+              {linkLine && (
+                <path
+                  d={`M ${linkLine.x1} ${linkLine.y1} C ${linkLine.x1 + 60} ${linkLine.y1}, ${linkLine.x2 - 60} ${linkLine.y2}, ${linkLine.x2} ${linkLine.y2}`}
+                  fill="none" stroke="#7c3aed" strokeWidth="2" strokeDasharray="5 4"
+                />
+              )}
             </svg>
 
             {nodes.map((node) => {
@@ -439,6 +565,7 @@ export default function TriggerBuilderPage() {
                 <div
                   key={node.id}
                   data-node
+                  data-node-id={node.id}
                   ref={(el) => { if (el) nodeEls.current.set(node.id, el); else nodeEls.current.delete(node.id); }}
                   onPointerDown={(e) => onNodePointerDown(e, node.id)}
                   onPointerMove={onNodePointerMove}
@@ -450,8 +577,7 @@ export default function TriggerBuilderPage() {
                     <TriggerCard
                       node={node} selected={selectedId === node.id}
                       onSelect={() => { setSelectedId(node.id); setDrawerOpen(true); }}
-                      registerPort={registerPort}
-                      onAddNext={(e) => !node.next && openAddMenu(e, (nid) => patch(node.id, { next: nid } as Partial<FlowNode>))}
+                      ports={ports}
                       onEditSource={(sid) => { setSelectedId(node.id); setDrawerOpen(true); setEditingSourceId(sid); }}
                       onAddSource={() => { setSelectedId(node.id); setDrawerOpen(true); addSource("dm"); }}
                     />
@@ -460,14 +586,7 @@ export default function TriggerBuilderPage() {
                     <MessageCard
                       node={node} index={msgIndex(node.id)} selected={selectedId === node.id}
                       onSelect={() => { setSelectedId(node.id); setDrawerOpen(true); }}
-                      registerPort={registerPort}
-                      onAddFromButton={(bid, e) => {
-                        if (node.buttons.find((b) => b.id === bid)?.next) return;
-                        openAddMenu(e, (nid) => setNodes((prev) => prev.map((x) =>
-                          x.id === node.id && x.type === "message"
-                            ? { ...x, buttons: x.buttons.map((b) => (b.id === bid ? { ...b, next: nid } : b)) }
-                            : x)));
-                      }}
+                      ports={ports}
                       onAddButton={() => addButton(node.id)}
                       onDelete={() => removeNode(node.id)}
                     />
@@ -476,8 +595,7 @@ export default function TriggerBuilderPage() {
                     <ConditionCard
                       node={node} selected={selectedId === node.id}
                       onSelect={() => { setSelectedId(node.id); setDrawerOpen(true); }}
-                      registerPort={registerPort}
-                      onAddBranch={(b, e) => !node[b] && openAddMenu(e, (nid) => patch(node.id, { [b]: nid } as unknown as Partial<FlowNode>))}
+                      ports={ports}
                       onDelete={() => removeNode(node.id)}
                     />
                   )}
@@ -518,12 +636,17 @@ export default function TriggerBuilderPage() {
                 </button>
                 <button
                   onClick={() => { addCondition(pendingPort.attach); setPendingPort(null); }}
-                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-gray-50 cursor-pointer flex items-center gap-2.5"
+                  disabled={hasCondition(nodes)}
+                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-gray-50 cursor-pointer flex items-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
                   <GitBranch className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                   <span>
                     <span className="block text-xs font-medium text-gray-800">Follow check</span>
-                    <span className="block text-[11px] text-gray-400">Branch on whether they follow</span>
+                    <span className="block text-[11px] text-gray-400">
+                      {hasCondition(nodes)
+                        ? "This flow already has one"
+                        : "Branch on whether they follow"}
+                    </span>
                   </span>
                 </button>
               </div>
@@ -547,8 +670,9 @@ export default function TriggerBuilderPage() {
             </button>
           </div>
 
-          <p className="absolute bottom-6 right-5 text-[11px] text-gray-400 pointer-events-none">
-            Scroll to zoom · drag to pan
+          <p className="absolute bottom-6 right-5 text-[11px] text-gray-400 pointer-events-none text-right leading-relaxed">
+            Scroll to zoom · drag to pan<br />
+            Drag a dot onto a card to connect · click a filled dot to detach
           </p>
         </div>
       </div>
