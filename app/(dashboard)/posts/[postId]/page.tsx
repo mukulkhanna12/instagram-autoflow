@@ -6,6 +6,10 @@ import {
   Zap, ChevronRight, ToggleLeft, ToggleRight, Trash2, Pencil, X, Check,
   Filter, GitBranch, RotateCcw, Plus, Copy, History, Send,
 } from "lucide-react";
+import {
+  YOUTUBE_SUBSCRIBE_BUTTON, hasPresetButton, togglePresetButton,
+} from "@/lib/buttons";
+import { YouTubePresetChip } from "@/components/youtube-preset-chip";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { MessageInput } from "@/components/message-input";
@@ -1009,6 +1013,7 @@ function ButtonListEditor({
   disabled: boolean;
 }) {
   const full = buttons.length >= MAX_BUTTONS;
+  const ytOn = hasPresetButton(buttons, YOUTUBE_SUBSCRIBE_BUTTON);
 
   function set(i: number, patch: Partial<DetailsButton>) {
     onChange(buttons.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
@@ -1016,6 +1021,14 @@ function ButtonListEditor({
 
   return (
     <div className="space-y-3">
+      {!disabled && (
+        <YouTubePresetChip
+          on={ytOn}
+          disabled={!ytOn && full}
+          onClick={() => onChange(togglePresetButton(buttons, YOUTUBE_SUBSCRIBE_BUTTON))}
+        />
+      )}
+
       {buttons.length === 0 && (
         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3">
           No buttons yet — this message goes out as <strong>plain text</strong>. Add one below.

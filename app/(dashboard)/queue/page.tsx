@@ -10,6 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { MessageInput } from "@/components/message-input";
 import { Badge } from "@/components/ui/badge";
+import {
+  YOUTUBE_SUBSCRIBE_BUTTON, hasPresetButton, togglePresetButton,
+} from "@/lib/buttons";
+import { YouTubePresetChip } from "@/components/youtube-preset-chip";
 
 interface DetailsButton { title: string; url: string }
 
@@ -422,6 +426,7 @@ function ButtonListEditor({
   buttons, onChange,
 }: { buttons: DetailsButton[]; onChange: (b: DetailsButton[]) => void }) {
   const full = buttons.length >= MAX_BUTTONS;
+  const ytOn = hasPresetButton(buttons, YOUTUBE_SUBSCRIBE_BUTTON);
 
   function set(i: number, patch: Partial<DetailsButton>) {
     onChange(buttons.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
@@ -429,6 +434,12 @@ function ButtonListEditor({
 
   return (
     <div className="space-y-3">
+      <YouTubePresetChip
+        on={ytOn}
+        disabled={!ytOn && full}
+        onClick={() => onChange(togglePresetButton(buttons, YOUTUBE_SUBSCRIBE_BUTTON))}
+      />
+
       {buttons.length === 0 && (
         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3">
           No buttons yet — this would send as <strong>plain text</strong>.

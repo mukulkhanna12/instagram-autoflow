@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { parseButtons, resolveDetailsButtons, MAX_BUTTONS } from "@/lib/buttons";
+import {
+  parseButtons, resolveDetailsButtons, MAX_BUTTONS,
+  YOUTUBE_SUBSCRIBE_BUTTON, hasPresetButton, togglePresetButton,
+} from "@/lib/buttons";
 
 const A = { title: "A", url: "https://a.com" };
 const B = { title: "B", url: "https://b.com" };
@@ -90,5 +93,43 @@ describe("resolveDetailsButtons", () => {
     expect(resolveDetailsButtons(src({ detailsButtonText: "Visit" }))).toEqual([]);
     expect(resolveDetailsButtons(src({ detailsUrl: "https://old.com" }))).toEqual([]);
     expect(resolveDetailsButtons(src())).toEqual([]);
+  });
+});
+
+describe("the YouTube subscribe preset", () => {
+  const YT = YOUTUBE_SUBSCRIBE_BUTTON;
+
+  it("keeps the title inside the 20-character button-title limit", () => {
+    expect(YT.title.length).toBeLessThanOrEqual(20);
+    expect(YT.url).toContain("sub_confirmation=1");
+  });
+
+  it("adds on the first click and removes on the second", () => {
+    const added = togglePresetButton([A], YT);
+    expect(added).toEqual([A, YT]);
+    expect(hasPresetButton(added, YT)).toBe(true);
+
+    const removed = togglePresetButton(added, YT);
+    expect(removed).toEqual([A]);
+    expect(hasPresetButton(removed, YT)).toBe(false);
+  });
+
+  it("recognises a hand-edited label or trailing slash as the same button", () => {
+    const renamed = [{ title: "Sub please", url: YT.url.toUpperCase() + "/" }];
+    expect(hasPresetButton(renamed, YT)).toBe(true);
+    expect(togglePresetButton(renamed, YT)).toEqual([]);
+  });
+
+  it("does nothing when all three slots are already taken", () => {
+    const full = [A, B, C];
+    expect(togglePresetButton(full, YT)).toEqual(full);
+  });
+
+  it("still removes itself when the list is full", () => {
+    expect(togglePresetButton([A, B, YT], YT)).toEqual([A, B]);
+  });
+
+  it("survives a save/load round trip through parseButtons", () => {
+    expect(parseButtons(togglePresetButton([], YT))).toEqual([YT]);
   });
 });

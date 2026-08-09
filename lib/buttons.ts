@@ -18,6 +18,46 @@ export interface DetailsButton {
   url: string;
 }
 
+/**
+ * One-click preset for the YouTube channel. `sub_confirmation=1` makes YouTube
+ * pop the subscribe dialog on arrival instead of just landing on the channel.
+ *
+ * The title is kept short on purpose. Instagram's button-template docs state no
+ * title limit, but the Messenger template it derives from caps titles at 20
+ * characters, so staying under that is the safe bet.
+ */
+export const YOUTUBE_SUBSCRIBE_BUTTON: DetailsButton = {
+  title: "Subscribe on YT",
+  url: "https://www.youtube.com/@mkexploress?sub_confirmation=1",
+};
+
+/** Compare links ignoring case and a trailing slash, so hand-edits still match. */
+function sameLink(a: string, b: string): boolean {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\/+$/, "");
+  return norm(a) === norm(b);
+}
+
+/** Is `preset` already one of these buttons? Matched on URL, not label. */
+export function hasPresetButton(buttons: DetailsButton[], preset: DetailsButton): boolean {
+  return buttons.some((b) => sameLink(b.url, preset.url));
+}
+
+/**
+ * Add the preset if it is missing, remove it if it is there — the single
+ * click that both sets and clears it. Adding past the ceiling is a no-op, so
+ * callers can disable the control instead of silently dropping a button.
+ */
+export function togglePresetButton(
+  buttons: DetailsButton[],
+  preset: DetailsButton
+): DetailsButton[] {
+  if (hasPresetButton(buttons, preset)) {
+    return buttons.filter((b) => !sameLink(b.url, preset.url));
+  }
+  if (buttons.length >= MAX_BUTTONS) return buttons;
+  return [...buttons, { ...preset }];
+}
+
 /** Shape of the fields this module reads. */
 interface ButtonSource {
   detailsButtonEnabled: boolean;
