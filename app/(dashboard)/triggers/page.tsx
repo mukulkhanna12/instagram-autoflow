@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Workflow, Trash2, MessageSquare, GitBranch, Filter, ImageIcon, Info, Sliders } from "lucide-react";
+import { Plus, Workflow, Trash2, MessageSquare, GitBranch, Filter, Play, Info, Sliders } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,15 +86,20 @@ export default function TriggersListPage() {
                 onClick={() => router.push(`/triggers/${t.id}`)}
                 className="group bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-4 cursor-pointer hover:border-brand-200 hover:shadow-md transition-all"
               >
-                <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 shrink-0 ring-1 ring-gray-200">
-                  {s.reel?.thumbnail ? (
+                {/*
+                  Only drawn when there is a reel to draw. The placeholder was a
+                  grey square that said nothing the row's own "No reel chosen
+                  yet" doesn't already say, and it read as a failed image.
+                */}
+                {s.reel?.thumbnail && (
+                  <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 shrink-0 ring-1 ring-gray-200">
                     <Image src={s.reel.thumbnail} alt="" fill unoptimized className="object-cover" />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <ImageIcon className="w-5 h-5 text-gray-300" />
-                    </div>
-                  )}
-                </div>
+                    {/* Marks the thumbnail as a reel — otherwise it's just a picture. */}
+                    <span className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center">
+                      <Play className="w-2 h-2 text-white fill-white" />
+                    </span>
+                  </div>
+                )}
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
