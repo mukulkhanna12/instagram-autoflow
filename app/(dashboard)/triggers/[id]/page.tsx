@@ -226,12 +226,10 @@ export default function TriggerBuilderPage() {
     // Let inputs, buttons and ports keep their own behaviour.
     if ((e.target as HTMLElement).closest("button, input, textarea, a")) return;
 
-    // Select here rather than on the click that follows. A card is also its own
-    // drag handle, so any pointer drift past the slop threshold used to swallow
-    // that click and the card never opened — which is why message cards looked
-    // uneditable while the trigger card, whose rows are real buttons, worked.
+    // Select, but don't open the panel. A card is also its own drag handle, so
+    // opening on contact meant every attempt to move one threw the drawer open.
+    // The pencil on the card is the way in; this only marks what's selected.
     setSelectedId(nid);
-    setDrawerOpen(true);
 
     const start = layout.get(nid) ?? { x: 0, y: 0 };
     dragging.current = { id: nid, sx: e.clientX, sy: e.clientY, ox: start.x, oy: start.y, moved: false };
@@ -640,7 +638,8 @@ export default function TriggerBuilderPage() {
                   {node.type === "trigger" && (
                     <TriggerCard
                       node={node} selected={selectedId === node.id}
-                      onSelect={() => { setSelectedId(node.id); setDrawerOpen(true); }}
+                      onSelect={() => setSelectedId(node.id)}
+                      onEdit={() => { setSelectedId(node.id); setDrawerOpen(true); setEditingSourceId(null); }}
                       ports={ports}
                       onEditSource={(sid) => { setSelectedId(node.id); setDrawerOpen(true); setEditingSourceId(sid); }}
                     />
@@ -648,7 +647,8 @@ export default function TriggerBuilderPage() {
                   {node.type === "message" && (
                     <MessageCard
                       node={node} index={msgIndex(node.id)} selected={selectedId === node.id}
-                      onSelect={() => { setSelectedId(node.id); setDrawerOpen(true); }}
+                      onSelect={() => setSelectedId(node.id)}
+                      onEdit={() => { setSelectedId(node.id); setDrawerOpen(true); setEditingSourceId(null); }}
                       ports={ports}
                       onAddButton={() => addButton(node.id)}
                       onDelete={() => removeNode(node.id)}
@@ -657,7 +657,8 @@ export default function TriggerBuilderPage() {
                   {node.type === "condition" && (
                     <ConditionCard
                       node={node} selected={selectedId === node.id}
-                      onSelect={() => { setSelectedId(node.id); setDrawerOpen(true); }}
+                      onSelect={() => setSelectedId(node.id)}
+                      onEdit={() => { setSelectedId(node.id); setDrawerOpen(true); setEditingSourceId(null); }}
                       ports={ports}
                       onDelete={() => removeNode(node.id)}
                     />

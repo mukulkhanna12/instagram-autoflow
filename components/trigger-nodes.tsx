@@ -1,5 +1,5 @@
 "use client";
-import { Zap, Instagram, MessageSquare, GitBranch, Plus, Trash2, Link2, Send, Image as ImageIcon } from "lucide-react";
+import { Zap, Instagram, MessageSquare, GitBranch, Plus, Trash2, Pencil, Link2, Send, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
 
 /**
@@ -105,11 +105,12 @@ function NodeHeader({ title, icon }: { title: string; icon?: React.ReactNode }) 
 }
 
 export function TriggerCard({
-  node, selected, onSelect, ports, onEditSource,
+  node, selected, onSelect, onEdit, ports, onEditSource,
 }: {
   node: Extract<FlowNode, { type: "trigger" }>;
   selected: boolean;
   onSelect: () => void;
+  onEdit: () => void;
   ports: PortHandlers;
   onEditSource: (sourceId: string) => void;
 }) {
@@ -173,17 +174,21 @@ export function TriggerCard({
         <span className="text-[11px] text-gray-400">Then</span>
         <Port id={`${node.id}:out`} ports={ports} connected={!!node.next} />
       </div>
+
+      {/* No delete: a flow without its trigger has nothing to start it. */}
+      <CardActions selected={selected} onEdit={onEdit} />
     </CardShell>
   );
 }
 
 export function MessageCard({
-  node, index, selected, onSelect, ports, onAddButton, onDelete,
+  node, index, selected, onSelect, onEdit, ports, onAddButton, onDelete,
 }: {
   node: Extract<FlowNode, { type: "message" }>;
   index: number;
   selected: boolean;
   onSelect: () => void;
+  onEdit: () => void;
   ports: PortHandlers;
   onAddButton: () => void;
   onDelete: () => void;
@@ -227,17 +232,18 @@ export function MessageCard({
         )}
       </div>
 
-      <DeleteBadge selected={selected} onDelete={onDelete} label="Remove this message" />
+      <CardActions selected={selected} onEdit={onEdit} onDelete={onDelete} deleteLabel="Remove this message" />
     </CardShell>
   );
 }
 
 export function ConditionCard({
-  node, selected, onSelect, ports, onDelete,
+  node, selected, onSelect, onEdit, ports, onDelete,
 }: {
   node: Extract<FlowNode, { type: "condition" }>;
   selected: boolean;
   onSelect: () => void;
+  onEdit: () => void;
   ports: PortHandlers;
   onDelete: () => void;
 }) {
@@ -276,34 +282,54 @@ export function ConditionCard({
         ))}
       </div>
 
-      <DeleteBadge selected={selected} onDelete={onDelete} label="Remove the follow check" />
+      <CardActions selected={selected} onEdit={onEdit} onDelete={onDelete} deleteLabel="Remove the follow check" />
     </CardShell>
   );
 }
 
 /**
- * The remove control on a card.
+ * The controls on a card: edit, and optionally remove.
  *
- * Shown on hover as well as on selection: when it only appeared once a card was
- * selected, there was no way to discover that a step could be removed at all.
+ * Edit is a button rather than a click on the card itself. The card is its own
+ * drag handle, so opening the panel on contact meant every attempt to move a
+ * card threw the drawer open — pressing a card now only selects it, and this is
+ * the deliberate way in.
+ *
+ * Shown on hover as well as on selection, so both are discoverable without
+ * having to select something first.
  */
-function DeleteBadge({
-  selected, onDelete, label,
+function CardActions({
+  selected, onEdit, onDelete, deleteLabel,
 }: {
   selected: boolean;
-  onDelete: () => void;
-  label: string;
+  onEdit: () => void;
+  onDelete?: () => void;
+  deleteLabel?: string;
 }) {
+  const cls = `w-6 h-6 rounded-full bg-white ring-1 ring-gray-200 shadow-sm flex items-center justify-center text-gray-400 cursor-pointer`;
   return (
-    <button
-      onClick={(e) => { e.stopPropagation(); onDelete(); }}
-      className={`absolute -top-2.5 -right-2.5 w-6 h-6 rounded-full bg-white ring-1 ring-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-red-500 hover:ring-red-200 cursor-pointer transition-opacity ${
+    <div
+      className={`absolute -top-2.5 -right-2.5 flex items-center gap-1 transition-opacity ${
         selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
       }`}
-      title={label}
     >
-      <Trash2 className="w-3 h-3" />
-    </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onEdit(); }}
+        className={`${cls} hover:text-brand-600 hover:ring-brand-200`}
+        title="Edit this step"
+      >
+        <Pencil className="w-3 h-3" />
+      </button>
+      {onDelete && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className={`${cls} hover:text-red-500 hover:ring-red-200`}
+          title={deleteLabel}
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      )}
+    </div>
   );
 }
 
