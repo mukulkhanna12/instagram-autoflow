@@ -487,10 +487,14 @@ function ConditionEditor({
         />
 
         <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-500">What each answer leads to</p>
+          <p className="text-xs font-medium text-gray-500">What each answer sends</p>
+          <p className="text-[11px] text-gray-400 leading-relaxed -mt-1">
+            Tap a branch to open its message and edit the wording, buttons and link.
+          </p>
 
           <BranchRow
-            tone="yes" title="They follow you" target={node.yes}
+            tone="yes" branch="They follow you"
+            target={nodes.find((n) => n.id === node.yes)}
             empty="Nothing yet — followers reach a dead end."
             onOpen={onSelectNode}
           />
@@ -498,7 +502,8 @@ function ConditionEditor({
           {node.no ? (
             <>
               <BranchRow
-                tone="no" title="Not following yet" target={node.no}
+                tone="no" branch="Not following yet"
+                target={nodes.find((n) => n.id === node.no)}
                 empty="" onOpen={onSelectNode}
               />
               {nudgeLoopsBack && (
@@ -557,35 +562,65 @@ function ConditionEditor({
   );
 }
 
+/**
+ * One answer, and the message it actually sends.
+ *
+ * The branch name alone ("They follow you") reads as a label rather than
+ * something to open, so the message's own title and opening words are shown
+ * underneath — that text is what people receive, and seeing it is what makes
+ * the row obviously the thing to click.
+ */
 function BranchRow({
-  tone, title, target, empty, onOpen,
+  tone, branch, target, empty, onOpen,
 }: {
   tone: "yes" | "no";
-  title: string;
-  target: string | null;
+  branch: string;
+  target: FlowNode | undefined;
   empty: string;
   onOpen: (id: string) => void;
 }) {
-  return (
-    <div className="rounded-lg border border-gray-200 p-3 flex items-center gap-2.5">
-      <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
+  const preview =
+    target?.type === "message"
+      ? (target.text.trim().split("\n")[0] || "Empty message")
+      : target?.type === "condition" ? target.label
+      : null;
+
+  const body = (
+    <>
+      <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 self-start ${
         tone === "yes" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
       }`}>
         {tone}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-xs text-gray-700 truncate">{title}</p>
-        {!target && empty && <p className="text-[11px] text-amber-700 mt-0.5">{empty}</p>}
+        <p className="text-[11px] text-gray-400">{branch}</p>
+        {target ? (
+          <>
+            <p className="text-xs font-medium text-gray-900 truncate mt-0.5">
+              {target.type === "message" ? target.title || "Untitled message" : "Follow check"}
+            </p>
+            <p className="text-[11px] text-gray-500 truncate">{preview}</p>
+          </>
+        ) : (
+          empty && <p className="text-[11px] text-amber-700 mt-0.5">{empty}</p>
+        )}
       </div>
       {target && (
-        <button
-          onClick={() => onOpen(target)}
-          className="text-[11px] font-medium text-brand-600 hover:text-brand-700 cursor-pointer shrink-0"
-        >
-          Edit message
-        </button>
+        <ChevronRight className="w-3.5 h-3.5 text-gray-300 shrink-0 self-center" />
       )}
-    </div>
+    </>
+  );
+
+  // The whole row opens the message — a small "edit" link was too easy to miss.
+  return target ? (
+    <button
+      onClick={() => onOpen(target.id)}
+      className="w-full text-left rounded-lg border border-gray-200 p-3 flex items-start gap-2.5 hover:border-brand-300 hover:bg-brand-50/30 transition-colors cursor-pointer"
+    >
+      {body}
+    </button>
+  ) : (
+    <div className="rounded-lg border border-gray-200 p-3 flex items-start gap-2.5">{body}</div>
   );
 }
 
