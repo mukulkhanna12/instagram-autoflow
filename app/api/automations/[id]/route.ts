@@ -108,6 +108,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const automation = await getAutomationForUser(id, session.user.id);
   if (!automation) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await db.postAutomation.delete({ where: { id } });
+  // Soft delete: the row and its Conversation history stay, hidden from every
+  // read by the extension in lib/db.ts. Configuring this reel again revives it.
+  await db.postAutomation.update({
+    where: { id },
+    data: { isDeleted: true, deletedAt: new Date(), isActive: false },
+  });
   return NextResponse.json({ success: true });
 }

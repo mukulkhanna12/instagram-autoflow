@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ImageIcon, Loader2, Heart, MessageCircle, Zap, AlertCircle, ExternalLink, Wand2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ImageIcon, Loader2, Heart, MessageCircle, MessageSquare, Zap, AlertCircle, ExternalLink, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
@@ -34,6 +35,7 @@ interface Automation {
 }
 
 export default function PostsPage() {
+  const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,9 +157,14 @@ export default function PostsPage() {
 
   return (
     <div className="p-8 max-w-6xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Reels</h1>
-        <p className="text-gray-500 text-sm mt-1">Select a reel to set up a comment-to-DM automation</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Reels</h1>
+          <p className="text-gray-500 text-sm mt-1">Select a reel to set up a comment-to-DM automation</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => router.push("/posts/defaults")}>
+          <MessageSquare className="w-3.5 h-3.5" /> Default messages
+        </Button>
       </div>
 
       {nextFlow && (
@@ -171,7 +178,8 @@ export default function PostsPage() {
             <p className="text-xs text-brand-700 mt-0.5">
               Press the <Wand2 className="w-3 h-3 inline align-[-1px]" /> button on the reel you meant it for
               and it goes Live straight away. Leave it and it attaches on its own when someone first comments.
-              <strong> Automate</strong> is the other button — that one starts a blank flow and leaves the queue alone.
+              <strong> Automate</strong> is the other button — that one starts from your{" "}
+              <Link href="/posts/defaults" className="underline">default messages</Link> and leaves the queue alone.
             </p>
           </div>
         </div>

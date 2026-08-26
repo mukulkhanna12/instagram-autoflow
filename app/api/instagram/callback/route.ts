@@ -45,6 +45,14 @@ export async function GET(req: NextRequest) {
         accessToken: longToken,
         username: profile.username,
         profilePicUrl: profile.profile_picture_url,
+        // Reconnecting the same account revives it. Everything that was hidden
+        // by the disconnect — automations, queued flows, conversation history —
+        // becomes visible again, because they were only ever hidden *through*
+        // this row. An automation deleted by hand before the disconnect keeps
+        // its own flag and correctly stays hidden.
+        isDeleted: false,
+        deletedAt: null,
+        userId: session.user.id,
       },
     });
 

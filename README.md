@@ -33,7 +33,7 @@ button tap is what opens it (see the constraints below).
 | Step | Field | Goes out as |
 |---|---|---|
 | 0 | `keywords` | *Filter* — only comments containing one of these trigger anything. Empty = respond to every comment |
-| 1 | `commentReplyText` ×3 | Public reply on the comment; a random non-empty variant each time |
+| 1 | `commentReplyText` ×3 | Public reply on the comment; a random non-empty variant each time. The comment itself is liked at the same time |
 | 2 | `greetingMessage` + `greetingButtonText` | First DM, with a button |
 | 3 | `followMessage` | If they're not following on the first tap |
 | 4 | `followRetryMessage` | Every tap after that, until they follow |
@@ -41,6 +41,51 @@ button tap is what opens it (see the constraints below).
 
 Each reel gets its own copy, so different reels can offer different things.
 **Copy from reel** clones one reel's whole setup onto another.
+
+**Reels → Default messages** sets the wording a *new* reel starts from — used
+when you hit Configure on a reel, and for newly added prepared flows. It never
+touches a reel that already has an automation.
+
+## Nothing is ever deleted
+
+Every "delete" in this app is a soft delete. `InstagramAccount`, `PostAutomation`
+and `QueuedFlow` carry an `isDeleted` flag; the rows stay, and a Prisma client
+extension in `lib/db.ts` hides flagged rows from every read. Call sites read
+normally and cannot forget the filter — `dbUnfiltered` is the only way to see
+hidden rows, and exists for reviving them.
+
+Children are hidden *through* their parent rather than being flagged one by one:
+an automation is invisible when its own flag is set **or** when its account is
+disconnected. So disconnecting writes exactly one row however many automations
+you have, and reconnecting the same account brings them all back — while an
+automation you deleted by hand beforehand correctly stays deleted.
+
+| Action | What happens | Reversed by |
+|---|---|---|
+| Settings → Disconnect | Account flagged; automations pause, nothing fires | Reconnecting the same account |
+| Delete an automation | Flagged, conversation history kept | Configure on that reel again |
+| Remove a queued flow | Flagged, leaves the queue | — |
+| A queued flow is used up | `consumedAt` stamped, not deleted | — |
+
+Comments arriving while disconnected are ignored as they come in, not queued and
+replayed later. Use **Backfill** to catch up, within Instagram's 7-day window.
+
+## Backups
+
+`scripts/backup-db.mjs` dumps every table to gzipped JSON, keeps the last 7 days
+and prunes older files. It deliberately includes soft-deleted rows — a backup
+that honoured the hide filter would be useless for recovery.
+
+```bash
+export DATABASE_URL="…"
+node scripts/backup-db.mjs              # back up, then prune
+node scripts/backup-db.mjs --list       # what is on disk
+node scripts/backup-db.mjs --verify <f> # row counts inside a backup
+```
+
+Writes to `~/backups/instagram-autoflow` (`BACKUP_DIR`, `BACKUP_KEEP_DAYS` to
+change). The dumps hold real usernames and conversation history — keep them out
+of the repo.
 
 ## Flows for reels you haven't posted yet
 
@@ -173,6 +218,7 @@ app/
   (dashboard)/
     dashboard/        overview
     posts/            your media, and the per-reel flow editor
+      defaults/       the wording new reels start from
     queue/            flows prepared for reels not yet uploaded
     settings/         connect / disconnect Instagram
   api/
@@ -181,6 +227,7 @@ app/
       [id]/copy-from  clone another reel's setup onto this one
       [id]/backfill   sweep comments predating the automation
     flows/            the prepared-flow queue (CRUD + reorder)
+    reel-defaults/    read/save the account's default messages
     instagram/        OAuth connect, callback, posts
     cron/             daily token refresh + post sync
     webhooks/         Instagram event receiver
@@ -191,11 +238,15 @@ lib/
   buttons.ts          final-message buttons (max 3, legacy fallback)
   backfill.ts         catching up on pre-existing comments
   templates.ts        claim the next queued flow for a new reel
+  reel-defaults.ts    the messages a new reel automation starts with
   otp.ts / email.ts   email-OTP login codes
+  db.ts               Prisma client + the soft-delete filter
   auth.ts             NextAuth config
 prisma/
   schema.prisma       User, InstagramAccount, PostAutomation, Conversation,
-                      QueuedFlow, LoginCode
+                      QueuedFlow, ReelDefaults, LoginCode
+scripts/
+  backup-db.mjs       rolling 7-day database backup
 tests/
   flow-engine.test.ts the state machine, db + Graph API mocked
   keywords.test.ts    the per-reel comment filter

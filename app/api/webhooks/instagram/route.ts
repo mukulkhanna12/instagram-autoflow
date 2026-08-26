@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { replyToComment } from "@/lib/instagram";
+import { likeComment, replyToComment } from "@/lib/instagram";
 import { handleNewComment, handlePostback } from "@/lib/flow-engine";
 import { attachNextQueuedFlow } from "@/lib/templates";
 import { commentMatchesKeywords } from "@/lib/keywords";
@@ -145,6 +145,10 @@ async function handleCommentChange(accountId: string, value: Record<string, unkn
   const reply = replyPool[Math.floor(Math.random() * replyPool.length)] ?? automation.commentReplyText;
 
   await replyToComment(commentId, reply, token);
+
+  // …and like what they wrote. Purely social, so it follows the reply rather
+  // than gating it: likeComment swallows its own failures.
+  await likeComment(igAccount.instagramId, commentId, token);
 
   // Count this as one comment handled (dedup above ensures one per comment id).
   await db.postAutomation.update({

@@ -21,6 +21,7 @@ export function getInstagramAuthUrl(redirectUri: string): string {
       "instagram_business_basic", // read the account and its media
       "instagram_business_manage_comments", // read comments, post the public reply
       "instagram_business_manage_messages", // send DMs and read is_user_follow_business
+      "instagram_manage_engagement", // like the commenter's comment (added 2026-04-22)
     ].join(","),
   });
   return `https://www.instagram.com/oauth/authorize?${params}`;
@@ -235,6 +236,37 @@ export async function replyToComment(
   });
   if (!res.ok) {
     console.error("replyToComment error:", await res.text());
+  }
+}
+
+/**
+ * Like someone's comment as the connected account.
+ *
+ * Meta only opened this up on 2026-04-22, and the endpoint hangs off the IG
+ * user rather than the comment: POST /{ig-user-id}/likes with comment_id. It
+ * needs the `instagram_manage_engagement` scope, which tokens issued before
+ * that scope was added to getInstagramAuthUrl do not carry — an account
+ * connected earlier has to be reconnected once before likes start landing.
+ *
+ * Never throws: a missing like is cosmetic next to the reply and the DM, so a
+ * failure here must not abandon the rest of the flow.
+ */
+export async function likeComment(
+  igUserId: string,
+  commentId: string,
+  accessToken: string
+): Promise<void> {
+  try {
+    const res = await fetch(`${IG_GRAPH}/${igUserId}/likes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ comment_id: commentId, access_token: accessToken }),
+    });
+    if (!res.ok) {
+      console.error("likeComment error:", await res.text());
+    }
+  } catch (err) {
+    console.error("likeComment failed:", err);
   }
 }
 

@@ -53,6 +53,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const owned = await ownedFlow(id, session.user.id);
   if (!owned) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await db.queuedFlow.delete({ where: { id } });
+  // Soft delete — the prepared flow leaves the queue but the row stays.
+  await db.queuedFlow.update({
+    where: { id },
+    data: { isDeleted: true, deletedAt: new Date() },
+  });
   return NextResponse.json({ success: true });
 }
