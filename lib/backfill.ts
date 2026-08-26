@@ -28,7 +28,7 @@
  */
 
 import { db } from "./db";
-import { getMediaComments, replyToComment, type IgComment } from "./instagram";
+import { getMediaComments, likeComment, replyToComment, type IgComment } from "./instagram";
 import { handleNewComment } from "./flow-engine";
 import { commentMatchesKeywords } from "./keywords";
 
@@ -141,6 +141,7 @@ export async function backfillComments(
 
     try {
       await replyToComment(c.id, pickReply(automation), account.accessToken);
+      await likeComment(account.instagramId, c.id, account.accessToken);
       await db.postAutomation.update({
         where: { id: automation.id },
         data: { commentsHandled: { increment: 1 } },
