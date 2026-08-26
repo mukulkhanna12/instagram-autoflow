@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import { buttonsSchema } from "@/lib/schemas";
+import { getReelDefaults } from "@/lib/reel-defaults";
 
 /** Flows prepared for reels not yet uploaded, front of the queue first. */
 export async function GET() {
@@ -38,7 +39,7 @@ const createSchema = z.object({
   detailsUrl: z.string().optional(),
 });
 
-/** Add a flow to the back of the queue. Unset fields take the schema defaults. */
+/** Add a flow to the back of the queue. Unset fields take the account's defaults. */
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -54,10 +55,14 @@ export async function POST(req: NextRequest) {
     orderBy: { position: "desc" },
   });
 
+  const defaults = await getReelDefaults(igAccount.id);
+
   const flow = await db.queuedFlow.create({
     data: {
       igAccountId: igAccount.id,
       position: (last?.position ?? -1) + 1,
+      ...defaults,
+      detailsButtons: defaults.detailsButtons ?? [],
       ...body.data,
     },
   });
