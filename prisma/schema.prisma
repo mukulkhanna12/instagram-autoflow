@@ -84,8 +84,15 @@ model InstagramAccount {
   updatedAt       DateTime @updatedAt
 
   user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Soft delete. Disconnecting sets this instead of removing the row, so every
+  // automation, queued flow and conversation survives a disconnect/reconnect
+  // cycle. Reconnecting the same instagramId clears it and everything reappears.
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
   automations PostAutomation[]
   queuedFlows QueuedFlow[]
+  reelDefaults ReelDefaults?
 }
 
 // A flow prepared in advance for a reel you haven't uploaded yet.
@@ -135,9 +142,49 @@ model QueuedFlow {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Soft delete, and the record of being used up. A flow leaves the queue when
+  // it is consumed into an automation (consumedAt) or removed by hand
+  // (isDeleted); either way the row stays so the history is auditable.
+  isDeleted  Boolean   @default(false)
+  deletedAt  DateTime?
+  consumedAt DateTime?
+
   igAccount InstagramAccount @relation(fields: [igAccountId], references: [id], onDelete: Cascade)
 
   @@index([igAccountId, position])
+}
+
+// The wording a brand-new reel automation starts from.
+//
+// One row per account, edited on the Reels → Default messages page. It is only
+// ever read at creation time: a reel that already has an automation has been
+// customised by then, and rewriting it from here would be the opposite of a
+// default. A prepared flow in the queue still wins over these — it was written
+// for that specific reel.
+model ReelDefaults {
+  id          String @id @default(cuid())
+  igAccountId String @unique
+
+  keywords String @default("") @db.Text
+
+  commentReplyText   String  @default("Sent you a DM! 📩") @db.Text
+  commentReplyText2  String? @default("Just DM'd you the details 🙌") @db.Text
+  commentReplyText3  String? @default("It's in your inbox now ✨") @db.Text
+  greetingMessage    String @default("Hey! 👋 Hope you're doing great.\n\nClick the button below to get the details I promised!") @db.Text
+  greetingButtonText String @default("Get Details →")
+  followMessage      String @default("To receive the details, please follow my page first! 🙏\n\nOnce you follow, click the button below.") @db.Text
+  followButtonText   String @default("I've Followed ✓")
+  followRetryMessage String @default("Hmm, I can't see you on my followers list yet 👀\n\nPlease follow the page first, then tap the button again.") @db.Text
+  detailsMessage     String @default("Here are the details you asked for! 🎉\n\nClick below to visit the page.") @db.Text
+  detailsButtonEnabled Boolean @default(true)
+  detailsButtons       Json    @default("[]")
+  detailsButtonText    String  @default("Visit Page 🔗")
+  detailsUrl           String  @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  igAccount InstagramAccount @relation(fields: [igAccountId], references: [id], onDelete: Cascade)
 }
 
 model PostAutomation {
@@ -148,6 +195,12 @@ model PostAutomation {
   postCaption   String? @db.Text
   postThumbnail String?
   isActive      Boolean @default(false)
+
+  // Soft delete. Deleting an automation from the dashboard sets this; the row
+  // and all its Conversation history stay. Configuring the same reel again
+  // revives this row rather than creating a second one — see @@unique below.
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
   // True when this automation was created automatically from the account's
   // default template (a reel uploaded after the template was enabled).
   fromTemplate  Boolean @default(false)

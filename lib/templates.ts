@@ -93,8 +93,13 @@ export async function attachNextQueuedFlow(
       include: { igAccount: true, _count: { select: { conversations: true } } },
     });
 
-    // Used up — each prepared flow belongs to exactly one reel.
-    await tx.queuedFlow.delete({ where: { id: next.id } });
+    // Used up — each prepared flow belongs to exactly one reel. Stamping
+    // consumedAt takes it out of the queue while keeping the record of which
+    // reel claimed it; the extension in lib/db.ts hides consumed flows.
+    await tx.queuedFlow.update({
+      where: { id: next.id },
+      data: { consumedAt: new Date() },
+    });
 
     return automation;
   });

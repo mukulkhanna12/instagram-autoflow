@@ -34,7 +34,7 @@ function SettingsContent() {
   }, []);
 
   async function disconnect() {
-    if (!confirm("Disconnect your Instagram account? All automations will be paused.")) return;
+    if (!confirm("Disconnect your Instagram account?\n\nAll automations will be paused. Reconnect this same account later and they will start again — nothing is lost.")) return;
     setDisconnecting(true);
     await fetch("/api/instagram/disconnect", { method: "DELETE" });
     setAccount(null);
