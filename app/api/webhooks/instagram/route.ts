@@ -99,8 +99,13 @@ async function handleCommentChange(accountId: string, value: Record<string, unkn
 
   // Look for an automation for this reel — active or not. An inactive one means
   // the user deliberately turned this reel off, so we leave it alone.
+  //
+  // Scoped to the account the delivery is for. postId alone would search every
+  // user's automations, and the table allows the same postId under two accounts
+  // (@@unique is [igAccountId, postId]) — so a match must be proven to belong
+  // to this account before its token is used to reply.
   let automation = await db.postAutomation.findFirst({
-    where: { postId: mediaId },
+    where: { postId: mediaId, igAccount: { instagramId: accountId } },
     include: { igAccount: true },
   });
 
