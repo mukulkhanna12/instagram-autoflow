@@ -60,7 +60,8 @@ function SettingsContent() {
           <AlertCircle className="w-5 h-5 shrink-0" />
           {errorMsg === "no_instagram" && "Couldn't read your Instagram account. Make sure it's a professional (Business or Creator) account."}
           {errorMsg === "instagram_auth_failed" && "Instagram authorization failed. Please try again."}
-          {!["no_instagram", "instagram_auth_failed"].includes(errorMsg) && "Something went wrong. Please try again."}
+          {errorMsg === "account_taken" && "That Instagram account is already connected to another AutoFlow account. Disconnect it there first, or connect a different Instagram account."}
+          {!["no_instagram", "instagram_auth_failed", "account_taken"].includes(errorMsg) && "Something went wrong. Please try again."}
         </div>
       )}
 

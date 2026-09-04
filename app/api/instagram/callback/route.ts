@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, dbUnfiltered } from "@/lib/db";
 import {
   exchangeCodeForToken,
   getLongLivedToken,
@@ -32,6 +32,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/settings?error=no_instagram`);
     }
 
+    // An Instagram account belongs to exactly one user. Without this check the
+    // upsert below would hand a row that already belongs to someone else to
+    // whoever authorized last — taking their automations, queued flows and
+    // conversation history with it, since those are all reached through it.
+    // Read unfiltered: a disconnected row is soft-deleted and hidden from the
+    // normal client, and that is precisely the case a reconnect would steal.
+    const existing = await dbUnfiltered.instagramAccount.findUnique({
+      where: { instagramId: profile.id },
+      select: { userId: true },
+    });
+    if (existing && existing.userId !== session.user.id) {
+      return NextResponse.redirect(
+        `${process.env.NEXTAUTH_URL}/settings?error=account_taken`
+      );
+    }
+
     await db.instagramAccount.upsert({
       where: { instagramId: profile.id },
       create: {
@@ -52,7 +68,9 @@ export async function GET(req: NextRequest) {
         // its own flag and correctly stays hidden.
         isDeleted: false,
         deletedAt: null,
-        userId: session.user.id,
+        // userId is deliberately not written here. The guard above proves the
+        // row is already this user's, so re-writing it could only ever move an
+        // account between users — which is the thing we are preventing.
       },
     });
 
