@@ -7,12 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// One row per person who has ever asked for a login code. Signing up is open —
+// anyone can register — but the row starts unapproved, and an unapproved row is
+// never emailed a code and can never sign in. Approval is manual: flip
+// `isApproved` in the database. Each approved user is a fully separate tenant:
+// their Instagram accounts, flows and automations all hang off this row and are
+// only ever queried by `userId`.
 model User {
   id            String    @id @default(cuid())
   name          String?
   email         String    @unique
   emailVerified DateTime?
   image         String?
+  // Manual gate. False for every new signup; set it true by hand to let them in.
+  isApproved    Boolean   @default(false)
+  approvedAt    DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Zap, ArrowLeft, Mail } from "lucide-react";
+import { Zap, ArrowLeft, Mail, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-type Step = "email" | "code";
+// "pending" is where a registered-but-unapproved account lands: the code step
+// is never reached, because no code was sent.
+type Step = "email" | "code" | "pending";
 
 export function LoginForm() {
   const router = useRouter();
@@ -36,8 +38,12 @@ export function LoginForm() {
       // In demo mode the API returns the code so it can be shown on-screen.
       const data = await res.json().catch(() => ({}));
       if (data.devCode) setDevCode(data.devCode);
-      // Always advances — the response is deliberately identical whether or not
-      // the address is allow-listed, so a code only actually arrives for yours.
+      // A new or not-yet-approved account is registered but sent no code, so
+      // there's nothing to enter — show it the waiting-for-approval message.
+      if (data.status === "pending") {
+        setStep("pending");
+        return;
+      }
       setStep("code");
     } catch {
       setError("Network error. Please try again.");
@@ -77,13 +83,40 @@ export function LoginForm() {
           <p className="text-gray-500 text-sm mt-2">
             {step === "email"
               ? "Sign in to manage your Instagram automations"
-              : "Enter the 6-digit code we emailed you"}
+              : step === "pending"
+                ? "Your account is waiting to be approved"
+                : "Enter the 6-digit code we emailed you"}
           </p>
         </div>
 
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
-          {step === "email" ? (
+          {step === "pending" ? (
+            <div className="space-y-4 text-center">
+              <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto">
+                <Clock className="w-6 h-6 text-amber-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900">Approval pending</p>
+                <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                  We&apos;ve registered <span className="font-medium text-gray-700">{email}</span>.
+                  Your account needs to be approved before you can sign in — once it&apos;s
+                  approved, come back and log in again to start using AutoFlow.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("email");
+                  setCode("");
+                  setError(null);
+                }}
+                className="w-full flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3 h-3" /> Use a different email
+              </button>
+            </div>
+          ) : step === "email" ? (
             <form onSubmit={requestCode} className="space-y-4">
               <Input
                 label="Email address"
@@ -144,7 +177,7 @@ export function LoginForm() {
           )}
 
           <p className="text-center text-xs text-gray-400 mt-6 leading-relaxed">
-            Access is restricted to the account owner's email.
+            Anyone can sign up — new accounts are enabled after approval.
           </p>
         </div>
 

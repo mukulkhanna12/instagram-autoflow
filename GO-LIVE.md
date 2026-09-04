@@ -32,7 +32,9 @@ linked to a Facebook Page**. Do the steps in order.
 
 1. Sign up at https://resend.com **with the email you'll log in as**.
 2. Create an API key → set env `RESEND_API_KEY`.
-3. Set `ALLOWED_LOGIN_EMAIL` to that same email (only this address can sign in).
+3. Set `ALLOWED_LOGIN_EMAIL` to that same email — it is auto-approved, so you can
+   always get in. Anyone else who signs up waits for you to approve their `User`
+   row (`isApproved = true`) before they're emailed a code.
    - On the free tier, Resend sends from `onboarding@resend.dev` to your own
      account email — no domain needed. (Set `EMAIL_FROM` later if you verify a domain.)
 
@@ -45,7 +47,7 @@ Set these env vars in Vercel (Project → Settings → Environment Variables), t
 | `DATABASE_URL` | (added by Vercel Postgres) |
 | `NEXTAUTH_SECRET` | your generated secret |
 | `CRON_SECRET` | your generated secret |
-| `ALLOWED_LOGIN_EMAIL` | your email |
+| `ALLOWED_LOGIN_EMAIL` | your email (auto-approved owner) |
 | `RESEND_API_KEY` | from Resend |
 | `NEXTAUTH_URL` | set after first deploy (step below) |
 | `NEXT_PUBLIC_APP_URL` | same as NEXTAUTH_URL |

@@ -15,10 +15,21 @@ npm install
 
 ## 3. Login (email-OTP)
 
-Sign-in is passwordless and locked to a single address — only your email can get
-in, via a one-time code emailed to it.
+Sign-in is passwordless: you enter your email and get a one-time code.
 
-1. Set `ALLOWED_LOGIN_EMAIL` in `.env` to your own email address.
+Sign-up is open — anyone can enter their email, which registers them — but a new
+account is **not** emailed a code and cannot sign in until it is approved by
+hand. Approve one by setting `isApproved = true` on its `User` row:
+
+```sql
+UPDATE "User" SET "isApproved" = true, "approvedAt" = now() WHERE email = 'them@example.com';
+```
+
+Each approved user is a separate tenant with their own Instagram account, flows
+and automations.
+
+1. Set `ALLOWED_LOGIN_EMAIL` in `.env` to your own email address — that one
+   address is approved automatically so you can always get in.
 2. Create a free account at https://resend.com and copy an API key into
    `RESEND_API_KEY`. Resend can send to your own account email from
    `onboarding@resend.dev` without verifying a domain, which is enough here.

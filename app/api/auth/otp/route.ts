@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { isAllowedEmail, createLoginCode } from "@/lib/otp";
+import { registerOrGetAccess, createLoginCode } from "@/lib/otp";
 import { sendEmail, otpEmail } from "@/lib/email";
 
 const schema = z.object({ email: z.string().email() });
 
 /**
- * Request a login code. Emails a one-time code only if the address is the
- * allow-listed one — but always responds the same way so an outsider can't use
- * this endpoint to discover which email is allowed.
+ * Request a login code.
+ *
+ * Sign-up is open, so an unknown address is registered here rather than
+ * rejected — but registering does not let anyone in. Only an approved account
+ * is emailed a code; an unapproved one gets `status: "pending"` back and the
+ * login page tells them to come back once they've been approved.
  */
 export async function POST(req: NextRequest) {
   const parsed = schema.safeParse(await req.json().catch(() => null));
@@ -18,9 +21,11 @@ export async function POST(req: NextRequest) {
 
   const { email } = parsed.data;
 
-  // Not the allow-listed address: pretend success, send nothing.
-  if (!isAllowedEmail(email)) {
-    return NextResponse.json({ ok: true });
+  // Registers the address on first sight. Anyone may sign up; only an approved
+  // account is sent a code, so nothing is emailed while they're pending.
+  const access = await registerOrGetAccess(email);
+  if (access === "pending") {
+    return NextResponse.json({ ok: true, status: "pending" });
   }
 
   const code = await createLoginCode(email);
@@ -48,5 +53,5 @@ export async function POST(req: NextRequest) {
   const showCode =
     process.env.NODE_ENV !== "production" && process.env.DEMO_SHOW_OTP === "1";
 
-  return NextResponse.json({ ok: true, ...(showCode ? { devCode: code } : {}) });
+  return NextResponse.json({ ok: true, status: "approved", ...(showCode ? { devCode: code } : {}) });
 }

@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "./db";
-import { isAllowedEmail, normalizeEmail, verifyLoginCode } from "./otp";
+import { isApprovedEmail, normalizeEmail, verifyLoginCode } from "./otp";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
@@ -17,22 +17,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       // The login page collects the email, requests a code (/api/auth/otp), then
-      // submits email + code here. We re-check the allow-list and verify the code.
+      // submits email + code here. We re-check approval and verify the code.
       credentials: { email: {}, code: {} },
       authorize: async (creds) => {
         const email = typeof creds?.email === "string" ? normalizeEmail(creds.email) : "";
         const code = typeof creds?.code === "string" ? creds.code : "";
-        if (!email || !code || !isAllowedEmail(email)) return null;
+        if (!email || !code) return null;
+
+        // Checked again here, not just when the code was issued: an account
+        // revoked in between must not be able to redeem a code already sent.
+        if (!(await isApprovedEmail(email))) return null;
 
         const ok = await verifyLoginCode(email, code);
         if (!ok) return null;
 
-        // Ensure the single owning user row exists (Instagram accounts hang off it).
-        const user = await db.user.upsert({
-          where: { email },
-          create: { email, name: "AutoFlow" },
-          update: {},
-        });
+        // The row was created when the code was requested; each signed-in user
+        // is its own tenant and their Instagram accounts hang off this row.
+        const user = await db.user.findUnique({ where: { email } });
+        if (!user) return null;
         return { id: user.id, email: user.email, name: user.name };
       },
     }),

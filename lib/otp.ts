@@ -1,7 +1,14 @@
 /**
- * Email-OTP login codes.
+ * Email-OTP login codes, plus the manual approval gate in front of them.
  *
- * Sign-in is locked to a single allow-listed address (`ALLOWED_LOGIN_EMAIL`).
+ * Sign-up is open: any email may register, which creates an unapproved `User`
+ * row. Nothing is emailed and nothing can be signed into until that row is
+ * approved by hand in the database (`isApproved = true`). Once approved, the
+ * person is a separate tenant with their own Instagram account and flows.
+ *
+ * `ALLOWED_LOGIN_EMAIL` is now only a bootstrap: that one address is approved
+ * automatically so the owner can never lock themselves out of a fresh database.
+ *
  * A 6-digit code is generated, hashed (HMAC-SHA256 with `NEXTAUTH_SECRET`) and
  * stored — the plaintext only ever exists long enough to be emailed. Codes
  * expire in 10 minutes, are capped at a handful per hour per email, and each
@@ -20,10 +27,71 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-export function isAllowedEmail(email: string): boolean {
+/** Where an email stands with the approval gate. */
+export type AccessStatus = "approved" | "pending";
+
+/**
+ * The bootstrap owner address. It is auto-approved on sight so a fresh
+ * deployment always has one account that can get in. Everyone else waits.
+ */
+export function isBootstrapEmail(email: string): boolean {
   const allowed = process.env.ALLOWED_LOGIN_EMAIL;
   if (!allowed) return false;
   return normalizeEmail(email) === normalizeEmail(allowed);
+}
+
+/**
+ * Register the email if it's new, and report whether it may sign in.
+ *
+ * A brand-new address gets an unapproved `User` row — that *is* the sign-up.
+ * Nothing is emailed to it and nothing is exposed; it simply waits for a human
+ * to approve it in the database.
+ */
+export async function registerOrGetAccess(email: string): Promise<AccessStatus> {
+  const e = normalizeEmail(email);
+  const bootstrap = isBootstrapEmail(e);
+
+  const existing = await db.user.findUnique({
+    where: { email: e },
+    select: { isApproved: true },
+  });
+
+  if (!existing) {
+    await db.user.create({
+      data: {
+        email: e,
+        name: "AutoFlow",
+        isApproved: bootstrap,
+        approvedAt: bootstrap ? new Date() : null,
+      },
+    });
+    return bootstrap ? "approved" : "pending";
+  }
+
+  // A pre-existing bootstrap row — one created before this gate existed, or
+  // before the env var was set — is brought up to approved on sight. Already
+  // approved rows are left alone so `approvedAt` records the real moment.
+  if (!existing.isApproved && bootstrap) {
+    await db.user.update({
+      where: { email: e },
+      data: { isApproved: true, approvedAt: new Date() },
+    });
+    return "approved";
+  }
+
+  return existing.isApproved ? "approved" : "pending";
+}
+
+/**
+ * Read-only approval check, used again at sign-in so a code issued moments
+ * before an account was revoked still can't be redeemed.
+ */
+export async function isApprovedEmail(email: string): Promise<boolean> {
+  const user = await db.user.findUnique({
+    where: { email: normalizeEmail(email) },
+    select: { isApproved: true },
+  });
+  return user?.isApproved === true;
 }
 
 function hashCode(code: string): string {

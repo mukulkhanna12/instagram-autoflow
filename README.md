@@ -193,7 +193,7 @@ covers deploying to Vercel.
 |---|---|
 | `DATABASE_URL` | Postgres connection string |
 | `NEXTAUTH_URL` / `NEXTAUTH_SECRET` | Session handling (`openssl rand -base64 32`) |
-| `ALLOWED_LOGIN_EMAIL` | The only email allowed to sign in |
+| `ALLOWED_LOGIN_EMAIL` | Bootstrap owner — this address is auto-approved; everyone else signs up and waits (see [Accounts & approval](#accounts--approval)) |
 | `RESEND_API_KEY` | Sends the login-code email ([resend.com](https://resend.com)) |
 | `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` | Instagram OAuth + webhook signature verification |
 | `META_WEBHOOK_VERIFY_TOKEN` | Any random string; must match the Meta dashboard |
@@ -257,6 +257,34 @@ tests/
 `PostAutomation` is one reel's flow; `Conversation` tracks one person's progress
 through it (`greeted` → `follow_requested` → `completed`). `QueuedFlow` is a flow
 waiting for a reel you haven't posted yet.
+
+## Accounts & approval
+
+Sign-in is passwordless: enter an email, get a 6-digit code, done. Sign-up is
+open — any address can register — but registering is not access.
+
+1. A new email hitting the login page creates a `User` row with
+   `isApproved = false`. **No code is emailed.** The page tells them their
+   account is awaiting approval and to log in again once it's approved.
+2. You approve it by hand in the database:
+
+   ```sql
+   UPDATE "User" SET "isApproved" = true, "approvedAt" = now()
+   WHERE email = 'them@example.com';
+   ```
+
+3. Next time they ask for a code, they get one and are in.
+
+Approval is re-checked at sign-in, not only when the code is issued, so
+un-approving someone mid-flow stops a code they already hold from working.
+
+`ALLOWED_LOGIN_EMAIL` is now only a bootstrap: that one address is approved
+automatically, so a fresh database always has an account that can get in.
+
+**Every approved user is a separate tenant.** Instagram accounts hang off the
+`User` row, and every automation, queued flow, reel default and conversation is
+reached through it — each user connects their own Instagram account and sees
+only their own flows.
 
 ## Security
 
