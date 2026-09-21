@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     // ── DM / postback events ────────────────────────────────────────────────
     for (const event of (entry.messaging as Array<Record<string, unknown>>) ?? []) {
       try {
-        await handleMessagingEvent(event);
+        await handleMessagingEvent(accountId, event);
       } catch (err) {
         console.error("messaging handler failed:", err);
       }
@@ -194,7 +194,7 @@ async function materializeFromTemplate(accountId: string, mediaId: string) {
   return attachNextQueuedFlow(igAccount.id, mediaId);
 }
 
-async function handleMessagingEvent(event: Record<string, unknown>) {
+async function handleMessagingEvent(accountId: string, event: Record<string, unknown>) {
   const sender = (event.sender as { id?: string })?.id;
   if (!sender) return;
 
@@ -217,6 +217,11 @@ async function handleMessagingEvent(event: Record<string, unknown>) {
   if (!automation) return;
 
   const { igAccount } = automation;
+
+  // The automation id comes from the button payload, so prove it belongs to
+  // the account this delivery is for before using that account's token — the
+  // same scoping the comment path applies.
+  if (igAccount.instagramId !== accountId || automation.isDeleted || igAccount.isDeleted) return;
 
   await handlePostback({
     payload,

@@ -24,6 +24,12 @@ export async function POST(req: NextRequest) {
   // Registers the address on first sight. Anyone may sign up; only an approved
   // account is sent a code, so nothing is emailed while they're pending.
   const access = await registerOrGetAccess(email);
+  if (access === "limited") {
+    return NextResponse.json(
+      { error: "Sign-ups are busy right now. Please try again in an hour." },
+      { status: 429 }
+    );
+  }
   if (access === "pending") {
     return NextResponse.json({ ok: true, status: "pending" });
   }

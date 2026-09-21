@@ -12,11 +12,13 @@ const IG_GRAPH = "https://graph.instagram.com/v21.0";
  * The "Log in with Instagram" authorize URL. One button — the user logs into
  * their Instagram professional account and approves; no Facebook involved.
  */
-export function getInstagramAuthUrl(redirectUri: string): string {
+export function getInstagramAuthUrl(redirectUri: string, state: string): string {
   const params = new URLSearchParams({
     client_id: process.env.INSTAGRAM_APP_ID!,
     redirect_uri: redirectUri,
     response_type: "code",
+    // Echoed back to the callback, which refuses a mismatch — see connect/route.ts.
+    state,
     scope: [
       "instagram_business_basic", // read the account and its media
       "instagram_business_manage_comments", // read comments, post the public reply

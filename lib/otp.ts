@@ -27,8 +27,19 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-/** Where an email stands with the approval gate. */
-export type AccessStatus = "approved" | "pending";
+/**
+ * Where an email stands with the approval gate. "limited" means the address is
+ * new but sign-ups are being refused for now — see MAX_SIGNUPS_PER_HOUR.
+ */
+export type AccessStatus = "approved" | "pending" | "limited";
+
+/**
+ * Registering is unauthenticated and every attempt writes a User row, so a
+ * script could otherwise fill the database with junk sign-ups. Past this many
+ * new accounts in an hour, new addresses are turned away until it cools off;
+ * existing accounts are unaffected.
+ */
+const MAX_SIGNUPS_PER_HOUR = 30;
 
 /**
  * The bootstrap owner address. It is auto-approved on sight so a fresh
@@ -57,6 +68,12 @@ export async function registerOrGetAccess(email: string): Promise<AccessStatus> 
   });
 
   if (!existing) {
+    if (!bootstrap) {
+      const recent = await db.user.count({
+        where: { createdAt: { gt: new Date(Date.now() - 60 * 60 * 1000) } },
+      });
+      if (recent >= MAX_SIGNUPS_PER_HOUR) return "limited";
+    }
     await db.user.create({
       data: {
         email: e,

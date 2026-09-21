@@ -14,6 +14,9 @@ import { z } from "zod";
 /** Cookie that tells the Instagram OAuth callback to return to onboarding. */
 export const RETURN_COOKIE = "af_ig_return";
 
+/** One-time value tying an Instagram OAuth callback to the browser that started it. */
+export const OAUTH_STATE_COOKIE = "af_ig_state";
+
 /** The typed @username, carried across the OAuth round trip in the browser. */
 export const TYPED_USERNAME_KEY = "autoflow.onboarding.username";
 

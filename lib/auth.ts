@@ -8,6 +8,9 @@ import { db } from "./db";
 import { isApprovedEmail, normalizeEmail, registerOrGetAccess, verifyLoginCode } from "./otp";
 import { facebookConfig, googleConfig } from "./social-auth";
 
+/** How often a signed-in session re-confirms the user is still approved. */
+const APPROVAL_RECHECK_MS = 5 * 60 * 1000;
+
 // Google and Facebook are only registered when their keys are set; see
 // lib/social-auth.ts. Both verify the email address before handing it over,
 // which is what makes linking to an existing email-code account safe — and the
@@ -71,6 +74,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const email = normalizeEmail(rawEmail);
 
       const access = await registerOrGetAccess(email);
+      if (access === "limited") return "/login?error=busy";
       if (access !== "approved") return `/login?pending=${encodeURIComponent(email)}`;
 
       // registerOrGetAccess names a new row "AutoFlow"; take the real name and
@@ -87,8 +91,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return true;
     },
+    /**
+     * Sessions are self-contained JWTs, so on their own they'd outlive a
+     * revoked approval by up to 30 days. Every few minutes the token is checked
+     * against the database, and a user who is gone or no longer approved is
+     * signed out (returning null ends the session).
+     */
     jwt: async ({ token, user }) => {
-      if (user) token.id = user.id;
+      if (user) {
+        token.id = user.id;
+        token.checkedAt = Date.now();
+        return token;
+      }
+      if (!token.id) return null;
+      if (Date.now() - ((token.checkedAt as number | undefined) ?? 0) > APPROVAL_RECHECK_MS) {
+        const row = await db.user.findUnique({
+          where: { id: token.id as string },
+          select: { isApproved: true },
+        });
+        if (!row?.isApproved) return null;
+        token.checkedAt = Date.now();
+      }
       return token;
     },
     session: async ({ session, token }) => {

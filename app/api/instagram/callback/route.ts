@@ -7,7 +7,8 @@ import {
   getInstagramProfile,
   subscribeToWebhooks,
 } from "@/lib/instagram";
-import { RETURN_COOKIE } from "@/lib/onboarding";
+import crypto from "crypto";
+import { OAUTH_STATE_COOKIE, RETURN_COOKIE } from "@/lib/onboarding";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -21,8 +22,19 @@ export async function GET(req: NextRequest) {
       : "/settings";
     const res = NextResponse.redirect(`${process.env.NEXTAUTH_URL}${base}?${query}`);
     res.cookies.delete(RETURN_COOKIE);
+    res.cookies.set(OAUTH_STATE_COOKIE, "", { path: "/api/instagram/callback", maxAge: 0 });
     return res;
   };
+
+  // Only finish a login this browser started: the state Instagram hands back
+  // must match the one-time value set by /api/instagram/connect.
+  const expected = req.cookies.get(OAUTH_STATE_COOKIE)?.value ?? "";
+  const got = req.nextUrl.searchParams.get("state") ?? "";
+  const stateOk =
+    expected.length > 0 &&
+    expected.length === got.length &&
+    crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(got));
+  if (!stateOk) return done("error=instagram_auth_failed");
 
   const code = req.nextUrl.searchParams.get("code");
   const error = req.nextUrl.searchParams.get("error");

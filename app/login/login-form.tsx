@@ -18,6 +18,7 @@ const OAUTH_ERRORS: Record<string, string> = {
   no_email: "That account didn't share an email address, so we can't sign you in with it.",
   OAuthAccountNotLinked: "That email is already linked to a different sign-in method.",
   AccessDenied: "Sign-in was cancelled or refused.",
+  busy: "Sign-ups are busy right now. Please try again in an hour.",
 };
 
 export function LoginForm({

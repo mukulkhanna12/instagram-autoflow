@@ -7,6 +7,7 @@ const user = {
   findUnique: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
+  count: vi.fn(),
 };
 vi.mock("@/lib/db", () => ({ db: { user, loginCode: {} } }));
 
@@ -15,6 +16,7 @@ const { registerOrGetAccess, isApprovedEmail, isBootstrapEmail, normalizeEmail }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  user.count.mockResolvedValue(0);
   delete process.env.ALLOWED_LOGIN_EMAIL;
 });
 
@@ -45,6 +47,23 @@ describe("registerOrGetAccess", () => {
     expect(user.create).toHaveBeenCalledWith({
       data: { email: "new@example.com", name: "AutoFlow", isApproved: false, approvedAt: null },
     });
+  });
+
+  it("turns new addresses away once the hourly sign-up cap is reached", async () => {
+    user.findUnique.mockResolvedValue(null);
+    user.count.mockResolvedValue(30);
+
+    expect(await registerOrGetAccess("flood@example.com")).toBe("limited");
+    expect(user.create).not.toHaveBeenCalled();
+  });
+
+  it("still lets the bootstrap owner register while the cap is hit", async () => {
+    process.env.ALLOWED_LOGIN_EMAIL = "owner@example.com";
+    user.findUnique.mockResolvedValue(null);
+    user.count.mockResolvedValue(999);
+    user.create.mockResolvedValue({});
+
+    expect(await registerOrGetAccess("owner@example.com")).toBe("approved");
   });
 
   it("keeps an existing unapproved account pending without touching the row", async () => {
