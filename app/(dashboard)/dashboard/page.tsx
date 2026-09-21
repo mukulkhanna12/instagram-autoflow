@@ -3,12 +3,13 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, AlertCircle, Plus, ImageIcon, Wand2, Play, MessageCircle } from "lucide-react";
+import { AlertCircle, Plus, ImageIcon, Wand2, Play, MessageCircle } from "lucide-react";
 import { truncate } from "@/lib/utils";
 import { Panel, PillLink, StatCard } from "@/components/dashboard/cards";
 import { ActivityBars, CompletionGauge } from "@/components/dashboard/charts";
 import { QuickStartModal } from "@/components/dashboard/quick-start";
 import { PauseResumeButton, RowMenu, StatusPill, TableFrame } from "@/components/dashboard/row-menu";
+import { DashboardSkeleton } from "@/components/skeletons";
 
 interface Stats {
   contacts: number;
@@ -133,11 +134,7 @@ function Dashboard() {
   }
 
   if (loading || !overview) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-brand-600 animate-spin" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   // Aggregate KPIs across all automations.

@@ -16,6 +16,7 @@ import { MessageInput } from "@/components/message-input";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import Image from "next/image";
+import { EditorSkeleton } from "@/components/skeletons";
 
 interface Automation {
   id: string;
@@ -233,11 +234,7 @@ export default function FlowEditorPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
-      </div>
-    );
+    return <EditorSkeleton />;
   }
 
   if (!automation || !v) {

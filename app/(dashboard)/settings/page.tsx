@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Instagram, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Instagram, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { AccountRowSkeleton, FormPageSkeleton } from "@/components/skeletons";
 
 interface IgAccount {
   id: string;
@@ -80,9 +81,7 @@ function SettingsContent() {
         </CardHeader>
         <CardBody>
           {loading ? (
-            <div className="flex items-center gap-2 text-gray-400 text-sm">
-              <Loader2 className="w-4 h-4 animate-spin" /> Loading...
-            </div>
+            <AccountRowSkeleton />
           ) : account ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -127,7 +126,7 @@ function SettingsContent() {
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<div className="p-8"><Loader2 className="w-6 h-6 animate-spin text-brand-500" /></div>}>
+    <Suspense fallback={<FormPageSkeleton label="Loading settings" />}>
       <SettingsContent />
     </Suspense>
   );

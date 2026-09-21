@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, AlertCircle, Check, Info, Link2, Loader2, MessageSquare, Save,
+  ArrowLeft, AlertCircle, Check, Info, Link2, MessageSquare, Save,
   UserCheck, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   Section, KeywordFilter, ButtonListEditor, ButtonToggle, buttonsOf,
   type DetailsButton,
 } from "@/components/flow-fields";
+import { FormPageSkeleton } from "@/components/skeletons";
 
 interface Defaults {
   keywords: string;
@@ -89,11 +90,7 @@ export default function ReelDefaultsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
-      </div>
-    );
+    return <FormPageSkeleton label="Loading your default messages" />;
   }
 
   if (noAccount || !d) {

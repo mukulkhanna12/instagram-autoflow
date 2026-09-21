@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ChevronsUpDown } from "lucide-react";
-import { OnboardingHeading, OnboardingSteps } from "@/components/onboarding/steps";
+import { ArrowRight, Check, ChevronsUpDown } from "lucide-react";
+import { OnboardingShell, StepHeading } from "@/components/onboarding/steps";
 import { GOAL_OPTIONS, ROLE_OPTIONS, SOURCE_OPTIONS, TYPED_USERNAME_KEY } from "@/lib/onboarding";
 import { countryList, guessCountry } from "@/lib/countries";
 import { cn } from "@/lib/utils";
@@ -52,13 +52,12 @@ export default function OnboardingQuestionsPage() {
   }
 
   return (
-    <>
-      <OnboardingSteps current={3} />
-      <OnboardingHeading title="Before you start">
-        4 quick questions to help us shape AutoFlow
-      </OnboardingHeading>
+    <OnboardingShell step={3} doneHint={{ 1: "Instagram connected", 2: "Account confirmed" }}>
+      <StepHeading step={3} title="A little about you">
+        Four quick questions so we can shape AutoFlow around how you use it.
+      </StepHeading>
 
-      <div className="w-full max-w-3xl mt-14 space-y-12">
+      <div className="space-y-10">
         <Question n={1} title="How did you discover us?">
           <Chips options={SOURCE_OPTIONS} selected={source ? [source] : []} onToggle={setSource} />
         </Question>
@@ -81,7 +80,7 @@ export default function OnboardingQuestionsPage() {
               value={country}
               onChange={(e) => setCountry(e.target.value)}
               className={cn(
-                "w-full h-16 appearance-none rounded-2xl border-2 border-gray-200 bg-white px-5 pr-12 text-base font-semibold outline-none focus:border-gray-950 cursor-pointer",
+                "w-full h-14 appearance-none rounded-2xl border-[1.5px] border-gray-200 bg-white px-4 pr-12 text-[15px] font-semibold outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 cursor-pointer",
                 country ? "text-gray-950" : "text-gray-400"
               )}
             >
@@ -99,12 +98,12 @@ export default function OnboardingQuestionsPage() {
         <button
           onClick={finish}
           disabled={!complete || saving}
-          className="w-full h-16 rounded-full bg-gray-950 text-white text-lg font-bold flex items-center justify-center gap-2 hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 cursor-pointer disabled:cursor-not-allowed transition-colors"
+          className="inline-flex items-center justify-center gap-2 h-14 px-7 rounded-2xl bg-brand-700 text-white text-[15.5px] font-extrabold hover:bg-brand-800 disabled:bg-gray-200 disabled:text-gray-400 cursor-pointer disabled:cursor-not-allowed transition-colors"
         >
           {saving ? "Saving…" : "Go to my dashboard"} {!saving && <ArrowRight className="w-5 h-5" />}
         </button>
       </div>
-    </>
+    </OnboardingShell>
   );
 }
 
@@ -118,8 +117,8 @@ function Question({
 }) {
   return (
     <section>
-      <h2 className="flex items-baseline gap-3 text-2xl font-extrabold text-gray-950 mb-4">
-        <span className="text-gray-400">{n}</span> {title}
+      <h2 className="flex flex-wrap items-baseline gap-x-2.5 text-lg font-extrabold text-gray-950 mb-3">
+        <span className="text-brand-600">{n}.</span> {title}
         {hint && <span className="text-sm font-medium text-gray-400">{hint}</span>}
       </h2>
       {children}
@@ -145,12 +144,13 @@ function Chips({
             onClick={() => onToggle(o)}
             aria-pressed={on}
             className={cn(
-              "h-14 px-6 rounded-2xl border-2 text-base font-semibold transition-colors cursor-pointer",
+              "inline-flex items-center gap-1.5 h-11 px-4 rounded-xl border-[1.5px] text-[15px] font-semibold transition-colors cursor-pointer",
               on
-                ? "border-brand-700 bg-brand-700 text-white"
-                : "border-gray-200 bg-white text-gray-800 hover:border-gray-400"
+                ? "border-brand-600 bg-brand-50 text-brand-800"
+                : "border-gray-200 bg-white text-gray-700 hover:border-gray-400"
             )}
           >
+            {on && <Check className="w-4 h-4" strokeWidth={3} />}
             {o}
           </button>
         );

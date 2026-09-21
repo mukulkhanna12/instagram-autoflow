@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { answersSchema } from "@/lib/onboarding";
-import { getInstagramAccountDetails } from "@/lib/instagram";
+import { getInstagramAccountDetails, getWebhookSubscription } from "@/lib/instagram";
 
 /**
  * Onboarding state: where the user is, plus the connected account's live
@@ -20,7 +20,12 @@ export async function GET() {
     db.instagramAccount.findFirst({ where: { userId: session.user.id } }),
   ]);
 
-  const details = igAccount ? await getInstagramAccountDetails(igAccount.accessToken) : null;
+  const [details, subscribed] = igAccount
+    ? await Promise.all([
+        getInstagramAccountDetails(igAccount.accessToken),
+        getWebhookSubscription(igAccount.instagramId, igAccount.accessToken),
+      ])
+    : [null, null];
 
   return NextResponse.json({
     onboarded: !!user?.onboardedAt,
@@ -32,6 +37,9 @@ export async function GET() {
           profilePicUrl: details?.profilePictureUrl ?? igAccount.profilePicUrl ?? null,
           followersCount: details?.followersCount ?? null,
           mediaCount: details?.mediaCount ?? null,
+          accountType: details?.accountType ?? null,
+          // Null = couldn't be read from Instagram; the UI says so rather than guessing.
+          subscribedFields: subscribed,
         }
       : null,
   });

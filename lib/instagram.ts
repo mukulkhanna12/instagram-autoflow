@@ -106,6 +106,8 @@ export async function getInstagramProfile(
 export interface IgAccountDetails {
   username: string;
   name?: string;
+  /** "BUSINESS" or "MEDIA_CREATOR"; a personal account can't use messaging. */
+  accountType?: string;
   profilePictureUrl?: string;
   followersCount?: number;
   mediaCount?: number;
@@ -122,7 +124,7 @@ export async function getInstagramAccountDetails(
   accessToken: string
 ): Promise<IgAccountDetails | null> {
   try {
-    const fields = "username,name,profile_picture_url,followers_count,media_count";
+    const fields = "username,name,account_type,profile_picture_url,followers_count,media_count";
     const res = await fetch(`${IG_GRAPH}/me?fields=${fields}&access_token=${accessToken}`);
     if (!res.ok) {
       console.error("getInstagramAccountDetails error:", await res.text());
@@ -132,6 +134,7 @@ export async function getInstagramAccountDetails(
     return {
       username: d.username,
       name: d.name || undefined,
+      accountType: d.account_type || undefined,
       profilePictureUrl: d.profile_picture_url,
       followersCount: typeof d.followers_count === "number" ? d.followers_count : undefined,
       mediaCount: typeof d.media_count === "number" ? d.media_count : undefined,
@@ -169,6 +172,34 @@ export async function subscribeToWebhooks(
   } catch (err) {
     console.error("subscribeToWebhooks threw:", err);
     return false;
+  }
+}
+
+/**
+ * Which webhook fields this account is subscribed to, read back from Instagram
+ * — so onboarding can show that comment alerts are really on rather than
+ * assuming the subscribe call on connect worked. Null when it can't be read.
+ */
+export async function getWebhookSubscription(
+  igUserId: string,
+  accessToken: string
+): Promise<string[] | null> {
+  try {
+    const res = await fetch(
+      `${IG_GRAPH}/${igUserId}/subscribed_apps?access_token=${accessToken}`
+    );
+    if (!res.ok) {
+      console.error("getWebhookSubscription error:", await res.text());
+      return null;
+    }
+    const body = await res.json();
+    const fields = (body.data ?? []).flatMap(
+      (app: { subscribed_fields?: string[] }) => app.subscribed_fields ?? []
+    );
+    return [...new Set<string>(fields)];
+  } catch (err) {
+    console.error("getWebhookSubscription threw:", err);
+    return null;
   }
 }
 

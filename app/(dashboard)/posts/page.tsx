@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ImageIcon, Loader2, Heart, MessageCircle, MessageSquare, Zap, AlertCircle, ExternalLink, Wand2 } from "lucide-react";
+import { ImageIcon, Heart, MessageCircle, MessageSquare, Zap, AlertCircle, ExternalLink, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import Link from "next/link";
 import { truncate } from "@/lib/utils";
+import { ReelsGridSkeleton } from "@/components/skeletons";
 
 interface Post {
   id: string;
@@ -130,11 +131,7 @@ export default function PostsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
-      </div>
-    );
+    return <ReelsGridSkeleton />;
   }
 
   if (error) {

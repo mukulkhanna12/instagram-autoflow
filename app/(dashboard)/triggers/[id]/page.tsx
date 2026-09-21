@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  Loader2, Plus, X, ArrowLeft, ImageIcon, Search, Minus, Maximize2,
+  Plus, X, ArrowLeft, ImageIcon, Search, Minus, Maximize2,
   Eye, Check, ChevronRight, MessageSquare, GitBranch, Sliders, Unlink,
 } from "lucide-react";
 import Image from "next/image";
@@ -20,6 +20,7 @@ import {
   type Trigger, type FlowNode, type FlowButton, type TriggerReel, type TriggerSource,
   type NodePos,
 } from "@/lib/trigger-store";
+import { CanvasSkeleton } from "@/components/skeletons";
 
 const COL_GAP = 130;
 const ROW_GAP = 44;
@@ -535,7 +536,7 @@ export default function TriggerBuilderPage() {
   }
 
   if (!trigger) {
-    return <div className="flex items-center justify-center h-screen"><Loader2 className="w-6 h-6 animate-spin text-brand-500" /></div>;
+    return <CanvasSkeleton />;
   }
 
   return (

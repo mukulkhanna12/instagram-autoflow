@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  Loader2, MessageSquare, Zap, UserCheck, Link2, Save, Wand2, AlertCircle,
+  MessageSquare, Zap, UserCheck, Link2, Save, Wand2, AlertCircle,
   Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Inbox,
 } from "lucide-react";
 import Link from "next/link";
@@ -13,6 +13,7 @@ import {
   Section, KeywordFilter, ButtonListEditor, ButtonToggle, buttonsOf,
   type DetailsButton,
 } from "@/components/flow-fields";
+import { QueueSkeleton } from "@/components/skeletons";
 
 interface Flow {
   id: string;
@@ -118,11 +119,7 @@ export default function QueuePage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
-      </div>
-    );
+    return <QueueSkeleton />;
   }
 
   if (noAccount || !flows) {

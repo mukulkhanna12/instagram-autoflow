@@ -38,6 +38,7 @@ export function LoginForm({
   const [social, setSocial] = useState<"google" | "facebook" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
+  const [notReady, setNotReady] = useState<string | null>(null);
   const oauthError = initialError
     ? OAUTH_ERRORS[initialError] ?? "Couldn't sign you in. Please try again."
     : null;
@@ -92,6 +93,13 @@ export function LoginForm({
   }
 
   function continueWith(provider: "google" | "facebook") {
+    // The buttons always show; until a provider's keys are set there's nothing
+    // behind them, so say so here rather than landing on Auth.js's error page.
+    if (!providers[provider]) {
+      setNotReady(provider === "google" ? "Google" : "Facebook");
+      return;
+    }
+    setNotReady(null);
     setSocial(provider);
     signIn(provider, { callbackUrl: "/dashboard" });
   }
@@ -103,7 +111,6 @@ export function LoginForm({
     router.replace("/login");
   };
 
-  const hasSocial = providers.google || providers.facebook;
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -160,38 +167,37 @@ export function LoginForm({
                 </p>
               )}
 
-              {providers.google && (
-                <button
-                  type="button"
-                  onClick={() => continueWith("google")}
-                  disabled={!!social}
-                  className="w-full h-14 rounded-full border-2 border-gray-950 bg-white text-gray-950 font-bold flex items-center justify-center gap-3 hover:bg-gray-50 disabled:opacity-60 cursor-pointer transition-colors"
-                >
-                  <GoogleIcon className="w-5 h-5" />
-                  {social === "google" ? "Opening Google…" : "Continue with Google"}
-                </button>
-              )}
-              {providers.facebook && (
-                <button
-                  type="button"
-                  onClick={() => continueWith("facebook")}
-                  disabled={!!social}
-                  className="w-full h-14 rounded-full bg-[#1877F2] text-white font-bold flex items-center justify-center gap-3 hover:bg-[#166fe0] disabled:opacity-60 cursor-pointer transition-colors"
-                >
-                  <FacebookIcon className="w-5 h-5" />
-                  {social === "facebook" ? "Opening Facebook…" : "Continue with Facebook"}
-                </button>
+              {notReady && (
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
+                  {notReady} sign-in isn&apos;t switched on yet. Use your email below for now.
+                </p>
               )}
 
-              {hasSocial && (
-                <div className="flex items-center gap-3 py-3 text-xs font-medium uppercase tracking-wider text-gray-400">
-                  <span className="h-px flex-1 bg-gray-200" /> or use email <span className="h-px flex-1 bg-gray-200" />
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => continueWith("google")}
+                disabled={!!social}
+                className="w-full h-14 rounded-full border-2 border-gray-950 bg-white text-gray-950 font-bold flex items-center justify-center gap-3 hover:bg-gray-50 disabled:opacity-60 cursor-pointer transition-colors"
+              >
+                <GoogleIcon className="w-5 h-5" />
+                {social === "google" ? "Opening Google…" : "Continue with Google"}
+              </button>
+              <button
+                type="button"
+                onClick={() => continueWith("facebook")}
+                disabled={!!social}
+                className="w-full h-14 rounded-full bg-[#1877F2] text-white font-bold flex items-center justify-center gap-3 hover:bg-[#166fe0] disabled:opacity-60 cursor-pointer transition-colors"
+              >
+                <FacebookIcon className="w-5 h-5" />
+                {social === "facebook" ? "Opening Facebook…" : "Continue with Facebook"}
+              </button>
+
+              <div className="flex items-center gap-3 py-3 text-xs font-medium uppercase tracking-wider text-gray-400">
+                <span className="h-px flex-1 bg-gray-200" /> or use email <span className="h-px flex-1 bg-gray-200" />
+              </div>
 
               <form onSubmit={requestCode} className="space-y-3">
                 <Input
-                  label={hasSocial ? undefined : "Email address"}
                   aria-label="Email address"
                   type="email"
                   autoComplete="email"

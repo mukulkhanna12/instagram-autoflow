@@ -17,11 +17,18 @@ export function LogoMark({ className }: { className?: string }) {
   );
 }
 
-export function Logo({ href = "/", className }: { href?: string | null; className?: string }) {
+export function Logo({
+  href = "/", className, light,
+}: {
+  href?: string | null;
+  className?: string;
+  /** White wordmark, for dark backgrounds. */
+  light?: boolean;
+}) {
   const inner = (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <LogoMark />
-      <span className="text-lg font-extrabold tracking-tight text-gray-950">AutoFlow</span>
+      <span className={cn("text-lg font-extrabold tracking-tight", light ? "text-white" : "text-gray-950")}>AutoFlow</span>
     </span>
   );
   return href ? <Link href={href}>{inner}</Link> : inner;
