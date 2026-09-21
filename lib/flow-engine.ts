@@ -61,9 +61,10 @@ export async function handleNewComment(opts: {
       igUsername: opts.senderUsername,
       commentId: opts.commentId,
       state: "greeted",
+      lastCommentAt: new Date(),
     },
     // Commenting again restarts the greeting, so put them back on step one.
-    update: { state: "greeted", commentId: opts.commentId },
+    update: { state: "greeted", commentId: opts.commentId, lastCommentAt: new Date() },
   });
 
   // First contact: Instagram has no open messaging window with this person yet,

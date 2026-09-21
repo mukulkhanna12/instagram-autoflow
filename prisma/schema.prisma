@@ -22,6 +22,13 @@ model User {
   // Manual gate. False for every new signup; set it true by hand to let them in.
   isApproved    Boolean   @default(false)
   approvedAt    DateTime?
+  // First-run onboarding. `onboardingAnswers` holds the "Before you start"
+  // survey ({ source, role, goals, country }); `onboardedAt` is set when it is
+  // submitted. `quickStartSeenAt` records that the dashboard's quick-start
+  // modal was shown and dismissed, so it appears once rather than every visit.
+  onboardingAnswers Json?
+  onboardedAt       DateTime?
+  quickStartSeenAt  DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -274,6 +281,10 @@ model Conversation {
   igUsername   String?
   state        String   @default("greeted")
   commentId    String?
+  // When this person's most recent comment started (or restarted) the flow.
+  // Each one costs a private reply, so the sidebar counts these over the last
+  // hour against Meta's 750/hour private-reply limit.
+  lastCommentAt DateTime?
   // Last DM send failure for this person, surfaced in the flow editor so a
   // silent delivery problem (expired token, permission gap) is visible.
   lastError    String?   @db.Text

@@ -1,8 +1,24 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
+import Facebook from "next-auth/providers/facebook";
+import type { Provider } from "next-auth/providers";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "./db";
-import { isApprovedEmail, normalizeEmail, verifyLoginCode } from "./otp";
+import { isApprovedEmail, normalizeEmail, registerOrGetAccess, verifyLoginCode } from "./otp";
+import { facebookConfig, googleConfig } from "./social-auth";
+
+// Google and Facebook are only registered when their keys are set; see
+// lib/social-auth.ts. Both verify the email address before handing it over,
+// which is what makes linking to an existing email-code account safe — and the
+// linking is needed, because the approval gate below creates the User row
+// before the adapter gets to it.
+const google = googleConfig();
+const facebook = facebookConfig();
+const socialProviders: Provider[] = [
+  ...(google ? [Google({ ...google, allowDangerousEmailAccountLinking: true })] : []),
+  ...(facebook ? [Facebook({ ...facebook, allowDangerousEmailAccountLinking: true })] : []),
+];
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
@@ -38,8 +54,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return { id: user.id, email: user.email, name: user.name };
       },
     }),
+    ...socialProviders,
   ],
   callbacks: {
+    /**
+     * The approval gate, for Google and Facebook. Signing in with either is the
+     * same as asking for an email code: it registers an unapproved account, and
+     * nobody gets a session until it is approved by hand. A pending account is
+     * sent back to the login page's "waiting for approval" message.
+     */
+    signIn: async ({ account, profile, user }) => {
+      if (!account || account.provider === "credentials") return true;
+
+      const rawEmail = profile?.email ?? user?.email;
+      if (!rawEmail) return "/login?error=no_email";
+      const email = normalizeEmail(rawEmail);
+
+      const access = await registerOrGetAccess(email);
+      if (access !== "approved") return `/login?pending=${encodeURIComponent(email)}`;
+
+      // registerOrGetAccess names a new row "AutoFlow"; take the real name and
+      // photo from the provider the first time we see them.
+      const row = await db.user.findUnique({ where: { email }, select: { name: true, image: true } });
+      if (row && (!row.name || row.name === "AutoFlow" || !row.image)) {
+        await db.user.update({
+          where: { email },
+          data: {
+            name: !row.name || row.name === "AutoFlow" ? (user?.name ?? row.name) : row.name,
+            image: row.image ?? user?.image ?? null,
+          },
+        });
+      }
+      return true;
+    },
     jwt: async ({ token, user }) => {
       if (user) token.id = user.id;
       return token;

@@ -1,24 +1,45 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Zap, ArrowLeft, Mail, Clock } from "lucide-react";
+import { ArrowLeft, Clock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FacebookIcon, GoogleIcon, Logo } from "@/components/brand";
 
 // "pending" is where a registered-but-unapproved account lands: the code step
-// is never reached, because no code was sent.
+// is never reached, because no code was sent. Google and Facebook sign-ins that
+// hit the gate come back here with ?pending=<email>.
 type Step = "email" | "code" | "pending";
 
-export function LoginForm() {
+const OAUTH_ERRORS: Record<string, string> = {
+  no_email: "That account didn't share an email address, so we can't sign you in with it.",
+  OAuthAccountNotLinked: "That email is already linked to a different sign-in method.",
+  AccessDenied: "Sign-in was cancelled or refused.",
+};
+
+export function LoginForm({
+  providers,
+  pendingEmail,
+  error: initialError,
+}: {
+  providers: { google: boolean; facebook: boolean };
+  pendingEmail: string | null;
+  error: string | null;
+}) {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("email");
-  const [email, setEmail] = useState("");
+  const [step, setStep] = useState<Step>(pendingEmail ? "pending" : "email");
+  const [email, setEmail] = useState(pendingEmail ?? "");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [social, setSocial] = useState<"google" | "facebook" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
+  const oauthError = initialError
+    ? OAUTH_ERRORS[initialError] ?? "Couldn't sign you in. Please try again."
+    : null;
 
   async function requestCode(e: React.FormEvent) {
     e.preventDefault();
@@ -38,8 +59,6 @@ export function LoginForm() {
       // In demo mode the API returns the code so it can be shown on-screen.
       const data = await res.json().catch(() => ({}));
       if (data.devCode) setDevCode(data.devCode);
-      // A new or not-yet-approved account is registered but sent no code, so
-      // there's nothing to enter — show it the waiting-for-approval message.
       if (data.status === "pending") {
         setStep("pending");
         return;
@@ -71,120 +90,174 @@ export function LoginForm() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-pink-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-200">
-            <Zap className="w-7 h-7 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Welcome to AutoFlow</h1>
-          <p className="text-gray-500 text-sm mt-2">
-            {step === "email"
-              ? "Sign in to manage your Instagram automations"
-              : step === "pending"
-                ? "Your account is waiting to be approved"
-                : "Enter the 6-digit code we emailed you"}
-          </p>
-        </div>
+  function continueWith(provider: "google" | "facebook") {
+    setSocial(provider);
+    signIn(provider, { callbackUrl: "/dashboard" });
+  }
 
-        {/* Card */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+  const backToEmail = () => {
+    setStep("email");
+    setCode("");
+    setError(null);
+    router.replace("/login");
+  };
+
+  const hasSocial = providers.google || providers.facebook;
+
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
+      <header className="px-6 py-5 flex items-center justify-between max-w-6xl w-full mx-auto">
+        <Logo />
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-900"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to home
+        </Link>
+      </header>
+
+      <main className="flex-1 flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-[420px]">
+          <div className="text-center mb-8">
+            <h1 className="text-[2.5rem] leading-[1.05] font-extrabold tracking-tight text-gray-950">
+              Welcome to AutoFlow
+            </h1>
+            <p className="text-gray-500 mt-4 leading-relaxed">
+              {step === "pending"
+                ? "Your account is waiting to be approved."
+                : step === "code"
+                  ? "Enter the 6-digit code we emailed you."
+                  : "Reply to comments, send links in DMs and grow your following — on autopilot."}
+            </p>
+          </div>
+
           {step === "pending" ? (
-            <div className="space-y-4 text-center">
-              <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto">
-                <Clock className="w-6 h-6 text-amber-500" />
+            <div className="rounded-3xl border border-gray-200 p-7 text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mx-auto">
+                <Clock className="w-6 h-6 text-brand-700" />
               </div>
               <div>
-                <p className="font-semibold text-gray-900">Approval pending</p>
+                <p className="font-bold text-gray-950">Approval pending</p>
                 <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-                  We&apos;ve registered <span className="font-medium text-gray-700">{email}</span>.
-                  Your account needs to be approved before you can sign in — once it&apos;s
-                  approved, come back and log in again to start using AutoFlow.
+                  We&apos;ve registered <span className="font-semibold text-gray-800">{email}</span>.
+                  Once it&apos;s approved, come back and sign in again to set up your account.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setStep("email");
-                  setCode("");
-                  setError(null);
-                }}
-                className="w-full flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                onClick={backToEmail}
+                className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 cursor-pointer"
               >
-                <ArrowLeft className="w-3 h-3" /> Use a different email
+                <ArrowLeft className="w-3.5 h-3.5" /> Use a different account
               </button>
             </div>
           ) : step === "email" ? (
-            <form onSubmit={requestCode} className="space-y-4">
-              <Input
-                label="Email address"
-                type="email"
-                autoComplete="email"
-                required
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                error={error ?? undefined}
-              />
-              <Button type="submit" className="w-full" loading={loading}>
-                <Mail className="w-4 h-4" /> Email me a login code
-              </Button>
-            </form>
+            <div className="space-y-3">
+              {oauthError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-2xl px-4 py-3">
+                  {oauthError}
+                </p>
+              )}
+
+              {providers.google && (
+                <button
+                  type="button"
+                  onClick={() => continueWith("google")}
+                  disabled={!!social}
+                  className="w-full h-14 rounded-full border-2 border-gray-950 bg-white text-gray-950 font-bold flex items-center justify-center gap-3 hover:bg-gray-50 disabled:opacity-60 cursor-pointer transition-colors"
+                >
+                  <GoogleIcon className="w-5 h-5" />
+                  {social === "google" ? "Opening Google…" : "Continue with Google"}
+                </button>
+              )}
+              {providers.facebook && (
+                <button
+                  type="button"
+                  onClick={() => continueWith("facebook")}
+                  disabled={!!social}
+                  className="w-full h-14 rounded-full bg-[#1877F2] text-white font-bold flex items-center justify-center gap-3 hover:bg-[#166fe0] disabled:opacity-60 cursor-pointer transition-colors"
+                >
+                  <FacebookIcon className="w-5 h-5" />
+                  {social === "facebook" ? "Opening Facebook…" : "Continue with Facebook"}
+                </button>
+              )}
+
+              {hasSocial && (
+                <div className="flex items-center gap-3 py-3 text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <span className="h-px flex-1 bg-gray-200" /> or use email <span className="h-px flex-1 bg-gray-200" />
+                </div>
+              )}
+
+              <form onSubmit={requestCode} className="space-y-3">
+                <Input
+                  label={hasSocial ? undefined : "Email address"}
+                  aria-label="Email address"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  error={error ?? undefined}
+                  className="h-14 rounded-2xl px-5 text-base"
+                />
+                <Button type="submit" variant="dark" className="w-full h-14 text-base" loading={loading}>
+                  <Mail className="w-4 h-4" /> Email me a login code
+                </Button>
+              </form>
+            </div>
           ) : (
-            <form onSubmit={verifyCode} className="space-y-4">
+            <form onSubmit={verifyCode} className="space-y-3">
               {devCode && (
                 <button
                   type="button"
                   onClick={() => setCode(devCode)}
-                  className="w-full text-left bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-amber-100 transition-colors"
+                  className="w-full text-left bg-lime-50 border border-lime-300 rounded-2xl px-4 py-3 cursor-pointer hover:bg-lime-100 transition-colors"
                 >
-                  <p className="text-xs text-amber-700">
+                  <p className="text-xs text-gray-700">
                     Demo mode — no email is set up. Your code is{" "}
                     <span className="font-bold tracking-wider">{devCode}</span>. Tap to fill.
                   </p>
                 </button>
               )}
               <Input
-                label="Login code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 maxLength={6}
                 required
                 placeholder="123456"
-                className="tracking-[0.5em] text-center text-lg font-semibold"
+                className="h-14 rounded-2xl tracking-[0.5em] text-center text-xl font-bold"
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                 error={error ?? undefined}
                 hint={`Sent to ${email}`}
               />
-              <Button type="submit" className="w-full" loading={loading}>
+              <Button type="submit" variant="dark" className="w-full h-14 text-base" loading={loading}>
                 Verify & sign in
               </Button>
               <button
                 type="button"
-                onClick={() => {
-                  setStep("email");
-                  setCode("");
-                  setError(null);
-                }}
-                className="w-full flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                onClick={backToEmail}
+                className="w-full flex items-center justify-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 pt-1 cursor-pointer"
               >
-                <ArrowLeft className="w-3 h-3" /> Use a different email
+                <ArrowLeft className="w-3.5 h-3.5" /> Use a different email
               </button>
             </form>
           )}
 
-          <p className="text-center text-xs text-gray-400 mt-6 leading-relaxed">
-            Anyone can sign up — new accounts are enabled after approval.
+          <p className="text-center text-xs text-gray-400 mt-8 leading-relaxed">
+            Anyone can sign up — new accounts are switched on after approval.
           </p>
         </div>
+      </main>
 
-        <p className="text-center text-xs text-gray-400 mt-4">
-          Free forever · No credit card required
-        </p>
-      </div>
+      <footer className="py-6 text-center text-xs text-gray-400">
+        By continuing you agree to our{" "}
+        <Link href="/privacy" className="underline underline-offset-2 hover:text-gray-700">
+          Privacy Policy
+        </Link>
+        .
+      </footer>
     </div>
   );
 }

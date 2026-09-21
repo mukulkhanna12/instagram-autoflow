@@ -100,6 +100,46 @@ export async function getInstagramProfile(
   };
 }
 
+/** The connected account as the onboarding "Account found" card shows it. */
+export interface IgAccountDetails {
+  username: string;
+  name?: string;
+  profilePictureUrl?: string;
+  followersCount?: number;
+  mediaCount?: number;
+}
+
+/**
+ * Display details for the connected account, read live with its own token.
+ * Instagram Login can only ever describe the account it holds a token for —
+ * there is no lookup by username — which is why onboarding connects first and
+ * shows this card afterwards. Null on any failure; the card falls back to the
+ * username and picture already stored.
+ */
+export async function getInstagramAccountDetails(
+  accessToken: string
+): Promise<IgAccountDetails | null> {
+  try {
+    const fields = "username,name,profile_picture_url,followers_count,media_count";
+    const res = await fetch(`${IG_GRAPH}/me?fields=${fields}&access_token=${accessToken}`);
+    if (!res.ok) {
+      console.error("getInstagramAccountDetails error:", await res.text());
+      return null;
+    }
+    const d = await res.json();
+    return {
+      username: d.username,
+      name: d.name || undefined,
+      profilePictureUrl: d.profile_picture_url,
+      followersCount: typeof d.followers_count === "number" ? d.followers_count : undefined,
+      mediaCount: typeof d.media_count === "number" ? d.media_count : undefined,
+    };
+  } catch (err) {
+    console.error("getInstagramAccountDetails threw:", err);
+    return null;
+  }
+}
+
 // ── Webhook subscription ─────────────────────────────────────────────────────
 
 /**

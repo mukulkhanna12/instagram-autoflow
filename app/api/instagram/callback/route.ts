@@ -7,16 +7,28 @@ import {
   getInstagramProfile,
   subscribeToWebhooks,
 } from "@/lib/instagram";
+import { RETURN_COOKIE } from "@/lib/onboarding";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/login`);
 
+  // Started from onboarding → finish there; otherwise Settings, as before.
+  const fromOnboarding = req.cookies.get(RETURN_COOKIE)?.value === "onboarding";
+  const done = (query: string) => {
+    const base = fromOnboarding
+      ? query.startsWith("error=") ? "/onboarding" : "/onboarding/account"
+      : "/settings";
+    const res = NextResponse.redirect(`${process.env.NEXTAUTH_URL}${base}?${query}`);
+    res.cookies.delete(RETURN_COOKIE);
+    return res;
+  };
+
   const code = req.nextUrl.searchParams.get("code");
   const error = req.nextUrl.searchParams.get("error");
 
   if (error || !code) {
-    return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/settings?error=instagram_auth_failed`);
+    return done("error=instagram_auth_failed");
   }
 
   try {
@@ -29,7 +41,7 @@ export async function GET(req: NextRequest) {
     // The connected Instagram professional account itself.
     const profile = await getInstagramProfile(longToken);
     if (!profile) {
-      return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/settings?error=no_instagram`);
+      return done("error=no_instagram");
     }
 
     // An Instagram account belongs to exactly one user. Without this check the
@@ -43,9 +55,7 @@ export async function GET(req: NextRequest) {
       select: { userId: true },
     });
     if (existing && existing.userId !== session.user.id) {
-      return NextResponse.redirect(
-        `${process.env.NEXTAUTH_URL}/settings?error=account_taken`
-      );
+      return done("error=account_taken");
     }
 
     await db.instagramAccount.upsert({
@@ -78,14 +88,12 @@ export async function GET(req: NextRequest) {
     const subscribed = await subscribeToWebhooks(profile.id, longToken);
     if (!subscribed) {
       console.error(`Connected ${profile.username} but webhook subscription failed`);
-      return NextResponse.redirect(
-        `${process.env.NEXTAUTH_URL}/settings?success=connected&warning=webhook_subscription_failed`
-      );
+      return done("success=connected&warning=webhook_subscription_failed");
     }
 
-    return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/settings?success=connected`);
+    return done("success=connected");
   } catch (err) {
     console.error("Instagram callback error:", err);
-    return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/settings?error=unknown`);
+    return done("error=unknown");
   }
 }

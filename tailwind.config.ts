@@ -10,21 +10,35 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Deep forest green — primary actions, the active nav item, the
+        // highlighted stat card.
         brand: {
-          50: "#faf5ff",
-          100: "#f3e8ff",
-          200: "#e9d5ff",
-          300: "#d8b4fe",
-          400: "#c084fc",
-          500: "#a855f7",
-          600: "#9333ea",
-          700: "#7e22ce",
-          800: "#6b21a8",
-          900: "#581c87",
+          50: "#eef6f1",
+          100: "#d7ebdf",
+          200: "#b0d6bf",
+          300: "#80bb97",
+          400: "#4f9a6d",
+          500: "#2e7d4f",
+          600: "#236840",
+          700: "#1d5535",
+          800: "#18452c",
+          900: "#123522",
+          950: "#0b2316",
+        },
+        // Lime accent — the "New automation" button, usage bars, highlights.
+        lime: {
+          DEFAULT: "#dcfb4b",
+          50: "#fbffe6",
+          100: "#f4fec3",
+          200: "#ebfd8f",
+          300: "#dcfb4b",
+          400: "#cbeb2a",
+          500: "#aecd12",
+          600: "#879f0b",
         },
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["\"Plus Jakarta Sans\"", "Inter", "system-ui", "sans-serif"],
       },
       borderRadius: {
         lg: "var(--radius)",

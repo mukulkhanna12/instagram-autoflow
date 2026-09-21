@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -13,8 +13,8 @@
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
-  background-color: #f8f9fc;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  background-color: #f3f4f1;
   color: #111827;
 }
 
@@ -25,4 +25,13 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 
 /* Focus ring */
-:focus-visible { outline: 2px solid #9333ea; outline-offset: 2px; }
+:focus-visible { outline: 2px solid #2e7d4f; outline-offset: 2px; }
+
+/* Diagonal hatching for empty/idle bars and chart segments (6.png). */
+.hatch {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #c9ccc6 0 2px,
+    transparent 2px 7px
+  );
+}

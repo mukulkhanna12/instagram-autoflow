@@ -3,147 +3,202 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, ImageIcon, Settings, Zap, LogOut, ChevronRight, Wand2, Workflow,
-  PanelLeftClose, PanelLeftOpen,
+  LayoutDashboard, ImageIcon, Settings, LogOut, Wand2, Workflow, Plus,
+  PanelLeftClose, PanelLeftOpen, ShieldCheck,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
+import { Logo, LogoMark } from "@/components/brand";
 
 interface SidebarProps {
-  user: { name?: string | null; email?: string | null; image?: string | null };
+  usage: { replies: number; repliesLimit: number; accounts: number; accountsLimit: number };
 }
 
-const links = [
+const menu = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/posts", icon: ImageIcon, label: "Reels" },
   { href: "/triggers", icon: Workflow, label: "Triggers" },
   { href: "/queue", icon: Wand2, label: "Upcoming reels" },
+];
+
+const general = [
   { href: "/settings", icon: Settings, label: "Settings" },
+  { href: "/privacy", icon: ShieldCheck, label: "Privacy" },
 ];
 
 const COLLAPSED_KEY = "autoflow.sidebar.collapsed";
 
-export function Sidebar({ user }: SidebarProps) {
+export function Sidebar({ usage }: SidebarProps) {
   const path = usePathname();
 
   // Read after mount, not during render: the server has no localStorage, and
   // seeding state from it directly would make the first client render disagree.
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
-    setCollapsed(window.localStorage.getItem(COLLAPSED_KEY) === "1");
+    try {
+      setCollapsed(window.localStorage.getItem(COLLAPSED_KEY) === "1");
+    } catch {}
   }, []);
 
   function toggle() {
     setCollapsed((c) => {
-      window.localStorage.setItem(COLLAPSED_KEY, c ? "0" : "1");
+      try {
+        window.localStorage.setItem(COLLAPSED_KEY, c ? "0" : "1");
+      } catch {}
       return !c;
     });
   }
 
+  const isActive = (href: string) => path === href || path.startsWith(href + "/");
+
   return (
     <aside
       className={cn(
-        "shrink-0 h-screen sticky top-0 bg-white border-r border-gray-100 flex flex-col transition-[width] duration-200",
-        collapsed ? "w-16" : "w-60"
+        "shrink-0 h-[calc(100vh-1.5rem)] sticky top-3 rounded-3xl bg-white flex flex-col transition-[width] duration-200",
+        collapsed ? "w-[76px]" : "w-64"
       )}
     >
-      {/* Logo + the collapse toggle */}
-      <div className={cn("border-b border-gray-100", collapsed ? "p-3" : "p-5")}>
-        <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-2.5")}>
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-sm shrink-0">
-            <Zap className="w-4 h-4 text-white" />
-          </div>
-          {!collapsed && (
-            <>
-              <span className="font-bold text-gray-900">AutoFlow</span>
-              <button
-                onClick={toggle}
-                className="ml-auto text-gray-300 hover:text-gray-600 cursor-pointer"
-                title="Collapse to icons"
-              >
-                <PanelLeftClose className="w-4 h-4" />
-              </button>
-            </>
-          )}
-        </div>
-        {collapsed && (
-          <button
-            onClick={toggle}
-            className="mt-2 w-full flex justify-center text-gray-300 hover:text-gray-600 cursor-pointer"
-            title="Expand the sidebar"
-          >
-            <PanelLeftOpen className="w-4 h-4" />
-          </button>
-        )}
+      {/* Logo + collapse */}
+      <div className={cn("flex items-center pt-6 pb-5", collapsed ? "flex-col gap-3 px-3" : "px-6")}>
+        {collapsed ? <LogoMark /> : <Logo href="/dashboard" />}
+        <button
+          onClick={toggle}
+          className={cn("text-gray-300 hover:text-gray-700 cursor-pointer", !collapsed && "ml-auto")}
+          title={collapsed ? "Expand the sidebar" : "Collapse to icons"}
+        >
+          {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+        </button>
       </div>
 
-      {/* Nav — collapsed, the label becomes the tooltip so nothing is guesswork */}
-      <nav className={cn("flex-1 space-y-1", collapsed ? "p-2" : "p-3")}>
-        {links.map(({ href, icon: Icon, label }) => {
-          const active = path === href || path.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={collapsed ? label : undefined}
-              className={cn(
-                "flex items-center rounded-lg text-sm font-medium transition-all",
-                collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
-                active
-                  ? "bg-brand-50 text-brand-700"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              )}
-            >
-              <Icon className={cn("w-4 h-4 shrink-0", active ? "text-brand-600" : "text-gray-400")} />
-              {!collapsed && (
-                <>
-                  {label}
-                  {active && <ChevronRight className="w-3.5 h-3.5 ml-auto text-brand-400" />}
-                </>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* User */}
-      <div className={cn("border-t border-gray-100", collapsed ? "p-2" : "p-3")}>
-        <div
+      {/* Primary action (5.png) */}
+      <div className={collapsed ? "px-3" : "px-4"}>
+        <Link
+          href="/posts"
+          title={collapsed ? "New automation" : undefined}
           className={cn(
-            "flex rounded-lg",
-            collapsed ? "flex-col items-center gap-2 py-2" : "items-center gap-3 px-2 py-2"
+            "flex items-center justify-center gap-2 rounded-2xl bg-lime text-gray-950 font-bold hover:bg-lime-400 shadow-[inset_0_-3px_0_rgba(0,0,0,0.08)] transition-colors",
+            collapsed ? "h-12" : "h-12 text-[15px]"
           )}
         >
-          {user.image ? (
-            <Image
-              src={user.image} alt="avatar" width={32} height={32}
-              title={collapsed ? (user.name ?? undefined) : undefined}
-              className="w-8 h-8 rounded-full object-cover shrink-0"
-            />
-          ) : (
-            <div
-              title={collapsed ? (user.name ?? undefined) : undefined}
-              className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-semibold text-sm shrink-0"
-            >
-              {user.name?.[0]?.toUpperCase() ?? "U"}
-            </div>
-          )}
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
-              <p className="text-xs text-gray-400 truncate">{user.email}</p>
-            </div>
-          )}
+          <Plus className="w-5 h-5" strokeWidth={2.5} />
+          {!collapsed && "New automation"}
+        </Link>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto mt-6">
+        <NavGroup title="Menu" collapsed={collapsed}>
+          {menu.map((l) => <NavItem key={l.href} {...l} active={isActive(l.href)} collapsed={collapsed} />)}
+        </NavGroup>
+        <NavGroup title="General" collapsed={collapsed}>
+          {general.map((l) => <NavItem key={l.href} {...l} active={isActive(l.href)} collapsed={collapsed} />)}
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded cursor-pointer shrink-0"
-            title="Sign out"
+            title={collapsed ? "Log out" : undefined}
+            className={cn(
+              "w-full flex items-center text-[15px] font-medium text-gray-500 hover:text-gray-950 transition-colors cursor-pointer",
+              collapsed ? "justify-center py-3" : "gap-3.5 pl-7 pr-4 py-2.5"
+            )}
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-5 h-5 shrink-0" />
+            {!collapsed && "Log out"}
           </button>
-        </div>
-      </div>
+        </NavGroup>
+      </nav>
+
+      {!collapsed && <UsagePanel {...usage} />}
     </aside>
+  );
+}
+
+function NavGroup({ title, collapsed, children }: { title: string; collapsed: boolean; children: React.ReactNode }) {
+  return (
+    <div className="mb-6">
+      {!collapsed && (
+        <p className="px-7 mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">{title}</p>
+      )}
+      <div className="space-y-0.5">{children}</div>
+    </div>
+  );
+}
+
+function NavItem({
+  href, icon: Icon, label, active, collapsed,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  active: boolean;
+  collapsed: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      title={collapsed ? label : undefined}
+      className={cn(
+        "relative flex items-center text-[15px] transition-colors",
+        collapsed ? "justify-center py-3" : "gap-3.5 pl-7 pr-4 py-2.5",
+        active ? "text-gray-950 font-bold" : "text-gray-500 font-medium hover:text-gray-950"
+      )}
+    >
+      {/* The active marker from 6.png: a rounded bar on the panel's edge. */}
+      {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-1.5 rounded-r-full bg-brand-700" />}
+      <Icon className={cn("w-5 h-5 shrink-0", active ? "text-brand-700" : "text-gray-400")} />
+      {!collapsed && label}
+    </Link>
+  );
+}
+
+/**
+ * 7.png, with real numbers: Meta's hourly private-reply cap and the account
+ * slot. There are no plans to upgrade to, so there's no upgrade button.
+ */
+function UsagePanel({
+  replies, repliesLimit, accounts, accountsLimit,
+}: SidebarProps["usage"]) {
+  const pct = Math.min(100, (replies / repliesLimit) * 100);
+  const nearLimit = pct >= 80;
+  return (
+    <div className="mx-4 mb-4 rounded-2xl border border-gray-100 bg-[#fafbf8] p-4 space-y-4">
+      <UsageRow
+        label="DMs this hour"
+        value={`${replies}/${repliesLimit}`}
+        pct={pct}
+        barClass={nearLimit ? "bg-amber-400" : "bg-lime-400"}
+        title="Meta allows 750 first DMs (private replies) per hour. Past that, new commenters are skipped until the hour rolls over."
+      />
+      <UsageRow
+        label="IG accounts"
+        value={`${accounts}/${accountsLimit}`}
+        pct={(accounts / accountsLimit) * 100}
+        barClass="bg-lime-400"
+      />
+      {accounts === 0 && (
+        <Link href="/settings" className="block text-center text-xs font-bold text-brand-700 hover:underline">
+          Connect Instagram
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function UsageRow({
+  label, value, pct, barClass, title,
+}: {
+  label: string;
+  value: string;
+  pct: number;
+  barClass: string;
+  title?: string;
+}) {
+  return (
+    <div title={title}>
+      <div className="flex items-center justify-between text-sm mb-2">
+        <span className="text-gray-500 font-medium">{label}</span>
+        <span className="font-extrabold text-gray-950 tabular-nums">{value}</span>
+      </div>
+      <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+        <div className={cn("h-full rounded-full transition-all", barClass)} style={{ width: `${Math.max(pct, pct > 0 ? 3 : 0)}%` }} />
+      </div>
+    </div>
   );
 }

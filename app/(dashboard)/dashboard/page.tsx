@@ -1,13 +1,14 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  Loader2, AlertCircle, Plus, ImageIcon, ToggleLeft, ToggleRight,
-  Users, MessageCircle, Send, UserPlus, MousePointerClick, Trash2,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2, AlertCircle, Plus, ImageIcon, Wand2, Play, MessageCircle } from "lucide-react";
 import { truncate } from "@/lib/utils";
+import { Panel, PillLink, StatCard } from "@/components/dashboard/cards";
+import { ActivityBars, CompletionGauge } from "@/components/dashboard/charts";
+import { QuickStartModal } from "@/components/dashboard/quick-start";
+import { PauseResumeButton, RowMenu, StatusPill, TableFrame } from "@/components/dashboard/row-menu";
 
 interface Stats {
   contacts: number;
@@ -25,15 +26,45 @@ interface Automation {
   isActive: boolean;
   fromTemplate: boolean;
   commentsHandled: number;
+  greetingClicked: number;
+  keywords: string;
+  greetingMessage: string;
   stats: Stats;
 }
 
+interface Overview {
+  quickStart: boolean;
+  username: string | null;
+  activity: { date: string; count: number }[];
+  recent: {
+    id: string;
+    igUsername: string | null;
+    state: string;
+    updatedAt: string;
+    automation: { id: string; postCaption: string | null; postThumbnail: string | null };
+  }[];
+  nextFlow: { id: string; name: string; keywords: string } | null;
+  queued: number;
+  states: { greeted: number; follow_requested: number; completed: number };
+}
+
 export default function DashboardPage() {
+  return (
+    <Suspense>
+      <Dashboard />
+    </Suspense>
+  );
+}
+
+function Dashboard() {
+  const router = useRouter();
+  const params = useSearchParams();
   const [automations, setAutomations] = useState<Automation[]>([]);
+  const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [noAccount, setNoAccount] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
-  const [removing, setRemoving] = useState<string | null>(null);
+  const [showQuickStart, setShowQuickStart] = useState(false);
   /**
    * Ids of reels still on the account, or null when we couldn't establish the
    * full library. An automation outlives the reel it points at — deleting a
@@ -44,18 +75,23 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      const [accRes, autoRes] = await Promise.all([
+      const [accRes, autoRes, overviewRes] = await Promise.all([
         fetch("/api/instagram/account"),
         fetch("/api/automations"),
+        fetch(`/api/dashboard?tz=${new Date().getTimezoneOffset()}`),
       ]);
       const { account } = await accRes.json();
       if (!account) setNoAccount(true);
       const { automations } = await autoRes.json();
+      const ov: Overview = await overviewRes.json();
       setAutomations(automations ?? []);
+      setOverview(ov);
+      // Offered once: straight after onboarding, or to anyone with nothing set up yet.
+      setShowQuickStart(ov.quickStart && (params.get("welcome") === "1" || (automations ?? []).length === 0));
       setLoading(false);
 
       // Second, slower pass — it hits Instagram, so the list renders first and
-      // the "Deleted" badges appear a moment later.
+      // the "Reel deleted" badges appear a moment later.
       try {
         const res = await fetch("/api/instagram/posts");
         const { posts, complete } = await res.json();
@@ -67,20 +103,18 @@ export default function DashboardPage() {
       }
     }
     load();
-  }, []);
+  }, [params]);
 
   /** The reel is gone from Instagram, so this automation can never fire again. */
   const isOrphaned = (a: Automation) => !!liveReelIds && !liveReelIds.has(a.postId);
 
   async function removeAutomation(a: Automation) {
-    if (!confirm("Remove this automation? Its reel no longer exists on Instagram.")) return;
-    setRemoving(a.id);
-    try {
-      const res = await fetch(`/api/automations/${a.id}`, { method: "DELETE" });
-      if (res.ok) setAutomations((prev) => prev.filter((x) => x.id !== a.id));
-    } finally {
-      setRemoving(null);
-    }
+    const msg = isOrphaned(a)
+      ? "Remove this automation? Its reel no longer exists on Instagram."
+      : "Remove this automation? The reel will stop replying to comments.";
+    if (!confirm(msg)) return;
+    const res = await fetch(`/api/automations/${a.id}`, { method: "DELETE" });
+    if (res.ok) setAutomations((prev) => prev.filter((x) => x.id !== a.id));
   }
 
   async function toggle(a: Automation) {
@@ -98,10 +132,10 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) {
+  if (loading || !overview) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-brand-600 animate-spin" />
       </div>
     );
   }
@@ -116,155 +150,284 @@ export default function DashboardPage() {
     }),
     { contacts: 0, sends: 0, completed: 0, newFollows: 0 }
   );
-
-  const kpis = [
-    { label: "Unique contacts", value: totals.contacts, icon: Users, color: "text-blue-600 bg-blue-50" },
-    { label: "Messages sent", value: totals.sends, icon: Send, color: "text-brand-600 bg-brand-50" },
-    { label: "Final DMs delivered", value: totals.completed, icon: MessageCircle, color: "text-pink-600 bg-pink-50" },
-    { label: "New follows earned", value: totals.newFollows, icon: UserPlus, color: "text-emerald-600 bg-emerald-50" },
-  ];
+  const weekCount = overview.activity.reduce((n, d) => n + d.count, 0);
+  const liveCount = automations.filter((a) => a.isActive && !isOrphaned(a)).length;
+  const topReels = [...automations].sort((a, b) => b.stats.contacts - a.stats.contacts).slice(0, 5);
 
   return (
-    <div className="p-8 max-w-6xl">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-6 lg:p-8 space-y-5">
+      <QuickStartModal
+        open={showQuickStart}
+        username={overview.username}
+        onClose={() => {
+          setShowQuickStart(false);
+          if (params.get("welcome")) router.replace("/dashboard");
+        }}
+      />
+
+      {/* Heading */}
+      <div className="flex flex-wrap items-end justify-between gap-4 pb-1">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Automations</h1>
-          <p className="text-gray-500 text-sm mt-1">Your reel automations and how they're performing</p>
+          <h1 className="text-4xl font-extrabold tracking-tight text-gray-950">Dashboard</h1>
+          <p className="text-gray-500 mt-2">Turn every comment into a conversation — automatically.</p>
         </div>
-        <Link
-          href="/posts"
-          className="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> New automation
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/posts"
+            className="inline-flex items-center gap-2 h-12 px-6 rounded-full bg-brand-700 text-white font-bold hover:bg-brand-800 transition-colors"
+          >
+            <Plus className="w-5 h-5" /> New automation
+          </Link>
+          <Link
+            href="/queue"
+            className="inline-flex items-center gap-2 h-12 px-6 rounded-full border-2 border-brand-700 text-brand-800 font-bold hover:bg-brand-50 transition-colors"
+          >
+            Prepare next reel
+          </Link>
+        </div>
       </div>
 
       {noAccount && (
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
           <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-800">Instagram account not connected</p>
-            <p className="text-xs text-amber-600 mt-0.5">Connect your Instagram Business account to start automating.</p>
+            <p className="text-sm font-semibold text-amber-900">Instagram account not connected</p>
+            <p className="text-xs text-amber-700 mt-0.5">Connect your Instagram Business account to start automating.</p>
           </div>
-          <Link href="/settings" className="text-xs font-medium text-amber-700 underline underline-offset-2">Connect now →</Link>
+          <Link href="/settings" className="text-xs font-bold text-amber-800 underline underline-offset-2">Connect now →</Link>
         </div>
       )}
 
-      {/* Aggregate KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {kpis.map((k) => (
-          <div key={k.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-start gap-3">
-            <div className={`w-10 h-10 rounded-lg ${k.color} flex items-center justify-center shrink-0`}>
-              <k.icon className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900">{k.value}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{k.label}</p>
-            </div>
-          </div>
-        ))}
+      {/* KPI row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        <StatCard featured label="Contacts" value={totals.contacts} note={`${weekCount} reached in the last 7 days`} href="#automations" />
+        <StatCard label="Messages sent" value={totals.sends} note="DMs across every step" href="#automations" />
+        <StatCard
+          label="Got the link"
+          value={totals.completed}
+          note={totals.contacts ? `${Math.round((totals.completed / totals.contacts) * 100)}% of contacts` : "Final DM delivered"}
+          href="#automations"
+        />
+        <StatCard label="New follows" value={totals.newFollows} note="Earned by your follow gate" href="#automations" />
       </div>
 
-      {/* Automation list */}
-      {automations.length === 0 ? (
-        <div className="text-center py-20 text-gray-400 bg-white rounded-xl border border-gray-100">
-          <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No automations yet</p>
-          <p className="text-sm mt-1">
-            <Link href="/posts" className="text-brand-600 underline">Pick a reel</Link> to create your first one.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {automations.map((a) => (
-            <div
-              key={a.id}
-              className={`bg-white rounded-xl border shadow-sm p-4 flex items-center gap-4 ${
-                isOrphaned(a) ? "border-amber-200 bg-amber-50/40" : "border-gray-100"
-              }`}
-            >
-              {/* Thumbnail */}
-              <div className="relative w-14 h-14 rounded-lg bg-gray-100 overflow-hidden shrink-0">
-                {a.postThumbnail ? (
-                  <Image src={a.postThumbnail} alt="" fill unoptimized className="object-cover" />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <ImageIcon className="w-6 h-6 text-gray-300" />
-                  </div>
-                )}
-              </div>
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
+        <Panel title="Comment activity" className="xl:col-span-6" action={<span className="text-sm text-gray-400">Last 7 days</span>}>
+          <ActivityBars days={overview.activity} />
+        </Panel>
 
-              {/* Title + link */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <Link href={`/posts/${a.id}`} className="text-sm font-semibold text-gray-900 hover:text-brand-600 truncate">
-                    {a.postCaption ? truncate(a.postCaption, 48) : "Untitled reel"}
+        {/* "Reminders" in 6.png → what's queued for the next upload */}
+        <Panel title="Next reel" className="xl:col-span-3 flex flex-col">
+          {overview.nextFlow ? (
+            <>
+              <p className="text-2xl font-extrabold text-brand-800 leading-tight">
+                {overview.nextFlow.name || "Untitled flow"}
+              </p>
+              <p className="text-sm text-gray-500 mt-2">
+                {overview.nextFlow.keywords
+                  ? <>Replies to comments with <strong className="text-gray-700">{overview.nextFlow.keywords}</strong></>
+                  : "Replies to every comment"}
+                {overview.queued > 1 && ` · ${overview.queued - 1} more queued`}
+              </p>
+              <p className="text-sm text-gray-400 mt-1">Attaches on your next reel&apos;s first comment.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-2xl font-extrabold text-brand-800 leading-tight">Nothing queued</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Prepare a flow now and it switches on by itself when your next reel is posted.
+              </p>
+            </>
+          )}
+          <Link
+            href="/queue"
+            className="mt-auto pt-6"
+          >
+            <span className="flex items-center justify-center gap-2 h-12 rounded-full bg-brand-700 text-white font-bold hover:bg-brand-800 transition-colors">
+              <Wand2 className="w-5 h-5" /> {overview.nextFlow ? "Open queue" : "Prepare a flow"}
+            </span>
+          </Link>
+        </Panel>
+
+        {/* "Project" list in 6.png → best-performing reels */}
+        <Panel
+          title="Top reels"
+          className="xl:col-span-3 xl:row-span-2"
+          action={<PillLink href="/posts"><Plus className="w-4 h-4" /> New</PillLink>}
+        >
+          {topReels.length === 0 ? (
+            <p className="text-sm text-gray-400">No reels set up yet.</p>
+          ) : (
+            <ul className="space-y-4">
+              {topReels.map((a) => (
+                <li key={a.id}>
+                  <Link href={`/posts/${a.id}`} className="flex items-center gap-3 group">
+                    <Thumb src={a.postThumbnail} size="w-11 h-11" />
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-semibold text-gray-900 truncate group-hover:text-brand-700">
+                        {a.postCaption ? truncate(a.postCaption, 30) : "Untitled reel"}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {a.stats.contacts} contacts · {a.isActive ? "Live" : "Paused"}
+                      </p>
+                    </div>
                   </Link>
-                  {a.fromTemplate && <Badge variant="info" className="bg-brand-100 text-brand-700 shrink-0">Auto</Badge>}
-                  {isOrphaned(a) && (
-                    <span title="This reel is no longer on the account" className="shrink-0">
-                      <Badge variant="warning">Reel deleted</Badge>
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-gray-500">
-                  <Metric icon={Users} label="contacts" value={a.stats.contacts} />
-                  <Metric icon={MessageCircle} label="comments" value={a.commentsHandled} />
-                  <Metric icon={Send} label="final DMs" value={a.stats.completed} />
-                  <Metric icon={UserPlus} label="new follows" value={a.stats.newFollows} highlight />
-                  <Metric icon={MousePointerClick} label="CTR" value={`${a.stats.greetingCtr}%`} />
-                </div>
-              </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
 
-              {/* A dead automation gets a way out instead of a toggle that
-                  would only ever switch on something with nothing to listen to. */}
-              {isOrphaned(a) ? (
-                <button
-                  onClick={() => removeAutomation(a)}
-                  disabled={removing === a.id}
-                  className="flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:text-red-600 disabled:opacity-50 cursor-pointer shrink-0"
-                  title="Remove this leftover automation"
+        {/* "Team collaboration" in 6.png → the latest people in a flow */}
+        <Panel title="Recent contacts" className="xl:col-span-5">
+          {overview.recent.length === 0 ? (
+            <p className="text-sm text-gray-400">Nobody yet — the first commenter will show up here.</p>
+          ) : (
+            <ul className="space-y-4">
+              {overview.recent.map((c) => (
+                <li key={c.id} className="flex items-center gap-3">
+                  <span className="w-11 h-11 rounded-full bg-lime-100 text-brand-800 font-bold flex items-center justify-center shrink-0">
+                    {(c.igUsername ?? "?")[0]?.toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-semibold text-gray-900 truncate">
+                      {c.igUsername ? `@${c.igUsername}` : "Instagram user"}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate">
+                      on <span className="font-medium text-gray-600">{c.automation.postCaption ? truncate(c.automation.postCaption, 36) : "a reel"}</span>
+                    </p>
+                  </div>
+                  <StateTag state={c.state} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        {/* "Project progress" in 6.png */}
+        <Panel title="Flow completion" className="xl:col-span-4">
+          <CompletionGauge
+            completed={overview.states.completed}
+            gated={overview.states.follow_requested}
+            greeted={overview.states.greeted}
+          />
+        </Panel>
+      </div>
+
+      {/* 5.png — every automation, with its numbers and a pause button */}
+      <section id="automations" className="pt-4 scroll-mt-6">
+        <h2 className="text-2xl font-extrabold text-gray-950">Your automations</h2>
+        <p className="text-gray-500 mt-1 mb-5">
+          {`${liveCount} of ${automations.length} live`} · manage them and track how they&apos;re doing.
+        </p>
+
+        {automations.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-3xl border border-gray-200">
+            <ImageIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <p className="font-bold text-gray-900">No automations yet</p>
+            <p className="text-sm text-gray-500 mt-1">
+              <Link href="/posts" className="text-brand-700 font-semibold underline">Pick a reel</Link> to create your first one.
+            </p>
+          </div>
+        ) : (
+          <TableFrame
+            columns={[
+              { label: "Name" },
+              { label: "Contacts", className: "text-center" },
+              { label: "DMs", className: "text-center" },
+              { label: "Clicks", className: "text-center" },
+              { label: "CTR", className: "text-center" },
+              { label: "Status", className: "text-center" },
+              { label: "Actions", className: "text-center" },
+            ]}
+          >
+            {automations.map((a) => {
+              const orphan = isOrphaned(a);
+              return (
+                <tr
+                  key={a.id}
+                  onClick={() => router.push(`/posts/${a.id}`)}
+                  className="hover:bg-[#fafbf8] cursor-pointer"
                 >
-                  {removing === a.id
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <Trash2 className="w-4 h-4" />}
-                  Remove
-                </button>
-              ) : (
-              <button
-                onClick={() => toggle(a)}
-                disabled={toggling === a.id}
-                className="flex items-center gap-2 text-sm font-medium cursor-pointer shrink-0"
-                title={a.isActive ? "Live — replying to comments" : "Off — ignoring comments"}
-              >
-                {a.isActive ? (
-                  <><ToggleRight className="w-8 h-8 text-emerald-500" /> <span className="text-emerald-600 hidden sm:inline">Live</span></>
-                ) : (
-                  <><ToggleLeft className="w-8 h-8 text-gray-300" /> <span className="text-gray-400 hidden sm:inline">Off</span></>
-                )}
-              </button>
-              )}
-            </div>
-          ))}
+                  <td className="px-6 py-5">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <Thumb src={a.postThumbnail} size="w-12 h-12" />
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-950 truncate max-w-[260px] 2xl:max-w-[360px]">
+                          {a.postCaption ? truncate(a.postCaption, 44) : "Untitled reel"}
+                          {a.fromTemplate && (
+                            <span className="ml-2 align-middle text-[10px] font-bold uppercase tracking-wider text-brand-700 bg-brand-50 rounded-full px-2 py-0.5">Auto</span>
+                          )}
+                        </p>
+                        <p className="text-sm text-gray-400 truncate max-w-[260px] 2xl:max-w-[420px]">
+                          Comment on reel
+                          {a.keywords.trim() ? ` · contains '${a.keywords.split(",")[0].trim()}'${a.keywords.split(",").length > 1 ? ` +${a.keywords.split(",").length - 1} more` : ""}` : " · any comment"}
+                          {` · DM: '${truncate(a.greetingMessage.replace(/\s+/g, " "), 40)}'`}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <Num v={a.stats.contacts} />
+                  <Num v={a.stats.totalSends} />
+                  <Num v={a.greetingClicked} />
+                  <td className="px-3 py-5 text-center font-bold text-gray-950">
+                    {a.stats.contacts ? `${a.stats.greetingCtr}%` : "—"}
+                  </td>
+                  <td className="px-3 py-5 text-center">
+                    <StatusPill status={orphan ? "deleted" : a.isActive ? "live" : "paused"} />
+                  </td>
+                  <td className="px-3 py-5">
+                    <div className="flex items-center justify-center gap-2">
+                      {!orphan && (
+                        <PauseResumeButton live={a.isActive} busy={toggling === a.id} onClick={() => toggle(a)} />
+                      )}
+                      <RowMenu
+                        items={[
+                          { label: "Edit flow", onSelect: () => router.push(`/posts/${a.id}`) },
+                          { label: "Remove", danger: true, onSelect: () => removeAutomation(a) },
+                        ]}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </TableFrame>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function Num({ v }: { v: number }) {
+  return <td className="px-3 py-5 text-center font-bold text-gray-950 tabular-nums">{v}</td>;
+}
+
+function Thumb({ src, size }: { src?: string | null; size: string }) {
+  return (
+    <div className={`relative ${size} rounded-xl bg-gray-100 overflow-hidden shrink-0`}>
+      {src ? (
+        <>
+          <Image src={src} alt="" fill unoptimized className="object-cover" />
+          <span className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 flex items-center justify-center">
+            <Play className="w-2 h-2 text-white fill-white" />
+          </span>
+        </>
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-950">
+          <MessageCircle className="w-5 h-5 text-lime" />
         </div>
       )}
     </div>
   );
 }
 
-function Metric({
-  icon: Icon, label, value, highlight,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number | string;
-  highlight?: boolean;
-}) {
-  return (
-    <span className={`flex items-center gap-1 ${highlight ? "text-emerald-600 font-medium" : ""}`}>
-      <Icon className="w-3.5 h-3.5" />
-      <span className="font-semibold text-gray-700">{value}</span>
-      <span className="text-gray-400">{label}</span>
-    </span>
-  );
+function StateTag({ state }: { state: string }) {
+  const map: Record<string, [string, string]> = {
+    completed: ["Got the link", "text-emerald-700 bg-emerald-50 border-emerald-200"],
+    follow_requested: ["At follow gate", "text-amber-700 bg-amber-50 border-amber-200"],
+    greeted: ["DM sent", "text-gray-600 bg-gray-50 border-gray-200"],
+  };
+  const [label, cls] = map[state] ?? [state, "text-gray-600 bg-gray-50 border-gray-200"];
+  return <span className={`text-[11px] font-semibold border rounded-md px-2 py-0.5 whitespace-nowrap ${cls}`}>{label}</span>;
 }
