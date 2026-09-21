@@ -221,11 +221,8 @@ export default function FlowEditorPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isActive: !automation.isActive }),
     });
-    const { automation: updated, backfill } = await res.json();
+    const { automation: updated } = await res.json();
     setAutomation((prev) => (prev ? { ...prev, isActive: updated.isActive } : updated));
-    // Switching a reel Live for the first time sweeps its existing comments —
-    // show what that did rather than letting it happen invisibly.
-    if (backfill) { setOutcome(backfill); setActiveStep("comment"); }
     setToggling(false);
   }
 

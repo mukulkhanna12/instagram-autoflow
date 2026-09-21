@@ -108,7 +108,8 @@ posted with an empty queue is deliberately left alone.
 A reel configured *after* it started collecting comments would otherwise skip
 everyone who commented first. **Comments from before setup** sweeps them, with a
 dry-run preview showing exactly what would be sent and why each comment was
-skipped. It also runs once automatically the first time a reel goes Live.
+skipped. It only ever runs when you press the button — switching a reel Live
+does not touch the comments it already has.
 
 Comments older than **7 days** are left entirely alone — Instagram refuses the
 DM past that, and posting a public "sent you a DM!" reply that can never be

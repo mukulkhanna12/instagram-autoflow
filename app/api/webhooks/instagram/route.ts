@@ -97,6 +97,13 @@ async function handleCommentChange(accountId: string, value: Record<string, unkn
 
   if (!mediaId || !commentId || !senderIgUserId) return;
 
+  // Only a top-level comment on the reel starts the flow. A reply inside a
+  // thread carries `parent_id` — typically the commenter answering our own
+  // reply — and that thread has already been answered once. Replying again
+  // would stack a second public reply and re-send the greeting DM. The same
+  // person commenting again at the top level is a fresh request and is handled.
+  if (value.parent_id) return;
+
   // Look for an automation for this reel — active or not. An inactive one means
   // the user deliberately turned this reel off, so we leave it alone.
   //
