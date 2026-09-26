@@ -97,11 +97,6 @@ export async function GET(req: NextRequest) {
   const rows = raw.map(toRow);
   const prevRows = prevRaw?.map(toRow) ?? null;
 
-  const activity = [...rows]
-    .sort((a, b) => b.at.getTime() - a.at.getTime())
-    .slice(0, 200)
-    .map((r) => ({ ...r, at: r.at.toISOString(), lastErrorAt: r.lastErrorAt?.toISOString() ?? null }));
-
   return NextResponse.json({
     range,
     selected,
@@ -115,7 +110,6 @@ export async function GET(req: NextRequest) {
     previousAudience: prevRows ? audience(prevRows) : null,
     superfans: superfans(rows),
     failures: failureReasons(rows),
-    activity,
     automations: automations.map(({ _count, ...a }) => ({
       ...a,
       createdAt: a.createdAt.toISOString(),

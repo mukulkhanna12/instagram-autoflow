@@ -28,10 +28,6 @@ interface Reel {
   followSent: number; followClicked: number; detailsSent: number; followsGained: number;
   contacts: number; // all time
 }
-interface ActivityRow {
-  automationId: string; igUserId: string; igUsername: string | null; state: string;
-  at: string; lastError: string | null; lastErrorAt: string | null;
-}
 interface Data {
   range: RangeKey;
   selected: string[]; // empty = every reel
@@ -45,7 +41,6 @@ interface Data {
   previousAudience: { unique: number; returning: number; firstTimers: number } | null;
   superfans: { igUserId: string; igUsername: string | null; reels: number; completed: number; lastAt: string }[];
   failures: { reason: string; count: number }[];
-  activity: ActivityRow[];
   automations: Reel[];
 }
 
@@ -63,7 +58,6 @@ const TABS = [
   { key: "reels", label: "Reels" },
   { key: "compare", label: "Compare" },
   { key: "audience", label: "Audience" },
-  { key: "activity", label: "Activity log" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -187,11 +181,6 @@ function Analytics() {
             )}
           >
             {t.label}
-            {t.key === "activity" && data.summary.failed > 0 && (
-              <span className="ml-2 align-middle text-[11px] font-bold text-red-700 bg-red-50 rounded-full px-1.5 py-0.5">
-                {data.summary.failed}
-              </span>
-            )}
             {tab === t.key && <span className="absolute left-2 right-2 -bottom-px h-[3px] rounded-full bg-brand-700" />}
           </button>
         ))}
@@ -211,7 +200,6 @@ function Analytics() {
           />
         )}
         {tab === "audience" && <Audience data={data} rangeMeta={rangeMeta} />}
-        {tab === "activity" && <Activity data={data} reelsById={reelsById} />}
       </div>
     </div>
   );
@@ -277,7 +265,7 @@ function Overview({
         <Kpi icon={MessageCircle} label="Comments handled" value={s.contacts} prev={p?.contacts} vs={rangeMeta.prev} spark={pts.map((x) => x.contacts)} />
         <Kpi icon={MousePointerClick} label="Tapped the DM" value={`${s.clickRate}%`} raw={s.clickRate} prev={p?.clickRate} vs={rangeMeta.prev} note={`${s.clicked} people`} points />
         <Kpi icon={Sparkles} label="Got the link" value={s.completed} prev={p?.completed} vs={rangeMeta.prev} spark={pts.map((x) => x.completed)} sparkColor={SERIES.completed.color} />
-        <Kpi icon={AlertTriangle} label="Failed DMs" value={s.failed} prev={p?.failed} vs={rangeMeta.prev} invert note={s.failed ? "See the activity log" : "All clear"} />
+        <Kpi icon={AlertTriangle} label="Failed DMs" value={s.failed} prev={p?.failed} vs={rangeMeta.prev} invert note={s.failed ? "Why — see below" : "All clear"} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
@@ -331,6 +319,7 @@ function Overview({
           />
         </Panel>
       </div>
+      <Failures data={data} />
     </div>
   );
 }
@@ -629,160 +618,6 @@ function GateStat({ label, value, note, accent }: { label: string; value: number
   );
 }
 
-// ─── Activity log ─────────────────────────────────────────────────────────────
-
-type StatusFilter = "all" | "completed" | "follow_requested" | "greeted" | "failed";
-
-function Activity({ data, reelsById }: { data: Data; reelsById: Map<string, Reel> }) {
-  const [status, setStatus] = useState<StatusFilter>("all");
-  const [shown, setShown] = useState(25);
-  const all = data.activity.filter((r) => (status === "all" ? true : status === "failed" ? !!r.lastError : r.state === status));
-  const rows = all.slice(0, shown);
-  const counts: Record<StatusFilter, number> = {
-    all: data.activity.length,
-    completed: data.activity.filter((r) => r.state === "completed").length,
-    follow_requested: data.activity.filter((r) => r.state === "follow_requested").length,
-    greeted: data.activity.filter((r) => r.state === "greeted").length,
-    failed: data.activity.filter((r) => r.lastError).length,
-  };
-  const maxFail = Math.max(1, ...data.failures.map((f) => f.count));
-
-  return (
-    <div className="space-y-5">
-      {data.failures.length > 0 && (
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-          <Panel title="Why DMs failed" className="xl:col-span-5">
-            <ul className="space-y-3">
-              {data.failures.map((f) => (
-                <li key={f.reason}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="font-semibold text-gray-800">{f.reason}</span>
-                    <span className="font-bold tabular-nums text-gray-950">{f.count}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-[#f1f2ee] overflow-hidden">
-                    <div className="h-full rounded-full bg-red-400" style={{ width: `${(f.count / maxFail) * 100}%` }} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-          <section className="xl:col-span-7 rounded-3xl bg-amber-50 border border-amber-200 p-6">
-            <p className="font-bold text-amber-900 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" /> What to do about them
-            </p>
-            <ul className="mt-3 space-y-2 text-sm text-amber-900/90 leading-relaxed">
-              <li><strong>Rate limit</strong> — Meta allows 750 first DMs an hour per account. Those people were skipped; a reply to them later still works.</li>
-              <li><strong>Messaging window closed</strong> — Instagram only lets you DM a commenter within 7 days of their comment.</li>
-              <li><strong>Login expired / missing permission</strong> — reconnect Instagram in <Link href="/settings" className="underline font-semibold">Settings</Link>.</li>
-              <li><strong>Person unreachable</strong> — they limited messages or their account is gone. Nothing to fix.</li>
-            </ul>
-          </section>
-        </div>
-      )}
-
-      <section className="rounded-3xl bg-white overflow-hidden">
-        <div className="px-6 pt-6 pb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold text-gray-950">Every conversation</h2>
-            <p className="text-sm text-gray-500 mt-0.5">Newest first{data.activity.length === 200 ? " · latest 200 shown" : ""}.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {(
-              [
-                ["all", "All"],
-                ["completed", "Got the link"],
-                ["follow_requested", "At follow gate"],
-                ["greeted", "DM sent"],
-                ["failed", "Failed"],
-              ] as [StatusFilter, string][]
-            ).map(([k, label]) => (
-              <button
-                key={k}
-                onClick={() => {
-                  setStatus(k);
-                  setShown(25);
-                }}
-                className={cn(
-                  "h-8 px-3 rounded-full text-xs font-semibold border cursor-pointer transition-colors",
-                  status === k ? "bg-gray-950 text-white border-gray-950" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
-                )}
-              >
-                {label} <span className="opacity-60 tabular-nums">{counts[k]}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {rows.length === 0 ? (
-          <div className="py-16 text-center border-t border-gray-100">
-            <MessageCircle className="w-10 h-10 mx-auto text-gray-200" />
-            <p className="font-semibold text-gray-700 mt-3">Nothing here</p>
-            <p className="text-sm text-gray-400 mt-1">Try a longer date range or a different status.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[720px]">
-              <thead>
-                <tr className="bg-[#fafbf8] border-y border-gray-200 text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400">
-                  <th className="px-6 py-3 text-left">Person</th>
-                  <th className="px-3 py-3 text-left">Reel</th>
-                  <th className="px-3 py-3 text-left">Status</th>
-                  <th className="px-6 py-3 text-right">Commented</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {rows.map((r) => {
-                  const reel = reelsById.get(r.automationId);
-                  return (
-                    <tr key={`${r.automationId}:${r.igUserId}`} className="align-top">
-                      <td className="px-6 py-3.5">
-                        <p className="font-semibold text-gray-950">{r.igUsername ? `@${r.igUsername}` : "Instagram user"}</p>
-                        {r.lastError && <p className="text-xs text-red-600 mt-1 max-w-[340px] break-words">{r.lastError}</p>}
-                      </td>
-                      <td className="px-3 py-3.5">
-                        <Link href={`/posts/${r.automationId}`} className="text-gray-600 hover:text-brand-700">
-                          {reel?.postCaption ? truncate(reel.postCaption, 34) : "Untitled reel"}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-3.5">
-                        <StateTag state={r.state} failed={!!r.lastError} />
-                      </td>
-                      <td className="px-6 py-3.5 text-right text-gray-500 whitespace-nowrap" title={new Date(r.at).toLocaleString()}>
-                        {timeAgo(r.at)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {all.length > shown && (
-              <div className="border-t border-gray-100 p-4 text-center">
-                <button
-                  onClick={() => setShown((n) => n + 50)}
-                  className="h-10 px-5 rounded-full border border-gray-300 text-sm font-semibold text-gray-800 hover:border-gray-950 cursor-pointer"
-                >
-                  Show more <span className="text-gray-400 tabular-nums">({all.length - shown} left)</span>
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function StateTag({ state, failed }: { state: string; failed: boolean }) {
-  if (failed) return <span className="text-[11px] font-semibold border rounded-md px-2 py-0.5 text-red-700 bg-red-50 border-red-200">Failed</span>;
-  const map: Record<string, [string, string]> = {
-    completed: ["Got the link", "text-emerald-700 bg-emerald-50 border-emerald-200"],
-    follow_requested: ["At follow gate", "text-amber-700 bg-amber-50 border-amber-200"],
-    greeted: ["DM sent", "text-gray-600 bg-gray-50 border-gray-200"],
-  };
-  const [label, cls] = map[state] ?? [state, "text-gray-600 bg-gray-50 border-gray-200"];
-  return <span className={`text-[11px] font-semibold border rounded-md px-2 py-0.5 whitespace-nowrap ${cls}`}>{label}</span>;
-}
-
 // ─── Small shared bits ────────────────────────────────────────────────────────
 
 function MiniStat({ icon: Icon, label, value, note }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number | string; note?: string }) {
@@ -853,4 +688,45 @@ function timeAgo(iso: string) {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   if (s < 86400 * 7) return `${Math.floor(s / 86400)}d ago`;
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+// ─── Why DMs failed ──────────────────────────────────────────────────────────
+
+/** Shown on Overview only when something failed in the chosen period. */
+function Failures({ data }: { data: Data }) {
+  const maxFail = Math.max(1, ...data.failures.map((f) => f.count));
+  return (
+    <>
+      {data.failures.length > 0 && (
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
+          <Panel title="Why DMs failed" className="xl:col-span-5">
+            <ul className="space-y-3">
+              {data.failures.map((f) => (
+                <li key={f.reason}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-semibold text-gray-800">{f.reason}</span>
+                    <span className="font-bold tabular-nums text-gray-950">{f.count}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-[#f1f2ee] overflow-hidden">
+                    <div className="h-full rounded-full bg-red-400" style={{ width: `${(f.count / maxFail) * 100}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+          <section className="xl:col-span-7 rounded-3xl bg-amber-50 border border-amber-200 p-6">
+            <p className="font-bold text-amber-900 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" /> What to do about them
+            </p>
+            <ul className="mt-3 space-y-2 text-sm text-amber-900/90 leading-relaxed">
+              <li><strong>Rate limit</strong> — Meta allows 750 first DMs an hour per account. Those people were skipped; a reply to them later still works.</li>
+              <li><strong>Messaging window closed</strong> — Instagram only lets you DM a commenter within 7 days of their comment.</li>
+              <li><strong>Login expired / missing permission</strong> — reconnect Instagram in <Link href="/settings" className="underline font-semibold">Settings</Link>.</li>
+              <li><strong>Person unreachable</strong> — they limited messages or their account is gone. Nothing to fix.</li>
+            </ul>
+          </section>
+        </div>
+      )}
+    </>
+  );
 }

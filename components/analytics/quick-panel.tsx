@@ -231,7 +231,7 @@ function Body({ data, rangeMeta, onReel }: { data: Data; rangeMeta: (typeof RANG
               icon={Trophy}
               label="Star reel"
               value={starMeta ? (starMeta.postCaption ? truncate(starMeta.postCaption, 18) : "Untitled reel") : "—"}
-              note={star ? `${star.contacts} comments` : "No activity yet"}
+              note={star ? `${star.contacts} ${star.contacts === 1 ? "person" : "people"}` : "No activity yet"}
               thumb={starMeta?.postThumbnail}
               onClick={star ? () => onReel(star.automationId) : undefined}
             />
@@ -249,14 +249,14 @@ function Body({ data, rangeMeta, onReel }: { data: Data; rangeMeta: (typeof RANG
             icon={Flame}
             label="Peak time"
             value={peak ? `${DAY_NAMES[peak.day]} · ${hourLabel(peak.hour)}` : "—"}
-            note={peak ? `${peak.count} comments` : "No activity yet"}
+            note={peak ? `${peak.count} ${peak.count === 1 ? "person" : "people"}` : "No activity yet"}
           />
           <Highlight
             compact
             icon={CalendarDays}
             label="Busiest day"
             value={busiest ? new Date(busiest.date).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }) : "—"}
-            note={busiest ? `${busiest.contacts} comments` : "No activity yet"}
+            note={busiest ? `${busiest.contacts} ${busiest.contacts === 1 ? "person" : "people"}` : "No activity yet"}
           />
           <Highlight
             compact
