@@ -135,6 +135,17 @@ through a membership with one of two roles (`lib/roles.ts`):
 - **No migration script**: the first time an existing user signs in, they get a
   personal workspace (`ws_<userId>`) as owner and their Instagram account moves in.
 
+## Feedback & ideas
+
+`/feedback` (sidebar → Feedback, or ⌘K) lets anyone send an idea, feedback, a
+bug or anything else (5–2,000 characters, 10 a day), with the page they were on.
+They see everything they've sent with its status: Received → Reviewing →
+Planned → Shipped → **Rewarded 🎁**. The app owner (`ALLOWED_LOGIN_EMAIL`) also
+sees everyone's on the same page, sets the status and adds a note the sender
+sees — e.g. the discount they've earned — and gets an email for each new one.
+Any helpful input can be rewarded — ideas, bug reports, feedback — not only ideas.
+Stored in the `Feedback` table; never deleted.
+
 ## Analytics
 
 The **Analytics** page reports on real conversations for a date range

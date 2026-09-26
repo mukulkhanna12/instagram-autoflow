@@ -42,6 +42,7 @@ model User {
   memberships       Membership[]
   workspacesOwned   Workspace[] @relation("WorkspaceOwner")
   invitesSent       Invite[]    @relation("InviteSender")
+  feedback          Feedback[]
 }
 
 // A shared space that owns one Instagram account and everything hanging off it
@@ -378,4 +379,30 @@ model Conversation {
 
   @@unique([automationId, igUserId])
   @@index([igUserId])
+}
+
+// Ideas, feedback and bug reports sent from the Feedback tab. Reviewed by the
+// app owner (ALLOWED_LOGIN_EMAIL) on /feedback, who moves each one through a
+// status and can note a reward (e.g. a discount) that the sender then sees.
+// Never deleted.
+model Feedback {
+  id          String   @id @default(cuid())
+  userId      String
+  workspaceId String?
+  // idea | feedback | bug | other
+  type        String
+  message     String   @db.Text
+  // The page it was sent from, for context.
+  page        String?
+  // received | reviewing | planned | shipped | rewarded
+  status      String   @default("received")
+  // Shown to the sender, e.g. "20% off Pro — thank you!"
+  reply       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
 }

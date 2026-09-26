@@ -121,6 +121,7 @@ export default function PrivacyPage() {
                 ["Your reels", "Each automated reel's id, link, caption and thumbnail, so you can recognise it in the app"],
                 ["Your automations", "The keywords, replies, messages and links you write, plus counts of messages sent and buttons tapped"],
                 ["Your workspaces and team", "Which workspaces you belong to and your role, and the email addresses you invite — so the right people can get in"],
+                ["Feedback you send", "Your message, its type and the page you sent it from — so we can read it, reply and, if it helps, thank you with a discount"],
               ]}
             />
           </Section>

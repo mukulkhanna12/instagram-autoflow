@@ -75,11 +75,6 @@ const STEPS: Step[] = [
     body: "Jump to any page, playbook or action. Press ⌘K (Ctrl K on Windows) from anywhere.",
   },
   {
-    target: "instagram",
-    title: "Your Instagram account",
-    body: "The account this workspace runs on. A green dot means it's connected and replying.",
-  },
-  {
     target: "dock",
     title: "Stats & Help",
     body: "Quick stats for any reel, and a help assistant with answers from our guides — always one click away on the right.",

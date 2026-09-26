@@ -54,8 +54,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
             Settings → Profile shows straight away rather than at next sign-in. */}
         <Topbar
           user={user ? { name: user.name, email: user.email, image: user.image ?? session.user.image } : session.user}
-          igAccount={igAccount ? { username: igAccount.username, profilePicUrl: igAccount.profilePicUrl } : null}
-          workspace={{ name: ctx.workspace.name, color: ctx.workspace.color }}
         />
         <main className="flex-1 min-w-0 rounded-3xl bg-[#f7f8f5] overflow-auto">
           {pendingInvites.length > 0 && <PendingInvites invites={pendingInvites} />}

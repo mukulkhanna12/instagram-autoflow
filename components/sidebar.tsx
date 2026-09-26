@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, ImageIcon, Workflow,
+  LayoutDashboard, ImageIcon, Workflow, Lightbulb,
   PanelLeftClose, PanelLeftOpen, ShieldCheck, BookMarked, BarChart3, LifeBuoy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ const menu = [
 
 const general = [
   { href: "/help", icon: LifeBuoy, label: "Help" },
+  { href: "/feedback", icon: Lightbulb, label: "Feedback" },
   { href: "/privacy", icon: ShieldCheck, label: "Privacy" },
 ];
 
