@@ -403,3 +403,17 @@ export function summarise(t: Trigger) {
     keywords: [...new Set(sources.flatMap((x) => x.include))].join(", "),
   };
 }
+
+/**
+ * The seeded example automations ("1 · Full flow …") are there to explore the
+ * builder and don't count towards the plan. Stored ones predate any flag, so
+ * they're recognised by their numbered names.
+ */
+export function isSampleTrigger(t: Pick<Trigger, "name">): boolean {
+  return /^\d+ · /.test(t.name);
+}
+
+/** Automations the user has made themselves — what the Free plan counts. */
+export function ownAutomationCount(): number {
+  return loadTriggers().filter((t) => !isSampleTrigger(t)).length;
+}

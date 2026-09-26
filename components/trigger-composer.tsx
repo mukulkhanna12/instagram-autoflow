@@ -18,7 +18,8 @@ import {
   type DmSuggestion,
 } from "@/lib/dm-suggestions";
 import { composeProblems, toNodes, type ComposeState } from "@/lib/trigger-compose";
-import { upsertTrigger, uid, type TriggerReel } from "@/lib/trigger-store";
+import { ownAutomationCount, upsertTrigger, uid, type TriggerReel } from "@/lib/trigger-store";
+import { AUTOMATION_LIMIT_MESSAGE, canAddAutomation } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 /**
@@ -61,6 +62,7 @@ export function TriggerComposer({
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [username, setUsername] = useState("your.account");
   const [keywordDraft, setKeywordDraft] = useState("");
+  const [limitHit, setLimitHit] = useState(false);
   const refs = useRef<Partial<Record<SectionId, HTMLDivElement | null>>>({});
 
   useEffect(() => {
@@ -89,6 +91,10 @@ export function TriggerComposer({
   const problems = composeProblems(s);
 
   function save(status: ComposeState["status"]) {
+    if (!triggerId && !canAddAutomation(ownAutomationCount())) {
+      setLimitHit(true);
+      return;
+    }
     const id = triggerId ?? uid("tg");
     upsertTrigger({ id, name: s.name.trim() || "Untitled automation", status, updatedAt: Date.now(), nodes: toNodes(s) });
     setS((prev) => ({ ...prev, status }));
@@ -389,6 +395,12 @@ export function TriggerComposer({
             </Section>
           ))}
 
+          {limitHit && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              <p className="font-bold mb-1">Free plan limit</p>
+              <p>{AUTOMATION_LIMIT_MESSAGE} <Link href="/pricing" className="underline font-semibold">See plans</Link></p>
+            </div>
+          )}
           {problems.length > 0 && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               <p className="font-bold mb-1">Before it can go live</p>

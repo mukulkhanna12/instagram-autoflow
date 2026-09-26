@@ -4,6 +4,7 @@ import { db, dbUnfiltered } from "@/lib/db";
 import { z } from "zod";
 import { buildStats, type StateCounts } from "@/lib/analytics";
 import { getReelDefaults } from "@/lib/reel-defaults";
+import { REEL_LIMIT_MESSAGE, canAddReel } from "@/lib/plans";
 import { getWorkspaceContext } from "@/lib/workspace";
 
 const createSchema = z.object({
@@ -81,6 +82,14 @@ export async function POST(req: NextRequest) {
     select: { isDeleted: true },
   });
   const reviving = existing?.isDeleted === true;
+
+  // A reel that doesn't have a live automation yet counts against the plan.
+  if (!existing || reviving) {
+    const live = await db.postAutomation.count({ where: { igAccountId: igAccount.id } });
+    if (!canAddReel(live)) {
+      return NextResponse.json({ error: REEL_LIMIT_MESSAGE, reason: "plan_limit" }, { status: 403 });
+    }
+  }
 
   // `_count` matters: the reels grid drops this straight into the list it
   // renders, and reads `_count.conversations` on every card. Returning a bare

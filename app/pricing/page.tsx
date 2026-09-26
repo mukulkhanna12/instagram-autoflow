@@ -3,6 +3,8 @@ import { ArrowRight, Check, Clock, Minus, ShieldCheck, Sparkles } from "lucide-r
 import { SiteHeader } from "@/components/landing/site-header";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { PLAYBOOKS } from "@/lib/playbooks";
+import { FREE_PLAN } from "@/lib/plans";
+import { CurrencySwitch, Price } from "@/components/landing/price-tag";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
@@ -19,7 +21,9 @@ export const metadata = {
 
 const FREE = [
   "1 Instagram account",
-  "Unlimited reels and automations",
+  `${FREE_PLAN.reels} reels with automations`,
+  `${FREE_PLAN.automations} automation on the Automations page`,
+  "Every feature — nothing held back",
   `All ${PLAYBOOKS.length} ready-made Playbooks`,
   "Keyword triggers and public replies",
   "Follow gate — links unlock for followers",
@@ -43,7 +47,8 @@ const COMPARE: Array<{ group: string; rows: Array<[string, Cell, Cell]> }> = [
     group: "Automations",
     rows: [
       ["Instagram accounts", "1", "More"],
-      ["Reels with automations", "Unlimited", "Unlimited"],
+      ["Reels with automations", String(FREE_PLAN.reels), "More"],
+      ["Automations (Automations page)", String(FREE_PLAN.automations), "More"],
       ["Ready-made Playbooks", String(PLAYBOOKS.length), String(PLAYBOOKS.length)],
       ["Keyword filter + public reply variants", true, true],
       ["Follow gate", true, true],
@@ -70,6 +75,10 @@ const COMPARE: Array<{ group: string; rows: Array<[string, Cell, Cell]> }> = [
 ];
 
 const FAQ = [
+  {
+    q: "What's included in Free?",
+    a: `Every feature — playbooks, keyword triggers, the follow gate, analytics, prepared flows for your next reel — on ${FREE_PLAN.reels} reels, plus ${FREE_PLAN.automations} automation on the Automations page. Pro will lift those limits.`,
+  },
   {
     q: "Is the Free plan really free?",
     a: "Yes — no card, no trial clock. It includes everything the app does today. New accounts are approved by hand while we grow, so there may be a short wait after you sign up.",
@@ -101,9 +110,13 @@ export default function PricingPage() {
           Start free. <span className="bg-lime px-2 rounded-lg">Grow</span> when you&apos;re ready.
         </h1>
         <p className="mt-5 text-lg text-gray-600 max-w-2xl mx-auto">
-          Everything AutoFlow does today is free. Pro adds more accounts and new ways to start a conversation.
+          Every feature, free, on up to 3 reels. Pro will add more reels, more accounts and new ways to start a conversation.
         </p>
       </section>
+
+      <div className="flex justify-center mb-8 px-5">
+        <CurrencySwitch />
+      </div>
 
       {/* Plans */}
       <section className="max-w-4xl mx-auto px-5 grid md:grid-cols-2 gap-5">
@@ -111,7 +124,7 @@ export default function PricingPage() {
           <span className="absolute top-6 right-6 rounded-full bg-lime text-gray-950 text-xs font-extrabold px-3 py-1">Available now</span>
           <p className="text-lg font-bold">Free</p>
           <p className="mt-4 flex items-end gap-1.5">
-            <span className="text-6xl font-extrabold tracking-tight">$0</span>
+            <Price inr={0} usd={0} className="text-6xl font-extrabold tracking-tight" />
             <span className="text-white/60 mb-2">/ month</span>
           </p>
           <p className="mt-2 text-sm text-white/60">No card needed.</p>

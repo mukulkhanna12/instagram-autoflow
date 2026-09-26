@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { registerOrGetAccess, createLoginCode, resendWaitSeconds, RESEND_COOLDOWN_SEC } from "@/lib/otp";
-import { LIMITS, clientIp, rateLimit } from "@/lib/rate-limit";
 import { sendEmail, otpEmail } from "@/lib/email";
 
 const schema = z.object({
@@ -29,15 +28,6 @@ export async function POST(req: NextRequest) {
   // A filled honeypot is a bot. Answer like a normal pending sign-up so it
   // learns nothing — and do nothing at all.
   if (website) return NextResponse.json({ ok: true, status: "pending" });
-
-  // Per-device limit, so one bot can't burn through sign-ups or codes.
-  const limited = await rateLimit(LIMITS.otpRequest, clientIp(req.headers));
-  if (!limited.ok) {
-    return NextResponse.json(
-      { error: `Too many attempts from this device. Try again in ${Math.ceil(limited.retryAfterSec / 60)} min.` },
-      { status: 429, headers: { "Retry-After": String(limited.retryAfterSec) } }
-    );
-  }
 
   // Registers the address on first sight. Anyone may sign up; only an approved
   // account is sent a code, so nothing is emailed while they're pending.

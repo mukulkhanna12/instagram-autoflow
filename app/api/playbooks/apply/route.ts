@@ -4,6 +4,7 @@ import { db, dbUnfiltered } from "@/lib/db";
 import { z } from "zod";
 import { MAX_BUTTONS } from "@/lib/buttons";
 import { findPlaybook, playbookFields } from "@/lib/playbooks";
+import { REEL_LIMIT_MESSAGE, canAddReel } from "@/lib/plans";
 import { getWorkspaceContext } from "@/lib/workspace";
 
 const bodySchema = z.object({
@@ -74,6 +75,14 @@ export async function POST(req: NextRequest) {
     select: { isDeleted: true },
   });
   const hasLive = existing && !existing.isDeleted;
+
+  // A reel without a live automation counts against the plan.
+  if (!hasLive) {
+    const live = await db.postAutomation.count({ where: { igAccountId: igAccount.id } });
+    if (!canAddReel(live)) {
+      return NextResponse.json({ error: REEL_LIMIT_MESSAGE, reason: "plan_limit" }, { status: 403 });
+    }
+  }
 
   // Never overwrite a reel's wording without being asked to.
   if (hasLive && !replace) {

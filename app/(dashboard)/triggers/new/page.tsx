@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhonePreview } from "@/components/phone-preview";
 import { ReelStrip, ReelPickerModal } from "@/components/reel-picker";
+import { AUTOMATION_LIMIT_MESSAGE, canAddAutomation } from "@/lib/plans";
 import {
-  upsertTrigger, uid, commentSource, loadDefaults, DEFAULT_COMMENT_REPLIES,
+  upsertTrigger, uid, commentSource, loadDefaults, DEFAULT_COMMENT_REPLIES, ownAutomationCount,
   type Trigger, type FlowNode, type TriggerReel,
 } from "@/lib/trigger-store";
 
@@ -93,6 +94,10 @@ export default function NewTriggerPage() {
   }
 
   function save() {
+    if (!canAddAutomation(ownAutomationCount())) {
+      alert(AUTOMATION_LIMIT_MESSAGE);
+      return;
+    }
     setSaving(true);
     const t: Trigger = {
       id: uid("tg"), name: name.trim() || "Untitled automation",

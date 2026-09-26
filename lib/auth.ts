@@ -7,7 +7,6 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "./db";
 import { isApprovedEmail, normalizeEmail, registerOrGetAccess, verifyLoginCode } from "./otp";
 import { facebookConfig, googleConfig } from "./social-auth";
-import { LIMITS, clientIp, rateLimit } from "./rate-limit";
 
 /** How often a signed-in session re-confirms the user is still approved. */
 const APPROVAL_RECHECK_MS = 5 * 60 * 1000;
@@ -39,11 +38,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // The login page collects the email, requests a code (/api/auth/otp), then
       // submits email + code here. We re-check approval and verify the code.
       credentials: { email: {}, code: {} },
-      authorize: async (creds, request) => {
-        // Per-device cap on code guesses, on top of each code's own 5 tries.
-        const limited = await rateLimit(LIMITS.otpVerify, clientIp(request.headers));
-        if (!limited.ok) return null;
-
+      authorize: async (creds) => {
         const email = typeof creds?.email === "string" ? normalizeEmail(creds.email) : "";
         const code = typeof creds?.code === "string" ? creds.code : "";
         if (!email || !code) return null;

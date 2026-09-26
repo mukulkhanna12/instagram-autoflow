@@ -5,8 +5,10 @@ import Link from "next/link";
 import { UpcomingReels } from "@/components/automations/upcoming-reels";
 import Image from "next/image";
 import { Plus, Workflow, MessageCircle, Play, Info, Sliders, Send } from "lucide-react";
-import { loadTriggers, deleteTrigger, upsertTrigger, summarise, type Trigger, type FlowNode } from "@/lib/trigger-store";
+import { loadTriggers, deleteTrigger, upsertTrigger, summarise, ownAutomationCount, type Trigger, type FlowNode } from "@/lib/trigger-store";
 import { fromTrigger } from "@/lib/trigger-compose";
+import { AUTOMATION_LIMIT_MESSAGE, canAddAutomation } from "@/lib/plans";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { truncate } from "@/lib/utils";
 import { PageHeader, headerButton } from "@/components/ui/page-header";
 import { PauseResumeButton, RowMenu, StatusPill, TableFrame } from "@/components/dashboard/row-menu";
@@ -39,7 +41,21 @@ function TriggersListPage() {
 
   // Creating goes to the one-page editor; the step-by-step form stays one
   // click away while both are being tried out.
-  const create = () => router.push("/triggers/compose");
+  const ask = useConfirm();
+  const create = async () => {
+    if (!canAddAutomation(ownAutomationCount())) {
+      const see = await ask({
+        title: "You've used your free automation",
+        body: AUTOMATION_LIMIT_MESSAGE,
+        confirmLabel: "See plans",
+        cancelLabel: "OK",
+        icon: "warning",
+      });
+      if (see) router.push("/pricing");
+      return;
+    }
+    router.push("/triggers/compose");
+  };
 
   // Open in the one-page editor when it can show the whole flow; branched
   // flows only fit on the canvas.

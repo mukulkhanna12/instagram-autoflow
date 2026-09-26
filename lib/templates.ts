@@ -1,5 +1,6 @@
 import type { QueuedFlow } from "@prisma/client";
 import { db } from "./db";
+import { canAddReel } from "./plans";
 import type { IgMedia } from "./instagram";
 
 // The message fields a queued flow shares with a per-reel automation.
@@ -79,6 +80,12 @@ export async function attachNextQueuedFlow(
       include: { igAccount: true },
     });
     if (existing) return null;
+
+    // Plan limit: at the cap, the flow stays queued rather than attaching.
+    const live = await tx.postAutomation.count({
+      where: { igAccountId, isDeleted: false },
+    });
+    if (!canAddReel(live)) return null;
 
     const next = await tx.queuedFlow.findFirst({
       where: { igAccountId },

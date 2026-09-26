@@ -1,6 +1,8 @@
 /**
- * Rate limiting by IP address, for the endpoints bots go for: requesting and
- * checking login codes, and joining from an invite link.
+ * Rate limiting by IP address for joining from an invite link. Login is never
+ * limited per device — people on one shared network look like one device —
+ * it relies on the 60-second resend timer, per-code guess limits and a
+ * honeypot instead.
  *
  * Fixed windows, stored in the database (serverless instances share nothing in
  * memory). One row per action + IP; when its window has passed the same row is
@@ -17,8 +19,6 @@ export interface Limit {
 }
 
 export const LIMITS = {
-  otpRequest: { action: "otp-request", max: 8, windowMs: 10 * 60 * 1000 },
-  otpVerify: { action: "otp-verify", max: 20, windowMs: 10 * 60 * 1000 },
   inviteJoin: { action: "invite-join", max: 15, windowMs: 10 * 60 * 1000 },
 } satisfies Record<string, Limit>;
 
