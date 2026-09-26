@@ -54,7 +54,7 @@ you on a page:
 | Card | Goes to |
 |---|---|
 | DM on a posted reel | **Reels** — pick the reel, then Configure |
-| DM on your next reel | **Upcoming reels** — prepare a flow for the queue |
+| DM on your next reel | **Automations → Upcoming reels** — prepare a flow for the queue |
 | Start from a playbook | **Playbooks** |
 | Popular playbooks (chips) | That playbook's setup dialog, straight away |
 
@@ -76,7 +76,7 @@ link and its button label, and where it runs:
 - **A posted reel** — creates that reel's automation *switched off* and opens its
   editor, so you review it and go Live there. A reel that already has one is
   only overwritten after a confirm, and keeps its stats and Live switch.
-- **My next reel** — adds it to the back of the Upcoming reels queue.
+- **My next reel** — adds it to the back of the Upcoming reels queue (Automations → Upcoming reels).
 
 `POST /api/playbooks/apply` does both. Each playbook has its own link
 (`/playbooks?playbook=<id>`) that opens its setup dialog directly. Keywords are
@@ -190,7 +190,7 @@ of the repo.
 
 ## Flows for reels you haven't posted yet
 
-The **Upcoming reels** page holds an ordered queue of prepared flows. When a new
+The **Upcoming reels** tab on the Automations page (`/triggers?tab=upcoming`; the old `/queue` address redirects there) holds an ordered queue of prepared flows. When a new
 reel appears, the flow at the front is copied onto it and **used up**:
 
 ```
@@ -336,7 +336,6 @@ app/
       new/            step-by-step form
       [id]/           canvas;  [id]/compose — one-page edit
       defaults/       default wording for new flows
-    queue/            Upcoming reels — flows for reels not yet posted
     settings/         connect / disconnect Instagram
   api/
     auth/otp/         request a login code

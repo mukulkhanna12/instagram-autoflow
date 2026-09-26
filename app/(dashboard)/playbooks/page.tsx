@@ -251,7 +251,7 @@ function UsePlaybook({ p, onClose }: { p: Playbook; onClose: () => void }) {
       setError(typeof data.error === "string" ? data.error : "Couldn't save that — check the link and try again.");
       return;
     }
-    router.push(where === "queue" ? "/queue" : `/posts/${data.automation.id}`);
+    router.push(where === "queue" ? "/triggers?tab=upcoming" : `/posts/${data.automation.id}`);
   }
 
   const steps = [

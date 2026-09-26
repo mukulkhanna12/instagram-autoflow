@@ -33,16 +33,16 @@ const nav = (id: string, label: string, href: string, icon: Cmd["icon"], keyword
 
 const COMMANDS: Cmd[] = [
   nav("dashboard", "Dashboard", "/dashboard", LayoutDashboard, "home overview"),
+  nav("automations", "Automations", "/triggers", Workflow, "flows triggers builder"),
   nav("analytics", "Analytics", "/analytics", BarChart3, "stats insights numbers"),
   nav("reels", "Reels", "/posts", ImageIcon, "posts automations"),
   nav("playbooks", "Playbooks", "/playbooks", BookMarked, "templates"),
-  nav("automations", "Automations", "/triggers", Workflow, "flows triggers builder"),
-  nav("queue", "Upcoming reels", "/queue", Wand2, "queue next reel prepared"),
+  nav("queue", "Upcoming reels", "/triggers?tab=upcoming", Wand2, "queue next reel prepared automations"),
   nav("settings", "Settings", "/settings", Settings, "instagram connect profile"),
   nav("privacy", "Privacy", "/privacy", ShieldCheck, "policy"),
   nav("help", "Help center", "/help", LifeBuoy, "support docs faq assistant"),
   { id: "new-flow", group: "Create", label: "New automation", icon: Plus, keywords: "flow trigger", run: (go) => go("/triggers/compose") },
-  { id: "new-queue", group: "Create", label: "Prepare your next reel", icon: Plus, keywords: "queue upcoming", run: (go) => go("/queue") },
+  { id: "new-queue", group: "Create", label: "Prepare your next reel", icon: Plus, keywords: "queue upcoming", run: (go) => go("/triggers?tab=upcoming") },
   { id: "reel-auto", group: "Create", label: "Automate a posted reel", icon: Plus, keywords: "configure reel", run: (go) => go("/posts") },
   ...PLAYBOOKS.map((p): Cmd => ({
     id: `pb-${p.id}`, group: "Playbooks", label: p.title, emoji: p.emoji,

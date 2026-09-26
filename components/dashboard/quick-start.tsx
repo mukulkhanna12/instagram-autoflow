@@ -80,7 +80,7 @@ export function QuickStartModal({
               title="Prepare for your next reel"
               body="Write the flow now → it switches on when your next reel gets its first comment."
               cta="Or try this"
-              onClick={() => go("/queue")}
+              onClick={() => go("/triggers?tab=upcoming")}
             >
               <div className="flex items-center gap-3 rounded-2xl bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] px-4 py-3">
                 <span className="w-11 h-11 rounded-xl bg-gradient-to-br from-brand-600 to-brand-900 flex items-center justify-center shrink-0">

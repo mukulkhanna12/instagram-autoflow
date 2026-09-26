@@ -14,7 +14,6 @@ import {
   type DetailsButton,
 } from "@/components/flow-fields";
 import { QueueSkeleton } from "@/components/skeletons";
-import { PageHeader } from "@/components/ui/page-header";
 
 interface Flow {
   id: string;
@@ -44,7 +43,13 @@ const FIELDS = [
   "detailsMessage", "detailsButtonEnabled", "detailsButtons", "detailsButtonText", "detailsUrl",
 ] as const;
 
-export default function QueuePage() {
+/**
+ * Upcoming reels — flows prepared for reels you haven't posted yet. Lives as a
+ * tab on the Automations page (it used to be its own page at /queue, which now
+ * redirects here). Unlike the rest of that page this is live: each flow really
+ * attaches to your next reel on its first comment.
+ */
+export function UpcomingReels() {
   const [flows, setFlows] = useState<Flow[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -120,12 +125,12 @@ export default function QueuePage() {
   }
 
   if (loading) {
-    return <QueueSkeleton />;
+    return <QueueSkeleton embedded />;
   }
 
   if (noAccount || !flows) {
     return (
-      <div className="p-8 max-w-3xl">
+      <div className="max-w-3xl">
         <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-5">
           <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
           <div>
@@ -140,17 +145,18 @@ export default function QueuePage() {
   }
 
   return (
-    <div className="p-8 max-w-3xl">
-      <PageHeader
-        className="mb-2"
-        title="Upcoming reels"
-        subtitle="Flows waiting for your next reels. Each one attaches to a single upcoming reel, then it's used up."
-        actions={
-          <Button size="sm" onClick={addFlow} loading={saving && !openId}>
-            <Plus className="w-4 h-4" /> Add flow
-          </Button>
-        }
-      />
+    <div className="max-w-3xl">
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-gray-950">Upcoming reels</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Flows waiting for your next reels. Each one attaches to a single upcoming reel on its first comment, then it&apos;s used up.
+          </p>
+        </div>
+        <Button size="sm" onClick={addFlow} loading={saving && !openId}>
+          <Plus className="w-4 h-4" /> Add flow
+        </Button>
+      </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 my-5">
         <p className="text-sm text-gray-600">

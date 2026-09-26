@@ -220,10 +220,11 @@ export function FormPageSkeleton({ label = "Loading" }: { label?: string }) {
 }
 
 /** Upcoming reels: an ordered list of prepared flows. */
-export function QueueSkeleton() {
+/** `embedded`: inside the Automations tab, which has its own page heading and padding. */
+export function QueueSkeleton({ embedded = false }: { embedded?: boolean } = {}) {
   return (
-    <Loading label="Loading your upcoming reels" className="p-8 max-w-4xl space-y-6">
-      <Heading />
+    <Loading label="Loading your upcoming reels" className={embedded ? "max-w-3xl space-y-6" : "p-8 max-w-4xl space-y-6"}>
+      {!embedded && <Heading />}
       <div className="space-y-3">
         {[0, 1, 2].map((i) => (
           <div key={i} className="rounded-xl bg-white border border-gray-100 p-4 flex items-center gap-4">

@@ -179,7 +179,7 @@ function Dashboard() {
         subtitle="Turn every comment into a conversation — automatically."
         actions={
           <>
-            <Link href="/queue" className={headerButton.secondary}>Prepare next reel</Link>
+            <Link href="/triggers?tab=upcoming" className={headerButton.secondary}>Prepare next reel</Link>
             <NewAutomationButton className={headerButton.primary}>
               <Plus className="w-4 h-4" /> New automation
             </NewAutomationButton>
@@ -240,7 +240,7 @@ function Dashboard() {
             </>
           )}
           <Link
-            href="/queue"
+            href="/triggers?tab=upcoming"
             className="mt-auto pt-6"
           >
             <span className="flex items-center justify-center gap-2 h-12 rounded-full bg-brand-700 text-white font-bold hover:bg-brand-800 transition-colors">

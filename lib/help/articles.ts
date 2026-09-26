@@ -300,11 +300,11 @@ export const ARTICLES: Article[] = [
     slug: "upcoming-reels",
     category: "building-flows",
     title: "Prepare a flow before you post",
-    summary: "Queue flows under Upcoming reels and they attach to your next posts.",
+    summary: "Queue flows under Automations → Upcoming reels and they attach to your next posts.",
     keywords: ["upcoming", "queue", "prepared", "next reel", "schedule", "before posting", "attach", "auto", "not posted yet", "wand"],
     popular: true,
     body: [
-      { p: "Write a flow before the reel exists, so it's ready the moment people start commenting. [Upcoming reels](/queue) holds an ordered list of prepared flows." },
+      { p: "Write a flow before the reel exists, so it's ready the moment people start commenting. [Automations → Upcoming reels](/triggers?tab=upcoming) holds an ordered list of prepared flows." },
       { h: "How the queue is used" },
       {
         list: [

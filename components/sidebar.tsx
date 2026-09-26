@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, ImageIcon, Settings, Wand2, Workflow,
+  LayoutDashboard, ImageIcon, Settings, Workflow,
   PanelLeftClose, PanelLeftOpen, ShieldCheck, BookMarked, BarChart3, LifeBuoy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,11 +22,10 @@ interface SidebarProps {
 
 const menu = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/triggers", icon: Workflow, label: "Automations" },
   { href: "/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/posts", icon: ImageIcon, label: "Reels" },
   { href: "/playbooks", icon: BookMarked, label: "Playbooks" },
-  { href: "/triggers", icon: Workflow, label: "Automations" },
-  { href: "/queue", icon: Wand2, label: "Upcoming reels" },
 ];
 
 const general = [

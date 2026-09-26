@@ -50,6 +50,11 @@ const STEPS: Step[] = [
     body: "Your home: people reached, messages sent, new follows, and every automation with a pause button.",
   },
   {
+    target: "nav-triggers",
+    title: "Automations",
+    body: "Build a complete automation — reel, keyword and every message — with a live phone preview. The Upcoming reels tab here holds flows for reels you haven't posted yet.",
+  },
+  {
     target: "nav-analytics",
     title: "Analytics",
     body: "Go deeper: trends over time, your best reels, when people comment, and why any message failed.",
@@ -63,11 +68,6 @@ const STEPS: Step[] = [
     target: "nav-playbooks",
     title: "Playbooks",
     body: "Ready-made automations with every message written. Choose one, paste your link, pick the reel — done.",
-  },
-  {
-    target: "nav-queue",
-    title: "Upcoming reels",
-    body: "Write a flow before you post. It switches on by itself when your next reel gets its first comment.",
   },
   {
     target: "search",

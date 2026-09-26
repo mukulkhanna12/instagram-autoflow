@@ -100,7 +100,7 @@ export function NewAutomationModal({ open, onClose }: { open: boolean; onClose: 
                 title="DM on your next reel"
                 body="Write it now — it switches on with the next reel's first comment."
                 tint="bg-brand-50"
-                onClick={() => go("/queue")}
+                onClick={() => go("/triggers?tab=upcoming")}
                 art={
                   <div className="flex items-center gap-2">
                     <span className="w-14 h-20 rounded-xl bg-gradient-to-br from-brand-600 to-brand-900 flex items-center justify-center shadow-sm">

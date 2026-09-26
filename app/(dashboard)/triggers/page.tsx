@@ -1,6 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { UpcomingReels } from "@/components/automations/upcoming-reels";
 import Image from "next/image";
 import { Plus, Workflow, MessageCircle, Play, Info, Sliders, Send } from "lucide-react";
 import { loadTriggers, deleteTrigger, upsertTrigger, summarise, type Trigger, type FlowNode } from "@/lib/trigger-store";
@@ -17,7 +19,19 @@ import { PauseResumeButton, RowMenu, StatusPill, TableFrame } from "@/components
  * DMs / Clicks / CTR stay "—": triggers are still a design preview saved in
  * this browser, and nothing sends from them yet.
  */
-export default function TriggersListPage() {
+type Tab = "automations" | "upcoming";
+
+export default function TriggersPage() {
+  return (
+    <Suspense fallback={null}>
+      <TriggersListPage />
+    </Suspense>
+  );
+}
+
+function TriggersListPage() {
+  const params = useSearchParams();
+  const tab: Tab = params.get("tab") === "upcoming" ? "upcoming" : "automations";
   const router = useRouter();
   const [triggers, setTriggers] = useState<Trigger[] | null>(null);
 
@@ -50,7 +64,7 @@ export default function TriggersListPage() {
         title="Automations"
         subtitle="Build an automation once, then point it at a reel."
         actions={
-          <>
+          tab === "upcoming" ? undefined : <>
           <button
             onClick={() => router.push("/triggers/defaults")}
             className={headerButton.secondary}
@@ -73,6 +87,27 @@ export default function TriggersListPage() {
         }
       />
 
+      <nav className="mt-5 flex gap-1 border-b border-gray-200" aria-label="Automations sections">
+        {([
+          ["automations", "Automations", "/triggers"],
+          ["upcoming", "Upcoming reels", "/triggers?tab=upcoming"],
+        ] as const).map(([id, label, href]) => (
+          <Link
+            key={id}
+            href={href}
+            scroll={false}
+            aria-current={tab === id ? "page" : undefined}
+            className={`relative px-4 h-11 inline-flex items-center text-sm font-semibold ${tab === id ? "text-gray-950" : "text-gray-500 hover:text-gray-900"}`}
+          >
+            {label}
+            {tab === id && <span className="absolute left-3 right-3 -bottom-px h-0.5 rounded-full bg-brand-700" />}
+          </Link>
+        ))}
+      </nav>
+
+      {tab === "upcoming" && <div className="mt-6"><UpcomingReels /></div>}
+
+      {tab === "automations" && (<>
       <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-100 rounded-2xl p-4 mt-6">
         <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
         <p className="text-sm text-amber-900">
@@ -146,6 +181,7 @@ export default function TriggersListPage() {
           })}
         </TableFrame>
       )}
+      </>)}
     </div>
   );
 }

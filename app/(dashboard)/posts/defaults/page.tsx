@@ -132,7 +132,7 @@ export default function ReelDefaultsPage() {
         <Info className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
         <p className="text-xs text-gray-600">
           Used when you hit <strong>Configure</strong> on a reel, and for new{" "}
-          <Link href="/queue" className="underline">prepared flows</Link>. Reels that already have an
+          <Link href="/triggers?tab=upcoming" className="underline">prepared flows</Link>. Reels that already have an
           automation keep the wording you gave them, and a prepared flow still wins for the reel it
           was written for.
         </p>

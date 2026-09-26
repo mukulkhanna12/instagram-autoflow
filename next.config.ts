@@ -21,6 +21,10 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Upcoming reels moved into Automations as a tab; keep old links working.
+  async redirects() {
+    return [{ source: "/queue", destination: "/triggers?tab=upcoming", permanent: false }];
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**.cdninstagram.com" },
