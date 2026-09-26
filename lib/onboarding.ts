@@ -47,6 +47,22 @@ export function needsOnboarding(user: { onboardedAt: Date | null }, hasInstagram
   return !user.onboardedAt && !hasInstagram;
 }
 
+/**
+ * Should the app send this person to onboarding before anything else?
+ *
+ * Only a brand-new user: the owner of their one and only workspace, who hasn't
+ * done the survey or connected Instagram. Anyone in more than one workspace —
+ * someone who joined a team, or made a second workspace — is already using the
+ * app, and forcing them back to "connect Instagram" for an empty workspace
+ * would leave them stuck there.
+ */
+export function shouldForceOnboarding(
+  user: { onboardedAt: Date | null },
+  ws: { hasInstagram: boolean; role: "owner" | "member"; workspaceCount: number }
+): boolean {
+  return ws.role === "owner" && ws.workspaceCount === 1 && needsOnboarding(user, ws.hasInstagram);
+}
+
 /** Strip a pasted "@name", a profile URL, or stray whitespace down to the handle. */
 export function normalizeUsername(input: string): string {
   let v = input.trim();

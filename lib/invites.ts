@@ -196,6 +196,11 @@ export async function acceptInvite(
       where: { id: user.id, isApproved: false },
       data: { isApproved: true, approvedAt: now },
     }),
+    // Joining a team replaces the first-run survey: don't send them there later.
+    dbUnfiltered.user.updateMany({
+      where: { id: user.id, onboardedAt: null },
+      data: { onboardedAt: now },
+    }),
   ]);
   return { ok: true, workspaceId: inv.workspaceId };
 }
