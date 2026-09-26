@@ -59,6 +59,15 @@ const config: Config = {
         shimmer: {
           "100%": { transform: "translateX(100%)" },
         },
+        shake: {
+          "0%, 100%": { transform: "translateX(0)" },
+          "20%, 60%": { transform: "translateX(-6px)" },
+          "40%, 80%": { transform: "translateX(6px)" },
+        },
+        pop: {
+          from: { opacity: "0", transform: "translateY(8px) scale(0.96)" },
+          to: { opacity: "1", transform: "none" },
+        },
         "fade-in": {
           from: { opacity: "0" },
         },
@@ -70,6 +79,8 @@ const config: Config = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         shimmer: "shimmer 1.5s infinite",
+        pop: "pop 0.35s ease-out",
+        shake: "shake 0.4s ease-in-out",
         "fade-in": "fade-in 0.2s ease-out",
         "slide-in-right": "slide-in-right 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
       },

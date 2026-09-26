@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { ArrowLeft, Clock, Mail } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Check, Clock, Mail, Sparkles } from "lucide-react";
+import { emailProblem, emailSuggestion, isValidEmail } from "@/lib/email-check";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FacebookIcon, GoogleIcon, Logo } from "@/components/brand";
@@ -55,6 +57,25 @@ export function LoginForm({
   const oauthError = initialError
     ? OAUTH_ERRORS[initialError] ?? "Couldn't sign you in. Please try again."
     : null;
+
+  // Friendly email checking: a tick and a livelier button once it looks right,
+  // a "did you mean" for typos, and a plain-words message (with a shake) on submit.
+  const emailOk = isValidEmail(email);
+  const suggestion = emailSuggestion(email);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [shake, setShake] = useState(false);
+
+  function submitEmail(e: React.FormEvent) {
+    e.preventDefault();
+    const problem = emailProblem(email);
+    if (problem) {
+      setEmailError(problem);
+      setShake(true);
+      setTimeout(() => setShake(false), 450);
+      return;
+    }
+    requestCode();
+  }
 
   async function requestCode(e?: React.FormEvent) {
     e?.preventDefault();
@@ -215,7 +236,7 @@ export function LoginForm({
                 <span className="h-px flex-1 bg-gray-200" /> or use email <span className="h-px flex-1 bg-gray-200" />
               </div>
 
-              <form onSubmit={requestCode} className="space-y-3">
+              <form onSubmit={submitEmail} noValidate className="space-y-3">
                 {/* Honeypot: invisible to people, tempting to bots. */}
                 <input
                   type="text"
@@ -227,19 +248,58 @@ export function LoginForm({
                   onChange={(e) => setHoneypot(e.target.value)}
                   className="absolute -left-[9999px] w-px h-px opacity-0"
                 />
-                <Input
-                  aria-label="Email address"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  error={error ?? undefined}
-                  className="h-14 rounded-2xl px-5 text-base"
-                />
-                <Button type="submit" variant="dark" className="w-full h-14 text-base" loading={loading}>
+                <div className={cn("relative", shake && "animate-shake")}>
+                  <input
+                    aria-label="Email address"
+                    aria-invalid={!!emailError}
+                    aria-describedby="email-help"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setEmailError(null); setError(null); }}
+                    onBlur={() => { if (email.trim() && !emailOk) setEmailError(emailProblem(email)); }}
+                    className={cn(
+                      "w-full h-14 rounded-2xl border bg-white pl-5 pr-12 text-base text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:ring-2",
+                      emailError ? "border-red-300 focus:ring-red-400" : emailOk ? "border-brand-400 focus:ring-brand-500" : "border-gray-200 focus:ring-brand-500"
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center transition-all duration-300",
+                      emailOk ? "opacity-100 scale-100" : "opacity-0 scale-50"
+                    )}
+                    aria-hidden
+                  >
+                    <Check className="w-3.5 h-3.5" strokeWidth={3} />
+                  </span>
+                </div>
+                <div id="email-help" aria-live="polite" className="min-h-[1.25rem] -mt-1 px-1 text-sm">
+                  {emailError || error ? (
+                    <p className="text-red-600 flex items-center gap-1.5"><AlertCircle className="w-4 h-4 shrink-0" /> {emailError ?? error}</p>
+                  ) : suggestion ? (
+                    <p className="text-gray-600">
+                      Did you mean{" "}
+                      <button type="button" onClick={() => setEmail(suggestion)} className="font-bold text-brand-700 underline underline-offset-2 cursor-pointer">
+                        {suggestion}
+                      </button>
+                      ?
+                    </p>
+                  ) : emailOk ? (
+                    <p className="text-brand-700 flex items-center gap-1.5"><Sparkles className="w-4 h-4" /> Looks good — we&apos;ll email you a code.</p>
+                  ) : null}
+                </div>
+                <Button
+                  type="submit"
+                  variant="dark"
+                  className={cn(
+                    "group w-full h-14 text-base transition-all duration-300",
+                    emailOk && "shadow-[0_0_0_4px_rgba(220,251,75,0.55)] bg-brand-900 hover:bg-brand-900"
+                  )}
+                  loading={loading}
+                >
                   <Mail className="w-4 h-4" /> Email me a login code
+                  <ArrowRight className={cn("w-4 h-4 transition-all duration-300", emailOk ? "opacity-100 translate-x-0 group-hover:translate-x-1" : "opacity-0 -translate-x-2 w-0")} />
                 </Button>
               </form>
             </div>
