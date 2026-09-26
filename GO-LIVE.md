@@ -97,6 +97,8 @@ Set the Meta env vars in Vercel and **redeploy**.
 4. From a **second** Instagram account (not your admin/tester account), comment on
    that reel. Expect: public reply → greeting DM + button → follow gate → final DM.
 5. Watch it on the **Dashboard** — contacts, comments, final DMs, new follows, CTR.
+6. Quickest first automation: **Playbooks** → pick one → paste your link → choose
+   the reel → review it in the editor and switch it **Live**.
 
 ## Notes
 

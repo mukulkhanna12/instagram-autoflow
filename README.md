@@ -46,6 +46,80 @@ Each reel gets its own copy, so different reels can offer different things.
 when you hit Configure on a reel, and for newly added prepared flows. It never
 touches a reel that already has an automation.
 
+## Starting an automation
+
+**New automation** (sidebar and Dashboard) opens a picker rather than dropping
+you on a page:
+
+| Card | Goes to |
+|---|---|
+| DM on a posted reel | **Reels** — pick the reel, then Configure |
+| DM on your next reel | **Upcoming reels** — prepare a flow for the queue |
+| Start from a playbook | **Playbooks** |
+| Popular playbooks (chips) | That playbook's setup dialog, straight away |
+
+Story replies, inbox keywords and email capture are listed as **Coming soon**
+and can't be clicked — the engine only reacts to comments today.
+
+## Playbooks
+
+Ready-made reel automations: every message in the flow (public replies,
+greeting, follow gate, final message) is already written around one keyword.
+28 of them in `lib/playbooks.ts`, grouped as Most popular, Free resources,
+Sell & earn, Grow & engage, Book & launch and Creator niches — e.g. Freebie drop
+(`FREE`), Link in DMs (`LINK`), Secret discount (`CODE`), Buy it now
+(`BUY`/`ORDER`), Book a call (`CALL`), AI prompt pack (`PROMPT`).
+
+Picking one asks only what it can't know — the trigger word (pre-filled), the
+link and its button label, and where it runs:
+
+- **A posted reel** — creates that reel's automation *switched off* and opens its
+  editor, so you review it and go Live there. A reel that already has one is
+  only overwritten after a confirm, and keeps its stats and Live switch.
+- **My next reel** — adds it to the back of the Upcoming reels queue.
+
+`POST /api/playbooks/apply` does both. Each playbook has its own link
+(`/playbooks?playbook=<id>`) that opens its setup dialog directly. Keywords are
+chosen with the substring match in mind (`GIVEAWAY`, not `WIN`, which would
+match "window"); a test checks every playbook fires on its own sample comment
+and that every button label fits in 20 characters.
+
+## Flows (design preview)
+
+**Flows** (routes under `/triggers`) is where the next version of the flow
+builder is being worked out. Flows are saved **in this browser only**
+(`localStorage`, `lib/trigger-store.ts`) and **send nothing** — live reels still
+run on the per-reel automations above.
+
+There are three ways to build one, kept side by side on purpose until one wins:
+
+- **One-page editor** (`/triggers/compose`, the default for New flow and for
+  opening a flow) — every setting as a numbered section you can jump to:
+  reel, keywords, public reply, opening DM, follow check, final DM. Each DM has
+  **Use template** suggestions (`lib/dm-suggestions.ts`) and the page can be
+  filled from any playbook. A live Instagram-style phone beside it follows the
+  section you're editing — Post, Comments or DM — and can play the DM as a
+  follower or a non-follower.
+- **Step-by-step** (`/triggers/new`) — three questions, then the canvas.
+- **Canvas** (`/triggers/<id>`) — the full graph: branches, DM-started flows,
+  multiple buttons.
+
+The one-page editor only handles the standard shape
+(`lib/trigger-compose.ts`); a flow the canvas has branched beyond it opens on the
+canvas instead, so nothing is flattened away.
+
+## Analytics
+
+The **Analytics** page reports on real conversations for a date range
+(1d / 7d / 30d / 90d / all) and any mix of reels: a summary against the previous
+period, trend, heatmap, per-reel breakdown, audience, superfans, failure reasons
+and a reel-vs-reel compare. Every row of the
+Dashboard's automations table also has a **Quick stats** panel.
+
+There is no event log, so date-filtered numbers are "people whose comment landed
+in the window, and where they are now" (`lib/insights.ts`); the per-step
+counters on an automation have no timestamps and are shown as lifetime totals.
+
 ## Nothing is ever deleted
 
 Every "delete" in this app is a soft delete. `InstagramAccount`, `PostAutomation`
@@ -153,7 +227,8 @@ locally rather than sent and rejected.
 
 - **Next.js** (App Router) + TypeScript
 - **Prisma** + PostgreSQL — free tier on [Prisma Postgres](https://www.prisma.io/postgres)
-- **NextAuth** — passwordless email-OTP sign-in, locked to one address
+- **NextAuth** — email-OTP sign-in, plus optional Google / Facebook, all behind a
+  manual approval gate
 - **Resend** — delivers the login code email
 - **Tailwind** + Radix UI
 - **Instagram API with Instagram Login** — comments, messaging, profile
@@ -195,10 +270,14 @@ covers deploying to Vercel.
 | `DATABASE_URL` | Postgres connection string |
 | `NEXTAUTH_URL` / `NEXTAUTH_SECRET` | Session handling (`openssl rand -base64 32`) |
 | `ALLOWED_LOGIN_EMAIL` | Bootstrap owner — this address is auto-approved; everyone else signs up and waits (see [Accounts & approval](#accounts--approval)) |
-| `RESEND_API_KEY` | Sends the login-code email ([resend.com](https://resend.com)) |
+| `RESEND_API_KEY` | Sends the login-code email ([resend.com](https://resend.com)). Unset locally = the code is printed in the dev-server log |
+| `EMAIL_FROM` | Optional sender once you verify a domain with Resend |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Optional "Continue with Google" |
+| `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` | Optional "Continue with Facebook" |
 | `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` | Instagram OAuth + webhook signature verification |
 | `META_WEBHOOK_VERIFY_TOKEN` | Any random string; must match the Meta dashboard |
 | `CRON_SECRET` | Protects the scheduled `/api/cron/*` routes |
+| `NEXT_PUBLIC_APP_URL` | The app's public URL, exposed to the browser |
 
 A missing `INSTAGRAM_APP_SECRET` makes every webhook fail signature validation
 with a silent 401 — no reply, no DM, no visible error. To check a deployment,
@@ -216,22 +295,41 @@ curl -X POST "$APP_URL/api/webhooks/instagram" \
 
 ```
 app/
+  page.tsx            landing page
+  login/              email code + Google / Facebook sign-in
+  onboarding/         connect Instagram → confirm account → short survey
   (dashboard)/
-    dashboard/        overview
+    dashboard/        overview, automations table, quick stats
+    analytics/        date-range reporting across reels
     posts/            your media, and the per-reel flow editor
       defaults/       the wording new reels start from
-    queue/            flows prepared for reels not yet uploaded
+    playbooks/        ready-made automations + setup dialog
+    triggers/         Flows (design preview, browser-only)
+      compose/        one-page editor with live phone preview
+      new/            step-by-step form
+      [id]/           canvas;  [id]/compose — one-page edit
+      defaults/       default wording for new flows
+    queue/            Upcoming reels — flows for reels not yet posted
     settings/         connect / disconnect Instagram
   api/
     auth/otp/         request a login code
     automations/      CRUD for per-reel flows
       [id]/copy-from  clone another reel's setup onto this one
       [id]/backfill   sweep comments predating the automation
+    playbooks/apply   set a reel (or the next one) up from a playbook
+    analytics/        the Analytics page's numbers
+    dashboard/        dashboard overview
     flows/            the prepared-flow queue (CRUD + reorder)
     reel-defaults/    read/save the account's default messages
+    onboarding/       survey + quick-start dismissal
     instagram/        OAuth connect, callback, posts
     cron/             daily token refresh + post sync
     webhooks/         Instagram event receiver
+components/
+  new-automation.tsx  the "Start a new automation" picker
+  trigger-composer.tsx one-page flow editor
+  ig-phone-preview.tsx live Post / Comments / DM phone
+  analytics/          charts, tiles, compare, quick-stats panel
 lib/
   flow-engine.ts      conversation state machine
   instagram.ts        Graph API client
@@ -240,7 +338,13 @@ lib/
   backfill.ts         catching up on pre-existing comments
   templates.ts        claim the next queued flow for a new reel
   reel-defaults.ts    the messages a new reel automation starts with
+  playbooks.ts        the playbook catalog → automation fields
+  insights.ts         analytics maths over Conversation rows
+  trigger-store.ts    Flows, saved in localStorage
+  trigger-compose.ts  one-page editor ⇄ flow graph
+  dm-suggestions.ts   "Use template" wording for each DM
   otp.ts / email.ts   email-OTP login codes
+  social-auth.ts      which Google / Facebook buttons are switched on
   db.ts               Prisma client + the soft-delete filter
   auth.ts             NextAuth config
 prisma/
@@ -249,10 +353,16 @@ prisma/
 scripts/
   backup-db.mjs       rolling 7-day database backup
 tests/
-  flow-engine.test.ts the state machine, db + Graph API mocked
-  keywords.test.ts    the per-reel comment filter
-  buttons.test.ts     button resolution and the legacy fallback
-  backfill.test.ts    the 7-day window and duplicate guards
+  flow-engine.test.ts     the state machine, db + Graph API mocked
+  keywords.test.ts        the per-reel comment filter
+  buttons.test.ts         button resolution and the legacy fallback
+  backfill.test.ts        the 7-day window and duplicate guards
+  playbooks.test.ts       catalog sanity: keywords fire, labels fit
+  trigger-compose.test.ts one-page editor round trip
+  trigger-store.test.ts   Flows defaults and starter graph
+  insights.test.ts        analytics maths
+  approval.test.ts        the sign-in approval gate
+  soft-delete.test.ts     hide-not-delete behaviour
 ```
 
 `PostAutomation` is one reel's flow; `Conversation` tracks one person's progress
@@ -308,6 +418,9 @@ Known gaps:
 - [ ] No queueing or retry when the 750/hour private-reply limit is hit — those
       people are dropped, with the failure recorded on the conversation
 - [ ] Comments older than 7 days can't be reached at all
+- [ ] Flows are a design preview — saved per browser, nothing sends from them
+- [ ] Story-reply, inbox-keyword and email-capture triggers aren't built (shown
+      as Coming soon)
 - [ ] Meta App Review is only needed to serve accounts you don't own — a single
       account in Development mode with itself as a tester does not need it
 

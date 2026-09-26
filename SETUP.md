@@ -2,6 +2,9 @@
 
 ## 1. Install dependencies
 
+Requires **Node ≥ 20.9** (`node -v`). If your shell defaults to an older Node,
+switch first (e.g. `volta install node@22` or `nvm use 22`).
+
 ```bash
 cd instagram-autoflow
 npm install
@@ -37,6 +40,12 @@ and automations.
 
 Without `RESEND_API_KEY` (pure local dev) the code is printed to the server
 console instead of emailed, so you can still log in.
+
+**Google / Facebook sign-in (optional).** The buttons always show on `/login`;
+until `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` or
+`FACEBOOK_CLIENT_ID`/`FACEBOOK_CLIENT_SECRET` are set, clicking one explains it
+isn't switched on yet. Redirect URIs are in `.env.example`. The same approval
+gate applies.
 
 ## 4. Meta Developer App
 
@@ -126,7 +135,13 @@ npm run db:push
 npm run dev
 ```
 
-Visit http://localhost:3000
+Visit http://localhost:3000, log in, and you'll be taken through onboarding
+(connect Instagram → confirm the account → a short survey). After that:
+
+- **New automation** — pick how it starts: a posted reel, your next reel, or a playbook
+- **Playbooks** — ready-made automations; add your link and choose the reel
+- **Flows** — the design-preview flow builder (saved in your browser only)
+- **Analytics** — how your reels are converting
 
 ---
 
