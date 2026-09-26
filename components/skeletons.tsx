@@ -68,37 +68,7 @@ export function DashboardSkeleton() {
           ))}
         </div>
       </div>
-      <TableSkeleton rows={3} />
     </Loading>
-  );
-}
-
-export function TableSkeleton({ rows = 4 }: { rows?: number }) {
-  return (
-    <div className="rounded-3xl border border-gray-200 bg-white overflow-hidden">
-      <div className="bg-[#fafbf8] border-b border-gray-200 px-6 py-4 flex gap-10">
-        <Skeleton className="h-3 w-16" />
-        <Skeleton className="h-3 w-14 ml-auto" />
-        <Skeleton className="h-3 w-12" />
-        <Skeleton className="h-3 w-12" />
-        <Skeleton className="h-3 w-16" />
-      </div>
-      <div className="divide-y divide-gray-100">
-        {Array.from({ length: rows }, (_, i) => (
-          <div key={i} className="px-6 py-5 flex items-center gap-4">
-            <Skeleton className="w-12 h-12 rounded-xl" />
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-4 w-60 max-w-full" />
-              <Skeleton className="h-3 w-80 max-w-full" />
-            </div>
-            <Skeleton className="h-4 w-8 hidden md:block" />
-            <Skeleton className="h-4 w-8 hidden md:block" />
-            <Skeleton className="h-8 w-16 rounded-full hidden sm:block" />
-            <Skeleton className="h-10 w-24 rounded-xl" />
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }
 

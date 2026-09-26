@@ -8,7 +8,6 @@ import { truncate } from "@/lib/utils";
 import { Panel, PillLink, StatCard } from "@/components/dashboard/cards";
 import { ActivityBars, CompletionGauge } from "@/components/dashboard/charts";
 import { QuickStartModal } from "@/components/dashboard/quick-start";
-import { PauseResumeButton, RowMenu, StatusPill, TableFrame } from "@/components/dashboard/row-menu";
 import { DashboardSkeleton } from "@/components/skeletons";
 
 interface Stats {
@@ -16,20 +15,13 @@ interface Stats {
   totalSends: number;
   completed: number;
   newFollows: number;
-  greetingCtr: number;
 }
 
 interface Automation {
   id: string;
-  postId: string;
   postCaption?: string | null;
   postThumbnail?: string | null;
   isActive: boolean;
-  fromTemplate: boolean;
-  commentsHandled: number;
-  greetingClicked: number;
-  keywords: string;
-  greetingMessage: string;
   stats: Stats;
 }
 
@@ -64,15 +56,7 @@ function Dashboard() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [noAccount, setNoAccount] = useState(false);
-  const [toggling, setToggling] = useState<string | null>(null);
   const [showQuickStart, setShowQuickStart] = useState(false);
-  /**
-   * Ids of reels still on the account, or null when we couldn't establish the
-   * full library. An automation outlives the reel it points at — deleting a
-   * reel on Instagram leaves its row here, still switched Live, quietly
-   * unreachable. Null keeps every automation unflagged rather than guessing.
-   */
-  const [liveReelIds, setLiveReelIds] = useState<Set<string> | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -90,48 +74,9 @@ function Dashboard() {
       // Offered once: straight after onboarding, or to anyone with nothing set up yet.
       setShowQuickStart(ov.quickStart && (params.get("welcome") === "1" || (automations ?? []).length === 0));
       setLoading(false);
-
-      // Second, slower pass — it hits Instagram, so the list renders first and
-      // the "Reel deleted" badges appear a moment later.
-      try {
-        const res = await fetch("/api/instagram/posts");
-        const { posts, complete } = await res.json();
-        if (res.ok && complete && Array.isArray(posts)) {
-          setLiveReelIds(new Set(posts.map((p: { id: string }) => p.id)));
-        }
-      } catch {
-        // Leaving it null is the safe outcome: nothing gets flagged.
-      }
     }
     load();
   }, [params]);
-
-  /** The reel is gone from Instagram, so this automation can never fire again. */
-  const isOrphaned = (a: Automation) => !!liveReelIds && !liveReelIds.has(a.postId);
-
-  async function removeAutomation(a: Automation) {
-    const msg = isOrphaned(a)
-      ? "Remove this automation? Its reel no longer exists on Instagram."
-      : "Remove this automation? The reel will stop replying to comments.";
-    if (!confirm(msg)) return;
-    const res = await fetch(`/api/automations/${a.id}`, { method: "DELETE" });
-    if (res.ok) setAutomations((prev) => prev.filter((x) => x.id !== a.id));
-  }
-
-  async function toggle(a: Automation) {
-    setToggling(a.id);
-    try {
-      const res = await fetch(`/api/automations/${a.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: !a.isActive }),
-      });
-      const { automation } = await res.json();
-      setAutomations((prev) => prev.map((x) => (x.id === a.id ? { ...x, isActive: automation.isActive } : x)));
-    } finally {
-      setToggling(null);
-    }
-  }
 
   if (loading || !overview) {
     return <DashboardSkeleton />;
@@ -148,7 +93,6 @@ function Dashboard() {
     { contacts: 0, sends: 0, completed: 0, newFollows: 0 }
   );
   const weekCount = overview.activity.reduce((n, d) => n + d.count, 0);
-  const liveCount = automations.filter((a) => a.isActive && !isOrphaned(a)).length;
   const topReels = [...automations].sort((a, b) => b.stats.contacts - a.stats.contacts).slice(0, 5);
 
   return (
@@ -197,15 +141,15 @@ function Dashboard() {
 
       {/* KPI row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-        <StatCard featured label="Contacts" value={totals.contacts} note={`${weekCount} reached in the last 7 days`} href="#automations" />
-        <StatCard label="Messages sent" value={totals.sends} note="DMs across every step" href="#automations" />
+        <StatCard featured label="Contacts" value={totals.contacts} note={`${weekCount} reached in the last 7 days`} href="/posts" />
+        <StatCard label="Messages sent" value={totals.sends} note="DMs across every step" href="/posts" />
         <StatCard
           label="Got the link"
           value={totals.completed}
           note={totals.contacts ? `${Math.round((totals.completed / totals.contacts) * 100)}% of contacts` : "Final DM delivered"}
-          href="#automations"
+          href="/posts"
         />
-        <StatCard label="New follows" value={totals.newFollows} note="Earned by your follow gate" href="#automations" />
+        <StatCard label="New follows" value={totals.newFollows} note="Earned by your follow gate" href="/posts" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
@@ -310,94 +254,8 @@ function Dashboard() {
           />
         </Panel>
       </div>
-
-      {/* 5.png — every automation, with its numbers and a pause button */}
-      <section id="automations" className="pt-4 scroll-mt-6">
-        <h2 className="text-2xl font-extrabold text-gray-950">Your automations</h2>
-        <p className="text-gray-500 mt-1 mb-5">
-          {`${liveCount} of ${automations.length} live`} · manage them and track how they&apos;re doing.
-        </p>
-
-        {automations.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-3xl border border-gray-200">
-            <ImageIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p className="font-bold text-gray-900">No automations yet</p>
-            <p className="text-sm text-gray-500 mt-1">
-              <Link href="/posts" className="text-brand-700 font-semibold underline">Pick a reel</Link> to create your first one.
-            </p>
-          </div>
-        ) : (
-          <TableFrame
-            columns={[
-              { label: "Name" },
-              { label: "Contacts", className: "text-center" },
-              { label: "DMs", className: "text-center" },
-              { label: "Clicks", className: "text-center" },
-              { label: "CTR", className: "text-center" },
-              { label: "Status", className: "text-center" },
-              { label: "Actions", className: "text-center" },
-            ]}
-          >
-            {automations.map((a) => {
-              const orphan = isOrphaned(a);
-              return (
-                <tr
-                  key={a.id}
-                  onClick={() => router.push(`/posts/${a.id}`)}
-                  className="hover:bg-[#fafbf8] cursor-pointer"
-                >
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-4 min-w-0">
-                      <Thumb src={a.postThumbnail} size="w-12 h-12" />
-                      <div className="min-w-0">
-                        <p className="font-bold text-gray-950 truncate max-w-[260px] 2xl:max-w-[360px]">
-                          {a.postCaption ? truncate(a.postCaption, 44) : "Untitled reel"}
-                          {a.fromTemplate && (
-                            <span className="ml-2 align-middle text-[10px] font-bold uppercase tracking-wider text-brand-700 bg-brand-50 rounded-full px-2 py-0.5">Auto</span>
-                          )}
-                        </p>
-                        <p className="text-sm text-gray-400 truncate max-w-[260px] 2xl:max-w-[420px]">
-                          Comment on reel
-                          {a.keywords.trim() ? ` · contains '${a.keywords.split(",")[0].trim()}'${a.keywords.split(",").length > 1 ? ` +${a.keywords.split(",").length - 1} more` : ""}` : " · any comment"}
-                          {` · DM: '${truncate(a.greetingMessage.replace(/\s+/g, " "), 40)}'`}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <Num v={a.stats.contacts} />
-                  <Num v={a.stats.totalSends} />
-                  <Num v={a.greetingClicked} />
-                  <td className="px-3 py-5 text-center font-bold text-gray-950">
-                    {a.stats.contacts ? `${a.stats.greetingCtr}%` : "—"}
-                  </td>
-                  <td className="px-3 py-5 text-center">
-                    <StatusPill status={orphan ? "deleted" : a.isActive ? "live" : "paused"} />
-                  </td>
-                  <td className="px-3 py-5">
-                    <div className="flex items-center justify-center gap-2">
-                      {!orphan && (
-                        <PauseResumeButton live={a.isActive} busy={toggling === a.id} onClick={() => toggle(a)} />
-                      )}
-                      <RowMenu
-                        items={[
-                          { label: "Edit flow", onSelect: () => router.push(`/posts/${a.id}`) },
-                          { label: "Remove", danger: true, onSelect: () => removeAutomation(a) },
-                        ]}
-                      />
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </TableFrame>
-        )}
-      </section>
     </div>
   );
-}
-
-function Num({ v }: { v: number }) {
-  return <td className="px-3 py-5 text-center font-bold text-gray-950 tabular-nums">{v}</td>;
 }
 
 function Thumb({ src, size }: { src?: string | null; size: string }) {
