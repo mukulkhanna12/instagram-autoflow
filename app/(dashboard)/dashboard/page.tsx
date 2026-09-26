@@ -3,7 +3,8 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, Plus, ImageIcon, Wand2, Play, MessageCircle } from "lucide-react";
+import { AlertCircle, Plus, ImageIcon, Wand2, Play, MessageCircle, BarChart3 } from "lucide-react";
+import { openQuickStats } from "@/components/analytics/quick-panel";
 import { truncate } from "@/lib/utils";
 import { Panel, PillLink, StatCard } from "@/components/dashboard/cards";
 import { ActivityBars, CompletionGauge } from "@/components/dashboard/charts";
@@ -378,9 +379,21 @@ function Dashboard() {
                       {!orphan && (
                         <PauseResumeButton live={a.isActive} busy={toggling === a.id} onClick={() => toggle(a)} />
                       )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openQuickStats(a.id);
+                        }}
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-lime-100 hover:text-brand-800 cursor-pointer"
+                        aria-label="Quick stats for this reel"
+                        title="Quick stats"
+                      >
+                        <BarChart3 className="w-5 h-5" />
+                      </button>
                       <RowMenu
                         items={[
                           { label: "Edit flow", onSelect: () => router.push(`/posts/${a.id}`) },
+                          { label: "Quick stats", onSelect: () => openQuickStats(a.id) },
                           { label: "Remove", danger: true, onSelect: () => removeAutomation(a) },
                         ]}
                       />

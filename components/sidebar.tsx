@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ImageIcon, Settings, LogOut, Wand2, Workflow, Plus,
-  PanelLeftClose, PanelLeftOpen, ShieldCheck,
+  PanelLeftClose, PanelLeftOpen, ShieldCheck, BarChart3,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ interface SidebarProps {
 
 const menu = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/posts", icon: ImageIcon, label: "Reels" },
   { href: "/triggers", icon: Workflow, label: "Triggers" },
   { href: "/queue", icon: Wand2, label: "Upcoming reels" },

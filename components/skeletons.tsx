@@ -73,6 +73,50 @@ export function DashboardSkeleton() {
   );
 }
 
+/** Analytics: filter row, tabs, headline banner, stat tiles and two chart panels. */
+export function AnalyticsSkeleton() {
+  return (
+    <Loading label="Loading analytics" className="p-6 lg:p-8 space-y-6">
+      <Heading actions={0} />
+      <div className="flex gap-3">
+        <Skeleton className="h-11 w-96 max-w-full rounded-full" />
+        <Skeleton className="h-11 w-48 rounded-full" />
+      </div>
+      <div className="flex gap-6 border-b border-gray-200 pb-3">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-4 w-20" />
+        ))}
+      </div>
+      <div className="rounded-3xl p-8 bg-gradient-to-br from-brand-700 via-brand-800 to-brand-950 space-y-4">
+        <Skeleton onDark className="h-3 w-28" />
+        <Skeleton onDark className="h-8 w-[28rem] max-w-full" />
+        <Skeleton onDark className="h-4 w-64" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="rounded-3xl p-5 bg-white space-y-4">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-10 w-20" />
+            <Skeleton className="h-3 w-36" />
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
+        <div className="xl:col-span-8 rounded-3xl bg-white p-6 space-y-6">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-56 w-full rounded-2xl" />
+        </div>
+        <div className="xl:col-span-4 rounded-3xl bg-white p-6 space-y-5">
+          <Skeleton className="h-5 w-28" />
+          {[100, 70, 40].map((w) => (
+            <Skeleton key={w} className="h-9 rounded-xl" style={{ width: `${w}%` }} />
+          ))}
+        </div>
+      </div>
+    </Loading>
+  );
+}
+
 export function TableSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="rounded-3xl border border-gray-200 bg-white overflow-hidden">
