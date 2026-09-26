@@ -55,7 +55,7 @@ export function StatCard({
           <ArrowUpRight className="w-5 h-5" />
         </span>
       </div>
-      <p className="text-5xl font-extrabold tracking-tight tabular-nums">{value}</p>
+      <p className="text-4xl font-extrabold tracking-tight tabular-nums">{value}</p>
       <p className={cn("text-sm", featured ? "text-lime-200" : "text-gray-500")}>{note}</p>
     </Link>
   );

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  MessageSquare, Zap, UserCheck, Link2, Save, Wand2, AlertCircle,
+  MessageSquare, Zap, UserCheck, Link2, Save, AlertCircle,
   Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Inbox,
 } from "lucide-react";
 import Link from "next/link";
@@ -14,6 +14,7 @@ import {
   type DetailsButton,
 } from "@/components/flow-fields";
 import { QueueSkeleton } from "@/components/skeletons";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface Flow {
   id: string;
@@ -140,22 +141,16 @@ export default function QueuePage() {
 
   return (
     <div className="p-8 max-w-3xl">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shrink-0">
-            <Wand2 className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Flows waiting for your next reels</h1>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Each one attaches to a single upcoming reel, then it&apos;s used up
-            </p>
-          </div>
-        </div>
-        <Button size="sm" onClick={addFlow} loading={saving && !openId}>
-          <Plus className="w-4 h-4" /> Add flow
-        </Button>
-      </div>
+      <PageHeader
+        className="mb-2"
+        title="Upcoming reels"
+        subtitle="Flows waiting for your next reels. Each one attaches to a single upcoming reel, then it's used up."
+        actions={
+          <Button size="sm" onClick={addFlow} loading={saving && !openId}>
+            <Plus className="w-4 h-4" /> Add flow
+          </Button>
+        }
+      />
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 my-5">
         <p className="text-sm text-gray-600">

@@ -14,6 +14,7 @@ import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AccountRowSkeleton, FormPageSkeleton } from "@/components/skeletons";
+import { PageHeader } from "@/components/ui/page-header";
 
 // Two settings areas, side by side: the workspace (shared with your team) and
 // your own account. The side menu groups them so each is one click away.
@@ -94,10 +95,7 @@ function SettingsContent() {
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-500 text-sm mt-1">Your workspace — shared with your team — and your own account, side by side.</p>
-      </div>
+      <PageHeader title="Settings" subtitle="Your workspace — shared with your team — and your own account, side by side." />
 
       <div className="mt-6 grid gap-6 md:grid-cols-[220px_1fr]">
       <nav className="md:sticky md:top-6 self-start rounded-2xl bg-[#eef0eb] p-2 flex md:flex-col gap-1 overflow-x-auto" aria-label="Settings sections">

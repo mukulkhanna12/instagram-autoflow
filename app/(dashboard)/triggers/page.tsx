@@ -6,6 +6,7 @@ import { Plus, Workflow, MessageCircle, Play, Info, Sliders, Send } from "lucide
 import { loadTriggers, deleteTrigger, upsertTrigger, summarise, type Trigger, type FlowNode } from "@/lib/trigger-store";
 import { fromTrigger } from "@/lib/trigger-compose";
 import { truncate } from "@/lib/utils";
+import { PageHeader, headerButton } from "@/components/ui/page-header";
 import { PauseResumeButton, RowMenu, StatusPill, TableFrame } from "@/components/dashboard/row-menu";
 
 /**
@@ -45,32 +46,32 @@ export default function TriggersListPage() {
 
   return (
     <div className="p-6 lg:p-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-gray-950">Automations</h1>
-          <p className="text-gray-500 mt-2">Build an automation once, then point it at a reel.</p>
-        </div>
-        <div className="flex items-center gap-3">
+      <PageHeader
+        title="Automations"
+        subtitle="Build an automation once, then point it at a reel."
+        actions={
+          <>
           <button
             onClick={() => router.push("/triggers/defaults")}
-            className="inline-flex items-center gap-2 h-12 px-5 rounded-full border-2 border-gray-300 text-gray-800 font-bold hover:border-gray-950 transition-colors cursor-pointer"
+            className={headerButton.secondary}
           >
             <Sliders className="w-4 h-4" /> Default messages
           </button>
           <button
             onClick={() => router.push("/triggers/new")}
-            className="inline-flex items-center gap-2 h-12 px-5 rounded-full text-gray-600 font-bold hover:text-gray-950 transition-colors cursor-pointer"
+            className={headerButton.ghost}
           >
             Step-by-step
           </button>
           <button
             onClick={create}
-            className="inline-flex items-center gap-2 h-12 px-6 rounded-full bg-brand-700 text-white font-bold hover:bg-brand-800 transition-colors cursor-pointer"
+            className={headerButton.primary}
           >
-            <Plus className="w-5 h-5" /> New automation
+            <Plus className="w-4 h-4" /> New automation
           </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-100 rounded-2xl p-4 mt-6">
         <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
@@ -80,8 +81,8 @@ export default function TriggersListPage() {
         </p>
       </div>
 
-      <h2 className="text-2xl font-extrabold text-gray-950 mt-8">Your automations</h2>
-      <p className="text-gray-500 mt-1 mb-5">Manage your automations and track their performance below.</p>
+      <h2 className="text-lg font-bold text-gray-950 mt-8">Your automations</h2>
+      <p className="text-sm text-gray-500 mt-0.5 mb-4">Manage your automations and track their performance below.</p>
 
       {triggers.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed border-gray-300 p-14 text-center">

@@ -9,6 +9,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { truncate } from "@/lib/utils";
 import { ReelsGridSkeleton } from "@/components/skeletons";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface Post {
   id: string;
@@ -155,15 +156,16 @@ export default function PostsPage() {
 
   return (
     <div className="p-8 max-w-6xl">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reels</h1>
-          <p className="text-gray-500 text-sm mt-1">Select a reel to set up a comment-to-DM automation</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => router.push("/posts/defaults")}>
-          <MessageSquare className="w-3.5 h-3.5" /> Default messages
-        </Button>
-      </div>
+      <PageHeader
+        className="mb-6"
+        title="Reels"
+        subtitle="Select a reel to set up a comment-to-DM automation."
+        actions={
+          <Button variant="outline" size="sm" onClick={() => router.push("/posts/defaults")}>
+            <MessageSquare className="w-3.5 h-3.5" /> Default messages
+          </Button>
+        }
+      />
 
       {nextFlow && (
         <div className="mb-6 flex items-start gap-3 bg-brand-50 border border-brand-200 rounded-xl p-4">

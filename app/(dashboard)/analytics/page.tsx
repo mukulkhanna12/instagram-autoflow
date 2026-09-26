@@ -15,6 +15,7 @@ import { Highlight, Kpi, Thumb } from "@/components/analytics/tiles";
 import { ReelPicker } from "@/components/analytics/reel-picker";
 import { Compare } from "@/components/analytics/compare";
 import { busiestDay, delta as pctChange, peakSlot } from "@/lib/insights";
+import { PageHeader } from "@/components/ui/page-header";
 
 // ─── Types (mirror /api/analytics) ────────────────────────────────────────────
 
@@ -130,12 +131,7 @@ function Analytics() {
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-gray-950">Analytics</h1>
-          <p className="text-gray-500 mt-2">How your reels turn comments into conversations, followers and clicks.</p>
-        </div>
-      </div>
+      <PageHeader title="Analytics" subtitle="How your reels turn comments into conversations, followers and clicks." />
 
       {/* Filters: one row, above everything they scope. */}
       <div className="flex flex-wrap items-center gap-3">
@@ -351,7 +347,7 @@ function Hero({ data, rangeMeta, minutesSaved }: { data: Data; rangeMeta: (typeo
       <div className="relative flex flex-wrap items-end justify-between gap-6">
         <div className="max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lime-200/80">The short version</p>
-          <p className="text-2xl sm:text-3xl font-extrabold leading-snug mt-2">{headline}</p>
+          <p className="text-xl sm:text-2xl font-extrabold leading-snug mt-2">{headline}</p>
           {s.contacts > 0 && (
             <p className="text-brand-100 mt-3">
               <strong className="text-white">{s.completed}</strong> walked away with your link
@@ -612,7 +608,7 @@ function GateStat({ label, value, note, accent }: { label: string; value: number
   return (
     <div className={cn("rounded-2xl p-4", accent ? "bg-lime-50 border border-lime-200" : "bg-[#f7f8f5]")}>
       <p className="text-sm text-gray-500">{label}</p>
-      <p className="text-3xl font-extrabold text-gray-950 tabular-nums mt-1">{value}</p>
+      <p className="text-2xl font-extrabold text-gray-950 tabular-nums mt-1">{value}</p>
       <p className="text-xs text-gray-500 mt-1">{note}</p>
     </div>
   );

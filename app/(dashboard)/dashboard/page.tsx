@@ -12,6 +12,7 @@ import { QuickStartModal } from "@/components/dashboard/quick-start";
 import { NewAutomationButton } from "@/components/new-automation";
 import { PauseResumeButton, RowMenu, StatusPill, TableFrame } from "@/components/dashboard/row-menu";
 import { DashboardSkeleton } from "@/components/skeletons";
+import { PageHeader, headerButton } from "@/components/ui/page-header";
 
 interface Stats {
   contacts: number;
@@ -173,23 +174,18 @@ function Dashboard() {
       />
 
       {/* Heading */}
-      <div className="flex flex-wrap items-end justify-between gap-4 pb-1">
-        <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-gray-950">Dashboard</h1>
-          <p className="text-gray-500 mt-2">Turn every comment into a conversation — automatically.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <NewAutomationButton className="inline-flex items-center gap-2 h-12 px-6 rounded-full bg-brand-700 text-white font-bold hover:bg-brand-800 transition-colors">
-            <Plus className="w-5 h-5" /> New automation
-          </NewAutomationButton>
-          <Link
-            href="/queue"
-            className="inline-flex items-center gap-2 h-12 px-6 rounded-full border-2 border-brand-700 text-brand-800 font-bold hover:bg-brand-50 transition-colors"
-          >
-            Prepare next reel
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Turn every comment into a conversation — automatically."
+        actions={
+          <>
+            <Link href="/queue" className={headerButton.secondary}>Prepare next reel</Link>
+            <NewAutomationButton className={headerButton.primary}>
+              <Plus className="w-4 h-4" /> New automation
+            </NewAutomationButton>
+          </>
+        }
+      />
 
       {noAccount && (
         <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
@@ -320,8 +316,8 @@ function Dashboard() {
 
       {/* 5.png — every automation, with its numbers and a pause button */}
       <section id="automations" className="pt-4 scroll-mt-6">
-        <h2 className="text-2xl font-extrabold text-gray-950">Your automations</h2>
-        <p className="text-gray-500 mt-1 mb-5">
+        <h2 className="text-lg font-bold text-gray-950">Your automations</h2>
+        <p className="text-sm text-gray-500 mt-0.5 mb-4">
           {`${liveCount} of ${automations.length} live`} · manage them and track how they&apos;re doing.
         </p>
 

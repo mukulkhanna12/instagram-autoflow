@@ -74,7 +74,7 @@ export function CompletionGauge({
           <Arc R={R} len={a} offset={0} stroke="#2e7d4f" C={C} />
         </svg>
         <div className="absolute inset-x-0 bottom-1 text-center">
-          <p className="text-5xl font-extrabold tracking-tight text-gray-950">{pct}%</p>
+          <p className="text-4xl font-extrabold tracking-tight text-gray-950">{pct}%</p>
           <p className="text-sm text-gray-500 -mt-0.5">got the link</p>
         </div>
       </div>

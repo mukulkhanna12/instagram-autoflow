@@ -76,7 +76,7 @@ export function Kpi({
         </span>
       </div>
       <div className="flex items-end justify-between gap-3">
-        <p className={cn("font-extrabold tracking-tight text-gray-950 tabular-nums", compact ? "text-3xl" : "text-4xl")}>{value}</p>
+        <p className={cn("font-extrabold tracking-tight text-gray-950 tabular-nums", compact ? "text-2xl" : "text-3xl")}>{value}</p>
         {!compact && spark && spark.some((v) => v > 0) && <Sparkline values={spark} color={sparkColor} />}
       </div>
       <p className="text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">

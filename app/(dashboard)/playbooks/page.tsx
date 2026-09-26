@@ -13,6 +13,7 @@ import {
   type Playbook, type PlaybookCategory,
 } from "@/lib/playbooks";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/ui/page-header";
 
 type Filter = "all" | "popular" | PlaybookCategory;
 
@@ -68,15 +69,15 @@ export default function PlaybooksPage() {
   return (
     <div className="p-5 sm:p-8 max-w-7xl">
       <div className="flex flex-wrap items-end gap-4 justify-between">
-        <div>
-          <p className="inline-flex items-center gap-1.5 rounded-full bg-lime px-3 py-1 text-xs font-bold text-gray-950">
-            <Sparkles className="w-3.5 h-3.5" /> {PLAYBOOKS.length} ready to go
-          </p>
-          <h1 className="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-950">Playbooks</h1>
-          <p className="mt-1.5 text-gray-500 max-w-xl">
-            Every message already written. Pick a playbook, paste your link, choose the reel — done.
-          </p>
-        </div>
+        <PageHeader
+          title="Playbooks"
+          subtitle="Every message already written. Pick a playbook, paste your link, choose the reel — done."
+          eyebrow={
+            <p className="inline-flex items-center gap-1.5 rounded-full bg-lime px-3 py-1 text-xs font-bold text-gray-950">
+              <Sparkles className="w-3.5 h-3.5" /> {PLAYBOOKS.length} ready to go
+            </p>
+          }
+        />
         <label className="relative w-full sm:w-72">
           <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
           <input
@@ -118,7 +119,7 @@ export default function PlaybooksPage() {
 
       {sections.map((s) => (
         <section key={s.id} className="mt-9">
-          <h2 className="text-xl font-extrabold text-gray-950">{s.label}</h2>
+          <h2 className="text-lg font-bold text-gray-950">{s.label}</h2>
           <p className="text-sm text-gray-500 mt-0.5">{s.blurb}</p>
           <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {s.items.map((p) => <PlaybookCard key={`${s.id}-${p.id}`} p={p} onOpen={() => setOpen(p)} />)}
