@@ -6,7 +6,7 @@ import { db } from "./db";
  */
 export const PRIVATE_REPLY_HOURLY_LIMIT = 750;
 
-/** One Instagram account per AutoFlow user. */
+/** One Instagram account per workspace. */
 export const IG_ACCOUNT_LIMIT = 1;
 
 /**
@@ -14,11 +14,11 @@ export const IG_ACCOUNT_LIMIT = 1;
  * sends exactly one, and stamps `lastCommentAt`. A person commenting twice
  * within the hour counts once, so this can read slightly low, never high.
  */
-export async function privateRepliesLastHour(userId: string): Promise<number> {
+export async function privateRepliesLastHour(workspaceId: string): Promise<number> {
   return db.conversation.count({
     where: {
       lastCommentAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
-      automation: { igAccount: { userId, isDeleted: false }, isDeleted: false },
+      automation: { igAccount: { workspaceId, isDeleted: false }, isDeleted: false },
     },
   });
 }

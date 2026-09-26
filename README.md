@@ -108,6 +108,33 @@ The one-page editor only handles the standard shape
 (`lib/trigger-compose.ts`); a flow the canvas has branched beyond it opens on the
 canvas instead, so nothing is flattened away.
 
+## Workspaces & team
+
+Everything — the Instagram account, automations, prepared flows, reel defaults,
+conversations — belongs to a **workspace**, not a person. People reach it
+through a membership with one of two roles (`lib/roles.ts`):
+
+| Role | Can do |
+|---|---|
+| Owner | Everything, plus invite and remove people, connect/disconnect Instagram, rename the workspace |
+| Member | All day-to-day work: automations, playbooks, upcoming reels, analytics, going Live |
+
+- **Switcher** at the top of the sidebar; **New workspace** creates an empty one
+  (one Instagram account per workspace — e.g. a client, or a second page).
+- **Settings → Team**: the owner invites by email (Resend) and also gets the link
+  to share by hand; cancel, resend, remove. Members can leave.
+- **Invites** (`lib/invites.ts`): random token in the link, only its SHA-256
+  stored, single use, 7-day expiry, 20 per workspace per day. A new invite to the
+  same address retires the old link. Accepting also **approves** the account, and
+  an address with a live invite gets its login code without waiting.
+- `/invite/<token>` is public: see what you're invited to, sign up or log in
+  (you come straight back), accept. A banner offers any pending invites in-app.
+- **Access control** lives in `lib/workspace.ts`: every route resolves the
+  current workspace (cookie `af_ws`, re-checked against your memberships) and
+  its Instagram account from there. Owner-only routes return 403 to members.
+- **No migration script**: the first time an existing user signs in, they get a
+  personal workspace (`ws_<userId>`) as owner and their Instagram account moves in.
+
 ## Analytics
 
 The **Analytics** page reports on real conversations for a date range

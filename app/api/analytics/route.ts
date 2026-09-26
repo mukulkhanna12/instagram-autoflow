@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getWorkspaceContext } from "@/lib/workspace";
 import {
   audience, byReel, failureReasons, heatmap, isRangeKey, summarize, superfans, trend, windowFor,
   type InsightRow,
@@ -27,7 +28,8 @@ export async function GET(req: NextRequest) {
   const tz = Number(q.get("tz") ?? 0);
   const offsetMs = (Number.isFinite(tz) ? Math.max(-840, Math.min(840, tz)) : 0) * 60 * 1000;
 
-  const igAccount = await db.instagramAccount.findFirst({ where: { userId }, select: { id: true } });
+  void userId;
+  const igAccount = (await getWorkspaceContext())?.igAccount ?? null;
 
   const automations = igAccount
     ? await db.postAutomation.findMany({

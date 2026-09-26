@@ -35,6 +35,76 @@ model User {
   accounts   Account[]
   sessions   Session[]
   igAccounts InstagramAccount[]
+
+  memberships       Membership[]
+  workspacesOwned   Workspace[] @relation("WorkspaceOwner")
+  invitesSent       Invite[]    @relation("InviteSender")
+}
+
+// A shared space that owns one Instagram account and everything hanging off it
+// (automations, queued flows, reel defaults, conversations). People reach it
+// through a Membership with a role; see lib/workspace.ts. Every user gets a
+// personal one the first time they sign in after workspaces shipped, and the
+// Instagram account they already had moves into it.
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Soft delete, like everything else in this app.
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  owner      User               @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members    Membership[]
+  invites    Invite[]
+  igAccounts InstagramAccount[]
+}
+
+// Who belongs to a workspace, and what they may do there:
+// "owner" or "member" (lib/roles.ts has the rules).
+// Removing someone flags the row; re-inviting them revives it.
+model Membership {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        String   @default("member")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+// An invitation to join a workspace. The link carries a random token; only its
+// SHA-256 is stored, so a database leak can't be used to join anything. Single
+// use, expires after 7 days, and revoking stamps revokedAt rather than deleting.
+model Invite {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  email        String
+  role         String    @default("member")
+  tokenHash    String    @unique
+  invitedById  String
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  acceptedById String?
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  invitedBy User      @relation("InviteSender", fields: [invitedById], references: [id])
+
+  @@index([email])
+  @@index([workspaceId])
 }
 
 model Account {
@@ -100,6 +170,11 @@ model InstagramAccount {
   updatedAt       DateTime @updatedAt
 
   user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // The workspace this account belongs to. Null only on rows from before
+  // workspaces, until their owner next signs in (lib/workspace.ts moves them).
+  // userId stays as "who connected it".
+  workspaceId String?
+  workspace   Workspace?          @relation(fields: [workspaceId], references: [id])
   // Soft delete. Disconnecting sets this instead of removing the row, so every
   // automation, queued flow and conversation survives a disconnect/reconnect
   // cycle. Reconnecting the same instagramId clears it and everything reappears.
@@ -109,6 +184,8 @@ model InstagramAccount {
   automations PostAutomation[]
   queuedFlows QueuedFlow[]
   reelDefaults ReelDefaults?
+
+  @@index([workspaceId])
 }
 
 // A flow prepared in advance for a reel you haven't uploaded yet.

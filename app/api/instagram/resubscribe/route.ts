@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getWebhookSubscription, subscribeToWebhooks } from "@/lib/instagram";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 /**
  * Retry the webhook subscription for the connected account — the fix offered
@@ -11,7 +12,7 @@ export async function POST() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const igAccount = await db.instagramAccount.findFirst({ where: { userId: session.user.id } });
+  const igAccount = (await getWorkspaceContext())?.igAccount ?? null;
   if (!igAccount) return NextResponse.json({ error: "No Instagram account connected" }, { status: 404 });
 
   await subscribeToWebhooks(igAccount.instagramId, igAccount.accessToken);

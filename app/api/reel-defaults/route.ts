@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { z } from "zod";
 import { buttonsSchema } from "@/lib/schemas";
 import { getReelDefaults, FALLBACK_REEL_DEFAULTS } from "@/lib/reel-defaults";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 const updateSchema = z.object({
   keywords: z.string().optional(),
@@ -31,7 +32,7 @@ export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const igAccount = await db.instagramAccount.findFirst({ where: { userId: session.user.id } });
+  const igAccount = (await getWorkspaceContext())?.igAccount ?? null;
   if (!igAccount) return NextResponse.json({ defaults: null });
 
   return NextResponse.json({ defaults: await getReelDefaults(igAccount.id) });
@@ -42,7 +43,7 @@ export async function PUT(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const igAccount = await db.instagramAccount.findFirst({ where: { userId: session.user.id } });
+  const igAccount = (await getWorkspaceContext())?.igAccount ?? null;
   if (!igAccount) return NextResponse.json({ error: "No Instagram account" }, { status: 404 });
 
   const body = updateSchema.safeParse(await req.json());

@@ -1,12 +1,17 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { getWorkspaceContext } from "@/lib/workspace";
 import { getInstagramAuthUrl } from "@/lib/instagram";
 import { OAUTH_STATE_COOKIE, RETURN_COOKIE } from "@/lib/onboarding";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const ctx = await getWorkspaceContext();
+  if (ctx?.role !== "owner") {
+    return NextResponse.redirect(new URL("/settings?error=owner_only", req.url));
+  }
 
   const redirectUri = `${process.env.NEXTAUTH_URL}/api/instagram/callback`;
   // CSRF guard for the OAuth round trip. Without it, anyone could send a

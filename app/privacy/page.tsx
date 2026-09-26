@@ -120,6 +120,7 @@ export default function PrivacyPage() {
                 ["Your Instagram account", "Account id, username, profile photo and an access token, so we can reply and send messages on your behalf"],
                 ["Your reels", "Each automated reel's id, link, caption and thumbnail, so you can recognise it in the app"],
                 ["Your automations", "The keywords, replies, messages and links you write, plus counts of messages sent and buttons tapped"],
+                ["Your workspaces and team", "Which workspaces you belong to and your role, and the email addresses you invite — so the right people can get in"],
               ]}
             />
           </Section>
@@ -166,6 +167,11 @@ export default function PrivacyPage() {
                 ["Google, Facebook", "Only if you choose to sign in with them"],
               ]}
             />
+            <p>
+              <strong>Your team.</strong> Everyone you invite to a workspace can see and manage its
+              Instagram automations, reels and results — that&apos;s what an invite is for. Remove
+              someone in Settings → Team and their access ends straight away.
+            </p>
             <p>We&apos;ll only share anything else if the law requires it.</p>
           </Section>
 

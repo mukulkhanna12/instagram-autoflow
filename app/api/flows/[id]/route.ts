@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import { buttonsSchema } from "@/lib/schemas";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 const updateSchema = z.object({
   name: z.string().optional(),
@@ -24,7 +25,9 @@ const updateSchema = z.object({
 
 /** Confirm the flow belongs to the signed-in user's account. */
 async function ownedFlow(id: string, userId: string) {
-  const igAccount = await db.instagramAccount.findFirst({ where: { userId } });
+  // userId is kept for the call sites; access is decided by the current workspace.
+  void userId;
+  const igAccount = (await getWorkspaceContext())?.igAccount ?? null;
   if (!igAccount) return null;
   const flow = await db.queuedFlow.findFirst({ where: { id, igAccountId: igAccount.id } });
   return flow ? { flow, igAccount } : null;

@@ -9,6 +9,7 @@ import {
 } from "@/lib/instagram";
 import crypto from "crypto";
 import { OAUTH_STATE_COOKIE, RETURN_COOKIE } from "@/lib/onboarding";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -35,6 +36,12 @@ export async function GET(req: NextRequest) {
     expected.length === got.length &&
     crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(got));
   if (!stateOk) return done("error=instagram_auth_failed");
+
+  // Instagram is connected to the workspace you're in, and only its owner
+  // decides which account that is.
+  const ctx = await getWorkspaceContext();
+  if (!ctx) return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/login`);
+  if (ctx.role !== "owner") return done("error=owner_only");
 
   const code = req.nextUrl.searchParams.get("code");
   const error = req.nextUrl.searchParams.get("error");
@@ -64,16 +71,28 @@ export async function GET(req: NextRequest) {
     // normal client, and that is precisely the case a reconnect would steal.
     const existing = await dbUnfiltered.instagramAccount.findUnique({
       where: { instagramId: profile.id },
-      select: { userId: true },
+      select: { userId: true, workspaceId: true },
     });
-    if (existing && existing.userId !== session.user.id) {
-      return done("error=account_taken");
+    // A row from before workspaces (no workspaceId yet) still belongs to
+    // whoever connected it; anything else belongs to its workspace.
+    const ownedHere = existing
+      ? existing.workspaceId
+        ? existing.workspaceId === ctx.workspace.id
+        : existing.userId === session.user.id
+      : true;
+    if (!ownedHere) return done("error=account_taken");
+
+    // One Instagram account per workspace: a different live account here has
+    // to be disconnected first.
+    if (ctx.igAccount && ctx.igAccount.instagramId !== profile.id) {
+      return done("error=workspace_has_account");
     }
 
     await db.instagramAccount.upsert({
       where: { instagramId: profile.id },
       create: {
         userId: session.user.id,
+        workspaceId: ctx.workspace.id,
         instagramId: profile.id,
         username: profile.username,
         profilePicUrl: profile.profile_picture_url,
@@ -90,6 +109,7 @@ export async function GET(req: NextRequest) {
         // its own flag and correctly stays hidden.
         isDeleted: false,
         deletedAt: null,
+        workspaceId: ctx.workspace.id,
         // userId is deliberately not written here. The guard above proves the
         // row is already this user's, so re-writing it could only ever move an
         // account between users — which is the thing we are preventing.

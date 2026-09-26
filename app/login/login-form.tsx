@@ -25,14 +25,19 @@ export function LoginForm({
   providers,
   pendingEmail,
   error: initialError,
+  next = null,
+  initialEmail = null,
 }: {
   providers: { google: boolean; facebook: boolean };
   pendingEmail: string | null;
   error: string | null;
+  /** Where to go after signing in — only ever an invite link (checked by the page). */
+  next?: string | null;
+  initialEmail?: string | null;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(pendingEmail ? "pending" : "email");
-  const [email, setEmail] = useState(pendingEmail ?? "");
+  const [email, setEmail] = useState(pendingEmail ?? initialEmail ?? "");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [social, setSocial] = useState<"google" | "facebook" | null>(null);
@@ -83,7 +88,7 @@ export function LoginForm({
         setError("That code is invalid or expired. Please try again.");
         return;
       }
-      router.push("/dashboard");
+      router.push(next ?? "/dashboard");
       router.refresh();
     } catch {
       setError("Couldn't sign you in. Please try again.");
@@ -101,7 +106,7 @@ export function LoginForm({
     }
     setNotReady(null);
     setSocial(provider);
-    signIn(provider, { callbackUrl: "/dashboard" });
+    signIn(provider, { callbackUrl: next ?? "/dashboard" });
   }
 
   const backToEmail = () => {

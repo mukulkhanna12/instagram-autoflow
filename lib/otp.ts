@@ -60,7 +60,13 @@ export function isBootstrapEmail(email: string): boolean {
  */
 export async function registerOrGetAccess(email: string): Promise<AccessStatus> {
   const e = normalizeEmail(email);
-  const bootstrap = isBootstrapEmail(e);
+  // A live workspace invite counts as approval: an owner vouched for this
+  // address. (Checked here rather than via lib/invites to avoid an import cycle.)
+  const invited =
+    (await db.invite.count({
+      where: { email: e, acceptedAt: null, revokedAt: null, expiresAt: { gt: new Date() } },
+    })) > 0;
+  const bootstrap = isBootstrapEmail(e) || invited;
 
   const existing = await db.user.findUnique({
     where: { email: e },

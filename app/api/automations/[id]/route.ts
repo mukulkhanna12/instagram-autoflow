@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { z } from "zod";
 import { buildStats, type StateCounts } from "@/lib/analytics";
 import { buttonsSchema } from "@/lib/schemas";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 /** Tally an automation's conversations by state for the analytics funnel. */
 async function stateCounts(automationId: string): Promise<StateCounts> {
@@ -40,7 +41,9 @@ const updateSchema = z.object({
 });
 
 async function getAutomationForUser(id: string, userId: string) {
-  const igAccount = await db.instagramAccount.findFirst({ where: { userId } });
+  // userId is kept for the call sites; access is decided by the current workspace.
+  void userId;
+  const igAccount = (await getWorkspaceContext())?.igAccount ?? null;
   if (!igAccount) return null;
   return db.postAutomation.findFirst({ where: { id, igAccountId: igAccount.id } });
 }

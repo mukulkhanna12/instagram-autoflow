@@ -4,13 +4,14 @@ import { db } from "@/lib/db";
 import { z } from "zod";
 import { buttonsSchema } from "@/lib/schemas";
 import { getReelDefaults } from "@/lib/reel-defaults";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 /** Flows prepared for reels not yet uploaded, front of the queue first. */
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const igAccount = await db.instagramAccount.findFirst({ where: { userId: session.user.id } });
+  const igAccount = (await getWorkspaceContext())?.igAccount ?? null;
   if (!igAccount) return NextResponse.json({ flows: null });
 
   const flows = await db.queuedFlow.findMany({
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const igAccount = await db.instagramAccount.findFirst({ where: { userId: session.user.id } });
+  const igAccount = (await getWorkspaceContext())?.igAccount ?? null;
   if (!igAccount) return NextResponse.json({ error: "No Instagram account" }, { status: 404 });
 
   const body = createSchema.safeParse(await req.json().catch(() => ({})));

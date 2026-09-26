@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   const [user, igAccount] = await Promise.all([
     db.user.findUnique({ where: { id: userId }, select: { quickStartSeenAt: true } }),
-    db.instagramAccount.findFirst({ where: { userId }, select: { id: true, username: true } }),
+    getWorkspaceContext().then((ctx) => (ctx?.igAccount ? { id: ctx.igAccount.id, username: ctx.igAccount.username } : null)),
   ]);
 
   // Local-midnight boundaries for the last 7 days, oldest first.

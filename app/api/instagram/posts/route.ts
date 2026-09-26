@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getInstagramPosts, type IgMedia } from "@/lib/instagram";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 // DEMO ONLY: sample reels so the picker is browsable without a real IG token.
 // Double-gated — never returned in production.
@@ -20,9 +21,7 @@ export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const igAccount = await db.instagramAccount.findFirst({
-    where: { userId: session.user.id },
-  });
+  const igAccount = (await getWorkspaceContext())?.igAccount ?? null;
   if (!igAccount) return NextResponse.json({ error: "No Instagram account connected" }, { status: 404 });
 
   const demoMode =

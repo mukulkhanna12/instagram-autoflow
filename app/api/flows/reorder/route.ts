@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 const bodySchema = z.object({ ids: z.array(z.string()) });
 
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const igAccount = await db.instagramAccount.findFirst({ where: { userId: session.user.id } });
+  const igAccount = (await getWorkspaceContext())?.igAccount ?? null;
   if (!igAccount) return NextResponse.json({ error: "No Instagram account" }, { status: 404 });
 
   const body = bodySchema.safeParse(await req.json());

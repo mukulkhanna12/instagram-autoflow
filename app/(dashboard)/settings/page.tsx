@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Instagram, CheckCircle, AlertCircle, UserRound, Check, KeyRound } from "lucide-react";
+import { Instagram, CheckCircle, AlertCircle, UserRound, Check, KeyRound, Users } from "lucide-react";
+import { TeamPanel } from "@/components/workspace/team-panel";
 import Link from "next/link";
 import { SignInMethods } from "@/components/sign-in-methods";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,7 @@ import { AccountRowSkeleton, FormPageSkeleton } from "@/components/skeletons";
 const TABS = [
   { id: "instagram", label: "Instagram", icon: Instagram },
   { id: "profile", label: "Profile", icon: UserRound },
+  { id: "team", label: "Team", icon: Users },
   { id: "sign-in", label: "Sign-in methods", icon: KeyRound },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -31,6 +33,14 @@ function SettingsContent() {
   const [account, setAccount] = useState<IgAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
+  // Only the owner connects or disconnects; members see who can.
+  const [isOwner, setIsOwner] = useState(true);
+  useEffect(() => {
+    fetch("/api/workspaces")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setIsOwner(d.current.role === "owner"))
+      .catch(() => {});
+  }, []);
 
   const tab = TABS.some((t) => t.id === searchParams.get("tab")) ? (searchParams.get("tab") as TabId) : "instagram";
   const successMsg = searchParams.get("success");
@@ -58,7 +68,7 @@ function SettingsContent() {
     <div className="p-8 max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-500 text-sm mt-1">Your Instagram connection, profile and how you sign in</p>
+        <p className="text-gray-500 text-sm mt-1">Your Instagram connection, team, profile and how you sign in</p>
       </div>
 
       <nav className="flex gap-1 border-b border-gray-200 overflow-x-auto" aria-label="Settings sections">
@@ -92,7 +102,9 @@ function SettingsContent() {
           {errorMsg === "no_instagram" && "Couldn't read your Instagram account. Make sure it's a professional (Business or Creator) account."}
           {errorMsg === "instagram_auth_failed" && "Instagram authorization failed. Please try again."}
           {errorMsg === "account_taken" && "That Instagram account is already connected to another AutoFlow account. Disconnect it there first, or connect a different Instagram account."}
-          {!["no_instagram", "instagram_auth_failed", "account_taken"].includes(errorMsg) && "Something went wrong. Please try again."}
+          {errorMsg === "owner_only" && "Only the workspace owner can connect or change the Instagram account."}
+          {errorMsg === "workspace_has_account" && "This workspace already has an Instagram account. Disconnect it first, or create a new workspace for the other account."}
+          {!["no_instagram", "instagram_auth_failed", "account_taken", "owner_only", "workspace_has_account"].includes(errorMsg) && "Something went wrong. Please try again."}
         </div>
       )}
 
@@ -130,9 +142,13 @@ function SettingsContent() {
                   </span>
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={disconnect} loading={disconnecting}>
-                Disconnect
-              </Button>
+              {isOwner ? (
+                <Button variant="outline" size="sm" onClick={disconnect} loading={disconnecting}>
+                  Disconnect
+                </Button>
+              ) : (
+                <span className="text-xs text-gray-400">Managed by the workspace owner</span>
+              )}
             </div>
           ) : (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -140,19 +156,24 @@ function SettingsContent() {
                 <p className="text-sm text-gray-600">No Instagram account connected</p>
                 <p className="text-xs text-gray-400 mt-1">One click — log in with your Instagram <strong>Business</strong> or <strong>Creator</strong> account. No Facebook Page needed.</p>
               </div>
-              <a
-                href="/api/instagram/connect"
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-pink-500 to-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap shadow-md"
-              >
-                <Instagram className="w-4 h-4" />
-                Connect Instagram
-              </a>
+              {isOwner ? (
+                <a
+                  href="/api/instagram/connect"
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-pink-500 to-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap shadow-md"
+                >
+                  <Instagram className="w-4 h-4" />
+                  Connect Instagram
+                </a>
+              ) : (
+                <p className="text-sm text-gray-500">Ask the workspace owner to connect Instagram.</p>
+              )}
             </div>
           )}
         </CardBody>
       </Card>
       </>)}
       {tab === "profile" && <ProfileCard />}
+      {tab === "team" && <TeamPanel />}
       {tab === "sign-in" && <SignInMethodsCard linkedNow={searchParams.get("linked")} />}
     </div>
   );

@@ -72,6 +72,36 @@ export const db = base.$extends({
         return base.instagramAccount.findFirst(asFindFirst(args, { isDeleted: false }));
       },
     },
+    // Workspaces and memberships are soft-deleted too: a removed member or a
+    // closed workspace simply stops appearing.
+    workspace: {
+      async findMany({ args, query }) {
+        return query({ ...args, where: { ...args.where, isDeleted: false } });
+      },
+      async findFirst({ args, query }) {
+        return query({ ...args, where: { ...args.where, isDeleted: false } });
+      },
+      async count({ args, query }) {
+        return query({ ...args, where: { ...args.where, isDeleted: false } });
+      },
+      async findUnique({ args, query }) {
+        return base.workspace.findFirst(asFindFirst(args, { isDeleted: false }));
+      },
+    },
+    membership: {
+      async findMany({ args, query }) {
+        return query({ ...args, where: { ...args.where, isDeleted: false, workspace: { isDeleted: false } } });
+      },
+      async findFirst({ args, query }) {
+        return query({ ...args, where: { ...args.where, isDeleted: false, workspace: { isDeleted: false } } });
+      },
+      async count({ args, query }) {
+        return query({ ...args, where: { ...args.where, isDeleted: false, workspace: { isDeleted: false } } });
+      },
+      async findUnique({ args, query }) {
+        return base.membership.findFirst(asFindFirst(args, { isDeleted: false, workspace: { isDeleted: false } }));
+      },
+    },
     postAutomation: {
       async findMany({ args, query }) {
         return query({ ...args, where: { ...args.where, ...liveChild } });

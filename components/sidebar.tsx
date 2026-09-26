@@ -9,9 +9,15 @@ import {
 import { cn } from "@/lib/utils";
 import { Logo, LogoMark } from "@/components/brand";
 import { NewAutomationButton } from "@/components/new-automation";
+import { WorkspaceSwitcher } from "@/components/workspace/switcher";
+import type { Role } from "@/lib/roles";
 
 interface SidebarProps {
   usage: { replies: number; repliesLimit: number; accounts: number; accountsLimit: number };
+  workspace: {
+    current: { id: string; name: string; role: Role };
+    all: Array<{ id: string; name: string; role: Role }>;
+  };
 }
 
 const menu = [
@@ -31,7 +37,7 @@ const general = [
 
 const COLLAPSED_KEY = "autoflow.sidebar.collapsed";
 
-export function Sidebar({ usage }: SidebarProps) {
+export function Sidebar({ usage, workspace }: SidebarProps) {
   const path = usePathname();
 
   // Read after mount, not during render: the server has no localStorage, and
@@ -71,6 +77,10 @@ export function Sidebar({ usage }: SidebarProps) {
         >
           {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
         </button>
+      </div>
+
+      <div className={cn("mb-3", collapsed ? "px-3" : "px-4")}>
+        <WorkspaceSwitcher current={workspace.current} all={workspace.all} collapsed={collapsed} />
       </div>
 
       {/* Primary action (5.png) */}

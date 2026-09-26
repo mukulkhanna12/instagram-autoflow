@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { requireWorkspace } from "@/lib/workspace";
 
 /**
  * Disconnect the Instagram account — a soft delete.
@@ -11,11 +11,12 @@ import { db } from "@/lib/db";
  * come back the moment the same account is reconnected. Nothing is destroyed.
  */
 export async function DELETE() {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Pausing every automation at once is the owner's call.
+  const { ctx, error } = await requireWorkspace("owner");
+  if (error) return error;
 
   await db.instagramAccount.updateMany({
-    where: { userId: session.user.id, isDeleted: false },
+    where: { workspaceId: ctx.workspace.id, isDeleted: false },
     data: { isDeleted: true, deletedAt: new Date() },
   });
 

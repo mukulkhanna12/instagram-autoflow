@@ -9,7 +9,9 @@ const user = {
   update: vi.fn(),
   count: vi.fn(),
 };
-vi.mock("@/lib/db", () => ({ db: { user, loginCode: {} } }));
+// Live workspace invites count as approval, so the invite table is stubbed too.
+const invite = { count: vi.fn() };
+vi.mock("@/lib/db", () => ({ db: { user, invite, loginCode: {} } }));
 
 const { registerOrGetAccess, isApprovedEmail, isBootstrapEmail, normalizeEmail } =
   await import("@/lib/otp");
@@ -17,7 +19,26 @@ const { registerOrGetAccess, isApprovedEmail, isBootstrapEmail, normalizeEmail }
 beforeEach(() => {
   vi.clearAllMocks();
   user.count.mockResolvedValue(0);
+  invite.count.mockResolvedValue(0);
   delete process.env.ALLOWED_LOGIN_EMAIL;
+});
+
+describe("workspace invites", () => {
+  it("approves a new address that has a live invite", async () => {
+    invite.count.mockResolvedValue(1);
+    user.findUnique.mockResolvedValue(null);
+    expect(await registerOrGetAccess("invited@example.com")).toBe("approved");
+    expect(user.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ email: "invited@example.com", isApproved: true }),
+    }));
+  });
+
+  it("promotes an existing pending account once it's invited", async () => {
+    invite.count.mockResolvedValue(1);
+    user.findUnique.mockResolvedValue({ isApproved: false });
+    expect(await registerOrGetAccess("waiting@example.com")).toBe("approved");
+    expect(user.update).toHaveBeenCalled();
+  });
 });
 
 describe("normalizeEmail", () => {

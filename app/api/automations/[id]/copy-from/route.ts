@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import { pickContent } from "@/lib/automation-fields";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 const bodySchema = z.object({ sourceId: z.string() });
 
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Cannot copy a reel onto itself" }, { status: 400 });
   }
 
-  const igAccount = await db.instagramAccount.findFirst({ where: { userId: session.user.id } });
+  const igAccount = (await getWorkspaceContext())?.igAccount ?? null;
   if (!igAccount) return NextResponse.json({ error: "No Instagram account" }, { status: 404 });
 
   // Both must belong to this account — fetched together so a mismatch can't

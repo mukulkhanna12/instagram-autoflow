@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { answersSchema } from "@/lib/onboarding";
 import { getInstagramAccountDetails, getWebhookSubscription } from "@/lib/instagram";
+import { getWorkspaceContext } from "@/lib/workspace";
 
 /**
  * Onboarding state: where the user is, plus the connected account's live
@@ -17,7 +18,7 @@ export async function GET() {
       where: { id: session.user.id },
       select: { onboardedAt: true, onboardingAnswers: true },
     }),
-    db.instagramAccount.findFirst({ where: { userId: session.user.id } }),
+    getWorkspaceContext().then((ctx) => ctx?.igAccount ?? null),
   ]);
 
   const [details, subscribed] = igAccount

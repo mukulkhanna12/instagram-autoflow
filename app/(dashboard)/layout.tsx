@@ -8,27 +8,36 @@ import { HelpAssistant } from "@/components/help/help-assistant";
 import { EdgeDock } from "@/components/edge-dock";
 import { needsOnboarding } from "@/lib/onboarding";
 import { IG_ACCOUNT_LIMIT, PRIVATE_REPLY_HOURLY_LIMIT, privateRepliesLastHour } from "@/lib/usage";
+import { getWorkspaceContext } from "@/lib/workspace";
+import { pendingInvitesFor } from "@/lib/invites";
+import { PendingInvites } from "@/components/workspace/pending-invites";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
   const userId = session.user.id!;
 
-  const [user, igAccount, repliesThisHour] = await Promise.all([
-    db.user.findUnique({ where: { id: userId }, select: { onboardedAt: true, name: true, email: true, image: true } }),
-    db.instagramAccount.findFirst({
-      where: { userId },
-      select: { username: true, profilePicUrl: true },
-    }),
-    privateRepliesLastHour(userId),
-  ]);
+  const ctx = await getWorkspaceContext();
+  if (!ctx) redirect("/login");
 
-  // A brand-new account is walked through connecting Instagram first.
-  if (user && needsOnboarding(user, !!igAccount)) redirect("/onboarding");
+  const [user, repliesThisHour, pendingInvites] = await Promise.all([
+    db.user.findUnique({ where: { id: userId }, select: { onboardedAt: true, name: true, email: true, image: true } }),
+    privateRepliesLastHour(ctx.workspace.id),
+    pendingInvitesFor(ctx.email),
+  ]);
+  const igAccount = ctx.igAccount;
+
+  // A brand-new account is walked through connecting Instagram first. Only an
+  // owner can connect one, so members skip it — the owner will.
+  if (user && ctx.role === "owner" && needsOnboarding(user, !!igAccount)) redirect("/onboarding");
 
   return (
     <div className="flex min-h-screen gap-3 p-3 bg-[#eceee9]">
       <Sidebar
+        workspace={{
+          current: { id: ctx.workspace.id, name: ctx.workspace.name, role: ctx.role },
+          all: ctx.workspaces,
+        }}
         usage={{
           replies: repliesThisHour,
           repliesLimit: PRIVATE_REPLY_HOURLY_LIMIT,
@@ -43,7 +52,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
           user={user ? { name: user.name, email: user.email, image: user.image ?? session.user.image } : session.user}
           igAccount={igAccount}
         />
-        <main className="flex-1 min-w-0 rounded-3xl bg-[#f7f8f5] overflow-auto">{children}</main>
+        <main className="flex-1 min-w-0 rounded-3xl bg-[#f7f8f5] overflow-auto">
+          {pendingInvites.length > 0 && <PendingInvites invites={pendingInvites} />}
+          {children}
+        </main>
       </div>
       <QuickStats launcher={false} />
       {/* Both open from the tabs on the right edge rather than corner buttons. */}
