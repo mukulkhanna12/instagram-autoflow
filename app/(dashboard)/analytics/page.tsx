@@ -262,7 +262,7 @@ function Overview({
           icon={CalendarDays}
           label={data.trend.bucketDays > 1 ? "Busiest week" : "Busiest day"}
           value={busiest ? new Date(busiest.date).toLocaleDateString(undefined, { weekday: data.trend.bucketDays > 1 ? undefined : "short", day: "numeric", month: "short" }) : "—"}
-          note={busiest ? `${busiest.contacts} comments, ${busiest.completed} got the link` : "No comments in this period"}
+          note={busiest ? `${busiest.contacts} ${busiest.contacts === 1 ? "person" : "people"} started a flow, ${busiest.completed} got the link` : "Nobody started a flow in this period"}
         />
         <Highlight
           icon={Target}
@@ -312,9 +312,9 @@ function Overview({
         </Panel>
 
         <Panel
-          title="When your audience comments"
+          title="When people start your flows"
           className="xl:col-span-8"
-          action={<span className="text-xs text-gray-400">Your local time</span>}
+          action={<span className="text-xs text-gray-400">Each person once per reel, at their latest comment · your local time</span>}
         >
           <Heatmap grid={data.heatmap} />
         </Panel>

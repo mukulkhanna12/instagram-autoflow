@@ -207,7 +207,9 @@ export function Funnel({
   );
 }
 
-// ─── Heatmap: when comments arrive, day × hour ────────────────────────────────
+// ─── Heatmap: when people start a flow, day × hour ───────────────────────────
+// One square per person per reel, at their latest triggering comment — not a
+// count of every comment (see lib/insights.ts).
 
 // Sequential, one hue light → dark (the brand ramp). Zero is its own neutral.
 const HEAT = ["#eef6f1", "#b0d6bf", "#80bb97", "#4f9a6d", "#236840", "#123522"];
@@ -229,7 +231,7 @@ export function Heatmap({ grid }: { grid: number[][] }) {
                   <button
                     type="button"
                     key={h}
-                    aria-label={`${DAYS[d]} ${hourLabel(h)}: ${v} comments`}
+                    aria-label={`${DAYS[d]} ${hourLabel(h)}: ${v} ${v === 1 ? "person" : "people"}`}
                     onPointerEnter={() => setHover({ d, h })}
                     onPointerLeave={() => setHover(null)}
                     onFocus={() => setHover({ d, h })}
@@ -256,8 +258,8 @@ export function Heatmap({ grid }: { grid: number[][] }) {
         <p className="h-4">
           {hover ? (
             <>
-              <strong className="text-gray-950 tabular-nums">{grid[hover.d][hover.h]}</strong> comment
-              {grid[hover.d][hover.h] === 1 ? "" : "s"} on {DAYS[hover.d]}s at {hourLabel(hover.h)}
+              <strong className="text-gray-950 tabular-nums">{grid[hover.d][hover.h]}</strong>{" "}
+              {grid[hover.d][hover.h] === 1 ? "person" : "people"} started a flow on {DAYS[hover.d]}s at {hourLabel(hover.h)}
             </>
           ) : (
             "Hover a square for the count"

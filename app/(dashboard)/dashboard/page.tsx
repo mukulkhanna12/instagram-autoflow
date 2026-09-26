@@ -63,6 +63,14 @@ function Dashboard() {
   const router = useRouter();
   const params = useSearchParams();
   const [automations, setAutomations] = useState<Automation[]>([]);
+  // Table paging: 10 automations at a time. Clamped so removing the last row
+  // of the last page doesn't leave you on an empty one.
+  const [page, setPageRaw] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(automations.length / PAGE_SIZE));
+  const setPage = (p: number) => setPageRaw(Math.min(Math.max(1, p), pageCount));
+  useEffect(() => {
+    if (page > pageCount) setPageRaw(pageCount);
+  }, [page, pageCount]);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [noAccount, setNoAccount] = useState(false);
@@ -337,7 +345,7 @@ function Dashboard() {
               { label: "Actions", className: "text-center" },
             ]}
           >
-            {automations.map((a) => {
+            {automations.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((a) => {
               const orphan = isOrphaned(a);
               return (
                 <tr
@@ -402,8 +410,55 @@ function Dashboard() {
             })}
           </TableFrame>
         )}
+        {automations.length > PAGE_SIZE && (
+          <Pager page={page} total={automations.length} onPage={(p) => {
+            setPage(p);
+            document.getElementById("automations")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }} />
+        )}
       </section>
     </div>
+  );
+}
+
+const PAGE_SIZE = 10;
+
+/** "Showing 11–20 of 34" with previous / next and page numbers. */
+function Pager({ page, total, onPage }: { page: number; total: number; onPage: (p: number) => void }) {
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const from = (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(total, page * PAGE_SIZE);
+  // Up to 5 numbers around the current page, plus the ends.
+  const nums = Array.from({ length: pages }, (_, i) => i + 1).filter(
+    (n) => n === 1 || n === pages || Math.abs(n - page) <= 1
+  );
+  const btn = "h-9 min-w-9 px-3 rounded-full text-sm font-bold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
+  return (
+    <nav className="mt-4 flex flex-wrap items-center justify-between gap-3" aria-label="Automations pages">
+      <p className="text-sm text-gray-500">
+        Showing <b className="text-gray-900 tabular-nums">{from}–{to}</b> of <b className="text-gray-900 tabular-nums">{total}</b>
+      </p>
+      <div className="flex items-center gap-1">
+        <button onClick={() => onPage(page - 1)} disabled={page === 1} className={`${btn} border border-gray-200 bg-white text-gray-700 hover:border-gray-300`}>
+          ← Prev
+        </button>
+        {nums.map((n, i) => (
+          <span key={n} className="flex items-center gap-1">
+            {i > 0 && n - nums[i - 1] > 1 && <span className="px-1 text-gray-400">…</span>}
+            <button
+              onClick={() => onPage(n)}
+              aria-current={n === page ? "page" : undefined}
+              className={`${btn} ${n === page ? "bg-gray-950 text-white" : "text-gray-600 hover:bg-white"}`}
+            >
+              {n}
+            </button>
+          </span>
+        ))}
+        <button onClick={() => onPage(page + 1)} disabled={page === pages} className={`${btn} border border-gray-200 bg-white text-gray-700 hover:border-gray-300`}>
+          Next →
+        </button>
+      </div>
+    </nav>
   );
 }
 
