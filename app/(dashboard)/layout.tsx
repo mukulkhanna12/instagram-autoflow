@@ -13,7 +13,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const userId = session.user.id!;
 
   const [user, igAccount, repliesThisHour] = await Promise.all([
-    db.user.findUnique({ where: { id: userId }, select: { onboardedAt: true } }),
+    db.user.findUnique({ where: { id: userId }, select: { onboardedAt: true, name: true, email: true, image: true } }),
     db.instagramAccount.findFirst({
       where: { userId },
       select: { username: true, profilePicUrl: true },
@@ -35,7 +35,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
         }}
       />
       <div className="flex-1 min-w-0 flex flex-col gap-3">
-        <Topbar user={session.user} igAccount={igAccount} />
+        {/* Read from the database, not the session, so a name changed in
+            Settings → Profile shows straight away rather than at next sign-in. */}
+        <Topbar
+          user={user ? { name: user.name, email: user.email, image: user.image ?? session.user.image } : session.user}
+          igAccount={igAccount}
+        />
         <main className="flex-1 min-w-0 rounded-3xl bg-[#f7f8f5] overflow-auto">{children}</main>
       </div>
       <QuickStats />

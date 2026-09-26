@@ -5,8 +5,9 @@ import {
   ArrowRight, Check, Clock, Filter, History, Instagram, Lock, MessageCircle, Repeat2,
   ShieldCheck, UserPlus, Wand2, Zap,
 } from "lucide-react";
-import { Logo } from "@/components/brand";
 import { DmMockup } from "@/components/landing/dm-mockup";
+import { SiteFooter } from "@/components/landing/site-footer";
+import { SiteHeader } from "@/components/landing/site-header";
 
 const FEATURES = [
   { icon: MessageCircle, title: "Reel comment replies", body: "Someone comments, AutoFlow replies publicly and slides into their DMs — seconds later, day or night." },
@@ -42,7 +43,7 @@ const FAQ = [
   },
   {
     q: "How much does it cost?",
-    a: "AutoFlow is free. New accounts are approved by hand while we grow, so there may be a short wait after you sign up.",
+    a: "The Free plan costs nothing and has everything in the app today. A Pro plan with more accounts and new triggers is on the way — see Pricing. New accounts are approved by hand while we grow, so there may be a short wait after you sign up.",
   },
 ];
 
@@ -52,28 +53,7 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white text-gray-950">
-      {/* Nav */}
-      <header className="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-gray-100">
-        <nav className="max-w-6xl mx-auto px-5 h-[72px] flex items-center gap-8">
-          <Logo />
-          <div className="hidden md:flex items-center gap-7 text-[15px] font-semibold text-gray-600">
-            <a href="#features" className="hover:text-gray-950">Features</a>
-            <a href="#how" className="hover:text-gray-950">How it works</a>
-            <a href="#faq" className="hover:text-gray-950">FAQ</a>
-          </div>
-          <div className="ml-auto flex items-center gap-3">
-            <Link href="/login" className="hidden sm:inline text-[15px] font-semibold text-gray-700 hover:text-gray-950 px-3">
-              Log in
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex items-center h-11 px-5 rounded-full bg-lime text-gray-950 font-bold hover:bg-lime-400 shadow-[inset_0_-3px_0_rgba(0,0,0,0.08)] transition-colors"
-            >
-              Get started
-            </Link>
-          </div>
-        </nav>
-      </header>
+      <SiteHeader />
 
       {/* Hero */}
       <section className="max-w-6xl mx-auto px-5 pt-16 pb-24 grid lg:grid-cols-[1.15fr_1fr] gap-14 items-center">
@@ -254,22 +234,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-100">
-        <div className="max-w-6xl mx-auto px-5 py-10 flex flex-col sm:flex-row items-center gap-6 justify-between">
-          <div className="text-center sm:text-left">
-            <Logo />
-            <p className="text-sm text-gray-500 mt-2">Instagram comment and DM automation for creators.</p>
-          </div>
-          <div className="flex items-center gap-6 text-sm font-semibold text-gray-600">
-            <Link href="/privacy" className="hover:text-gray-950">Privacy</Link>
-            <Link href="/login" className="hover:text-gray-950">Log in</Link>
-          </div>
-        </div>
-        <p className="text-center text-xs text-gray-400 pb-8 px-5">
-          © {new Date().getFullYear()} AutoFlow. Not affiliated with Instagram or Meta.
-        </p>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

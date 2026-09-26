@@ -69,6 +69,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: async ({ account, profile, user }) => {
       if (!account || account.provider === "credentials") return true;
 
+      // Already linked to an account: sign in as that account, whatever email
+      // the provider reports — it may differ from the one the account uses.
+      const linked = await db.account.findUnique({
+        where: { provider_providerAccountId: { provider: account.provider, providerAccountId: account.providerAccountId } },
+        select: { user: { select: { email: true, isApproved: true } } },
+      });
+      if (linked) {
+        return linked.user.isApproved ? true : `/login?pending=${encodeURIComponent(linked.user.email)}`;
+      }
+
+      // Signed in already and connecting Google/Facebook from Settings →
+      // Sign-in methods: Auth.js links the new account to the current user, so
+      // the provider's email doesn't go through the sign-up gate at all.
+      const current = await auth();
+      if (current?.user?.id) return true;
+
       const rawEmail = profile?.email ?? user?.email;
       if (!rawEmail) return "/login?error=no_email";
       const email = normalizeEmail(rawEmail);

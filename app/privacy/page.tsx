@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import { SiteFooter } from "@/components/landing/site-footer";
+import { SiteHeader } from "@/components/landing/site-header";
 
 export const metadata = {
   title: "Privacy Policy — AutoFlow",
@@ -9,13 +10,8 @@ export const metadata = {
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-white">
+      <SiteHeader />
       <div className="max-w-2xl mx-auto px-6 py-16">
-        <Link href="/" className="inline-flex items-center gap-2 mb-8">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
-            <Zap className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-bold text-gray-900">AutoFlow</span>
-        </Link>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Privacy Policy</h1>
         <p className="text-sm text-gray-400 mb-10">Last updated: August 2026</p>
@@ -94,6 +90,7 @@ export default function PrivacyPage() {
           <Link href="/" className="text-sm text-brand-600 hover:underline">← Back to home</Link>
         </div>
       </div>
+      <SiteFooter />
     </div>
   );
 }

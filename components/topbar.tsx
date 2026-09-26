@@ -1,55 +1,54 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Instagram } from "lucide-react";
+import { ProfileMenu } from "@/components/profile-menu";
+import { CommandSearch } from "@/components/command-search";
 
 interface TopbarProps {
   user: { name?: string | null; email?: string | null; image?: string | null };
   igAccount: { username: string; profilePicUrl: string | null } | null;
 }
 
-/** 6.png's header strip: the connected account on the left, you on the right. */
+/**
+ * The signed-in header: search (⌘K) on the left; the connected Instagram
+ * account and your profile menu together on the right.
+ */
 export function Topbar({ user, igAccount }: TopbarProps) {
   return (
-    <header className="rounded-3xl bg-white px-5 sm:px-6 h-[76px] flex items-center gap-4">
+    <header className="rounded-3xl bg-white px-4 sm:px-5 h-[76px] flex items-center gap-3">
+      <div className="flex-1 min-w-0">
+        <CommandSearch />
+      </div>
+
       {igAccount ? (
         <Link
           href="/settings"
-          className="flex items-center gap-2.5 rounded-full bg-[#f3f4f1] pl-1.5 pr-4 h-11 hover:bg-gray-100 transition-colors min-w-0"
+          title="Connected Instagram account"
+          className="hidden md:flex items-center gap-2.5 rounded-full border border-gray-100 pl-1.5 pr-3.5 h-11 hover:border-gray-200 hover:bg-[#fafbf8] transition-colors min-w-0"
         >
-          <span className="relative w-8 h-8 rounded-full overflow-hidden bg-gray-200 shrink-0">
-            {igAccount.profilePicUrl ? (
-              <Image src={igAccount.profilePicUrl} alt="" fill unoptimized className="object-cover" />
-            ) : (
-              <Instagram className="w-4 h-4 m-2 text-gray-500" />
-            )}
+          <span className="relative w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 via-pink-500 to-purple-600 p-[2px] shrink-0">
+            <span className="relative block w-full h-full rounded-full overflow-hidden bg-gray-200 ring-2 ring-white">
+              {igAccount.profilePicUrl ? (
+                <Image src={igAccount.profilePicUrl} alt="" fill unoptimized className="object-cover" />
+              ) : (
+                <Instagram className="w-3.5 h-3.5 m-[5px] text-gray-500" />
+              )}
+            </span>
           </span>
-          <span className="text-sm font-semibold text-gray-900 truncate">@{igAccount.username}</span>
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 shrink-0">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" /> Connected
-          </span>
+          <span className="text-sm font-semibold text-gray-900 truncate max-w-[140px]">@{igAccount.username}</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" aria-label="Connected" />
         </Link>
       ) : (
         <Link
           href="/settings"
-          className="flex items-center gap-2 rounded-full bg-amber-50 border border-amber-200 px-4 h-11 text-sm font-semibold text-amber-800 hover:bg-amber-100"
+          className="flex items-center gap-2 rounded-full bg-amber-50 border border-amber-200 px-4 h-11 text-sm font-semibold text-amber-800 hover:bg-amber-100 shrink-0"
         >
-          <Instagram className="w-4 h-4" /> Connect Instagram
+          <Instagram className="w-4 h-4" /> <span className="hidden sm:inline">Connect Instagram</span>
         </Link>
       )}
 
-      <div className="ml-auto flex items-center gap-3 min-w-0">
-        <span className="relative w-11 h-11 rounded-full overflow-hidden bg-lime-200 shrink-0 flex items-center justify-center">
-          {user.image ? (
-            <Image src={user.image} alt="" fill unoptimized className="object-cover" />
-          ) : (
-            <span className="font-bold text-brand-900">{(user.name || user.email || "U")[0]?.toUpperCase()}</span>
-          )}
-        </span>
-        <div className="hidden sm:block min-w-0">
-          <p className="text-[15px] font-bold text-gray-950 truncate">{user.name && user.name !== "AutoFlow" ? user.name : "Your account"}</p>
-          <p className="text-sm text-gray-400 truncate">{user.email}</p>
-        </div>
-      </div>
+      <span className="hidden md:block w-px h-8 bg-gray-100" aria-hidden />
+      <ProfileMenu user={user} />
     </header>
   );
 }
