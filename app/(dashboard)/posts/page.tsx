@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ImageIcon, Heart, MessageCircle, MessageSquare, Zap, AlertCircle, ExternalLink, Wand2 } from "lucide-react";
+import { ImageIcon, Heart, MessageCircle, MessageSquare, Zap, AlertCircle, ExternalLink, Wand2, BarChart3 } from "lucide-react";
+import { openQuickStats } from "@/components/analytics/quick-panel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
@@ -257,7 +258,18 @@ export default function PostsPage() {
                       >
                         <Zap className="w-3 h-3" /> Configure
                       </Link>
-                    ) : (
+                    ) : null}
+                    {automation && (
+                      <button
+                        onClick={() => openQuickStats(automation.id)}
+                        className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-brand-700 hover:border-brand-300 transition-colors cursor-pointer"
+                        aria-label="Quick stats for this reel"
+                        title="Quick stats"
+                      >
+                        <BarChart3 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {automation ? null : (
                       <>
                         {/* Automate stays put whether or not a flow is queued.
                             It used to be *replaced* by Attach flow, so with

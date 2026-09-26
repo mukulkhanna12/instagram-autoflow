@@ -4,8 +4,9 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Loader2, MessageSquare, UserCheck, Link2, ArrowLeft,
   Zap, ChevronRight, ToggleLeft, ToggleRight, Trash2, Pencil, X, Check,
-  Filter, GitBranch, RotateCcw, Plus, Copy, History, Send,
+  Filter, GitBranch, RotateCcw, Plus, Copy, History, Send, BarChart3,
 } from "lucide-react";
+import { openQuickStats } from "@/components/analytics/quick-panel";
 import {
   YOUTUBE_SUBSCRIBE_BUTTON, hasPresetButton, togglePresetButton,
 } from "@/lib/buttons";
@@ -271,6 +272,11 @@ export default function FlowEditorPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {!editing && (
+            <Button variant="outline" size="sm" onClick={() => openQuickStats(automation.id)}>
+              <BarChart3 className="w-4 h-4" /> Stats
+            </Button>
+          )}
           {!editing && (
             <button
               onClick={toggleActive}
