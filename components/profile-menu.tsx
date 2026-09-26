@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import * as Menu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, Compass, Instagram, LogOut, Pencil, Settings2, UserRound, Users } from "lucide-react";
+import { ChevronDown, Compass, Instagram, LogOut, Pencil, UserRound, Users } from "lucide-react";
 import { colorTile } from "@/lib/workspace-colors";
 import { startProductTour } from "@/components/product-tour";
 import { signOut } from "next-auth/react";
@@ -66,7 +66,6 @@ export function ProfileMenu({
                 </span>
                 <span className="truncate normal-case tracking-normal text-gray-500">{workspace.name}</span>
               </p>
-              <Item href="/settings?tab=general" icon={Settings2}>Workspace settings</Item>
               <Item href="/settings?tab=team" icon={Users}>Team</Item>
               <Item href="/settings" icon={Instagram}>Instagram account</Item>
             </>
