@@ -98,7 +98,7 @@ function PostView({ reel, username }: { reel: { caption?: string; thumbnail?: st
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
             <ImageIcon className="w-7 h-7 text-white/20" />
-            <p className="text-[11px] text-white/40">No reel chosen for this trigger yet</p>
+            <p className="text-[11px] text-white/40">No reel chosen for this flow yet</p>
           </div>
         )}
       </div>

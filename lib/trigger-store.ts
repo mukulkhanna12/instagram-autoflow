@@ -208,7 +208,7 @@ export function starterNodes(): FlowNode[] {
   ];
 }
 
-export function newTrigger(name = "Untitled trigger"): Trigger {
+export function newTrigger(name = "Untitled flow"): Trigger {
   return { id: uid("tg"), name, status: "draft", updatedAt: Date.now(), nodes: starterNodes() };
 }
 

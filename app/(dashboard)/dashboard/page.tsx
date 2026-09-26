@@ -8,6 +8,7 @@ import { truncate } from "@/lib/utils";
 import { Panel, PillLink, StatCard } from "@/components/dashboard/cards";
 import { ActivityBars, CompletionGauge } from "@/components/dashboard/charts";
 import { QuickStartModal } from "@/components/dashboard/quick-start";
+import { NewAutomationButton } from "@/components/new-automation";
 import { DashboardSkeleton } from "@/components/skeletons";
 
 interface Stats {
@@ -113,12 +114,9 @@ function Dashboard() {
           <p className="text-gray-500 mt-2">Turn every comment into a conversation — automatically.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/posts"
-            className="inline-flex items-center gap-2 h-12 px-6 rounded-full bg-brand-700 text-white font-bold hover:bg-brand-800 transition-colors"
-          >
+          <NewAutomationButton className="inline-flex items-center gap-2 h-12 px-6 rounded-full bg-brand-700 text-white font-bold hover:bg-brand-800 transition-colors">
             <Plus className="w-5 h-5" /> New automation
-          </Link>
+          </NewAutomationButton>
           <Link
             href="/queue"
             className="inline-flex items-center gap-2 h-12 px-6 rounded-full border-2 border-brand-700 text-brand-800 font-bold hover:bg-brand-50 transition-colors"

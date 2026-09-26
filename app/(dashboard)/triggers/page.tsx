@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Plus, Workflow, MessageCircle, Play, Info, Sliders, Send } from "lucide-react";
 import { loadTriggers, deleteTrigger, upsertTrigger, summarise, type Trigger, type FlowNode } from "@/lib/trigger-store";
+import { fromTrigger } from "@/lib/trigger-compose";
 import { truncate } from "@/lib/utils";
 import { PauseResumeButton, RowMenu, StatusPill, TableFrame } from "@/components/dashboard/row-menu";
 
@@ -21,11 +22,16 @@ export default function TriggersListPage() {
 
   useEffect(() => setTriggers(loadTriggers()), []);
 
-  // Creating goes to the form, not the canvas — the canvas is for editing.
-  const create = () => router.push("/triggers/new");
+  // Creating goes to the one-page editor; the step-by-step form stays one
+  // click away while both are being tried out.
+  const create = () => router.push("/triggers/compose");
+
+  // Open in the one-page editor when it can show the whole flow; branched
+  // flows only fit on the canvas.
+  const edit = (t: Trigger) => router.push(fromTrigger(t) ? `/triggers/${t.id}/compose` : `/triggers/${t.id}`);
 
   function remove(id: string) {
-    if (!confirm("Delete this trigger?")) return;
+    if (!confirm("Delete this flow?")) return;
     deleteTrigger(id);
     setTriggers(loadTriggers());
   }
@@ -41,7 +47,7 @@ export default function TriggersListPage() {
     <div className="p-6 lg:p-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-gray-950">Triggers</h1>
+          <h1 className="text-4xl font-extrabold tracking-tight text-gray-950">Flows</h1>
           <p className="text-gray-500 mt-2">Build a flow once, then point it at a reel.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -52,10 +58,16 @@ export default function TriggersListPage() {
             <Sliders className="w-4 h-4" /> Default messages
           </button>
           <button
+            onClick={() => router.push("/triggers/new")}
+            className="inline-flex items-center gap-2 h-12 px-5 rounded-full text-gray-600 font-bold hover:text-gray-950 transition-colors cursor-pointer"
+          >
+            Step-by-step
+          </button>
+          <button
             onClick={create}
             className="inline-flex items-center gap-2 h-12 px-6 rounded-full bg-brand-700 text-white font-bold hover:bg-brand-800 transition-colors cursor-pointer"
           >
-            <Plus className="w-5 h-5" /> New trigger
+            <Plus className="w-5 h-5" /> New flow
           </button>
         </div>
       </div>
@@ -63,26 +75,26 @@ export default function TriggersListPage() {
       <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-100 rounded-2xl p-4 mt-6">
         <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
         <p className="text-sm text-amber-900">
-          <strong>Design preview.</strong> Triggers save to this browser only and don&apos;t send anything
+          <strong>Design preview.</strong> Flows save to this browser only and don&apos;t send anything
           yet, so they have no numbers. Your live reel automations are untouched.
         </p>
       </div>
 
-      <h2 className="text-2xl font-extrabold text-gray-950 mt-8">Your triggers</h2>
-      <p className="text-gray-500 mt-1 mb-5">Manage your triggers and track their performance below.</p>
+      <h2 className="text-2xl font-extrabold text-gray-950 mt-8">Your flows</h2>
+      <p className="text-gray-500 mt-1 mb-5">Manage your flows and track their performance below.</p>
 
       {triggers.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed border-gray-300 p-14 text-center">
           <Workflow className="w-9 h-9 text-gray-300 mx-auto mb-3" />
-          <p className="font-bold text-gray-900">No triggers yet</p>
+          <p className="font-bold text-gray-900">No flows yet</p>
           <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
-            A trigger is one complete flow — the reel, the keyword, and every message that follows.
+            A flow is one complete automation — the reel, the keyword, and every message that follows.
           </p>
           <button
             onClick={create}
             className="mt-5 inline-flex items-center gap-2 h-11 px-5 rounded-full bg-lime text-gray-950 font-bold hover:bg-lime-400 cursor-pointer"
           >
-            <Plus className="w-4 h-4" /> Create your first trigger
+            <Plus className="w-4 h-4" /> Create your first flow
           </button>
         </div>
       ) : (
@@ -100,7 +112,7 @@ export default function TriggersListPage() {
             const s = summarise(t);
             const live = t.status === "live";
             return (
-              <tr key={t.id} onClick={() => router.push(`/triggers/${t.id}`)} className="hover:bg-[#fafbf8] cursor-pointer">
+              <tr key={t.id} onClick={() => edit(t)} className="hover:bg-[#fafbf8] cursor-pointer">
                 <td className="px-6 py-5">
                   <div className="flex items-center gap-4 min-w-0">
                     <TriggerIcon trigger={t} />
@@ -121,7 +133,8 @@ export default function TriggersListPage() {
                     <PauseResumeButton live={live} onClick={() => toggle(t)} />
                     <RowMenu
                       items={[
-                        { label: "Edit", onSelect: () => router.push(`/triggers/${t.id}`) },
+                        ...(fromTrigger(t) ? [{ label: "Edit", onSelect: () => router.push(`/triggers/${t.id}/compose`) }] : []),
+                        { label: "Edit on canvas", onSelect: () => router.push(`/triggers/${t.id}`) },
                         { label: "Delete", danger: true, onSelect: () => remove(t.id) },
                       ]}
                     />

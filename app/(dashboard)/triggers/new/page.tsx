@@ -36,7 +36,7 @@ export default function NewTriggerPage() {
   const [browsing, setBrowsing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [name, setName] = useState("Untitled trigger");
+  const [name, setName] = useState("Untitled flow");
   const [reels, setReels] = useState<TriggerReel[] | null>(null);
 
   const [reel, setReel] = useState<TriggerReel | null>(null);
@@ -95,7 +95,7 @@ export default function NewTriggerPage() {
   function save() {
     setSaving(true);
     const t: Trigger = {
-      id: uid("tg"), name: name.trim() || "Untitled trigger",
+      id: uid("tg"), name: name.trim() || "Untitled flow",
       // Always a draft: the payoff link is still empty at this point.
       status: "draft", updatedAt: Date.now(), nodes: buildNodes(),
     };
@@ -110,9 +110,14 @@ export default function NewTriggerPage() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="px-8 pt-6 pb-4 shrink-0">
-          <button onClick={() => router.push("/triggers")} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 mb-4 cursor-pointer">
-            <ArrowLeft className="w-3.5 h-3.5" /> All triggers
-          </button>
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={() => router.push("/triggers")} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 cursor-pointer">
+              <ArrowLeft className="w-3.5 h-3.5" /> All flows
+            </button>
+            <button onClick={() => router.push("/triggers/compose")} className="text-xs font-semibold text-brand-700 hover:text-brand-800 cursor-pointer">
+              Try the one-page editor →
+            </button>
+          </div>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}

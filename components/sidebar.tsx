@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, ImageIcon, Settings, LogOut, Wand2, Workflow, Plus,
-  PanelLeftClose, PanelLeftOpen, ShieldCheck,
+  LayoutDashboard, ImageIcon, Settings, LogOut, Wand2, Workflow,
+  PanelLeftClose, PanelLeftOpen, ShieldCheck, BookMarked,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { Logo, LogoMark } from "@/components/brand";
+import { NewAutomationButton } from "@/components/new-automation";
 
 interface SidebarProps {
   usage: { replies: number; repliesLimit: number; accounts: number; accountsLimit: number };
@@ -17,7 +18,8 @@ interface SidebarProps {
 const menu = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/posts", icon: ImageIcon, label: "Reels" },
-  { href: "/triggers", icon: Workflow, label: "Triggers" },
+  { href: "/playbooks", icon: BookMarked, label: "Playbooks" },
+  { href: "/triggers", icon: Workflow, label: "Flows" },
   { href: "/queue", icon: Wand2, label: "Upcoming reels" },
 ];
 
@@ -72,17 +74,13 @@ export function Sidebar({ usage }: SidebarProps) {
 
       {/* Primary action (5.png) */}
       <div className={collapsed ? "px-3" : "px-4"}>
-        <Link
-          href="/posts"
-          title={collapsed ? "New automation" : undefined}
+        <NewAutomationButton
+          collapsed={collapsed}
           className={cn(
-            "flex items-center justify-center gap-2 rounded-2xl bg-lime text-gray-950 font-bold hover:bg-lime-400 shadow-[inset_0_-3px_0_rgba(0,0,0,0.08)] transition-colors",
+            "w-full flex items-center justify-center gap-2 rounded-2xl bg-lime text-gray-950 font-bold hover:bg-lime-400 shadow-[inset_0_-3px_0_rgba(0,0,0,0.08)] transition-colors",
             collapsed ? "h-12" : "h-12 text-[15px]"
           )}
-        >
-          <Plus className="w-5 h-5" strokeWidth={2.5} />
-          {!collapsed && "New automation"}
-        </Link>
+        />
       </div>
 
       <nav className="flex-1 overflow-y-auto mt-6">
