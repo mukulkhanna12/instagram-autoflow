@@ -60,6 +60,7 @@ export default async function LandingPage() {
             <a href="#features" className="hover:text-gray-950">Features</a>
             <a href="#how" className="hover:text-gray-950">How it works</a>
             <a href="#faq" className="hover:text-gray-950">FAQ</a>
+            <Link href="/help" className="hover:text-gray-950">Help</Link>
           </div>
           <div className="ml-auto flex items-center gap-3">
             <Link href="/login" className="hidden sm:inline text-[15px] font-semibold text-gray-700 hover:text-gray-950 px-3">

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
+import { HelpAssistant } from "@/components/help/help-assistant";
 import { needsOnboarding } from "@/lib/onboarding";
 import { IG_ACCOUNT_LIMIT, PRIVATE_REPLY_HOURLY_LIMIT, privateRepliesLastHour } from "@/lib/usage";
 
@@ -37,6 +38,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <Topbar user={session.user} igAccount={igAccount} />
         <main className="flex-1 min-w-0 rounded-3xl bg-[#f7f8f5] overflow-auto">{children}</main>
       </div>
+      <HelpAssistant />
     </div>
   );
 }
