@@ -6,6 +6,8 @@ const config: Config = {
     "./pages/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
     "./app/**/*.{ts,tsx}",
+    // Class names built in lib/ (e.g. workspace colours) must be scanned too.
+    "./lib/**/*.{ts,tsx}",
   ],
   theme: {
     extend: {

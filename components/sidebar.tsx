@@ -8,15 +8,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo, LogoMark } from "@/components/brand";
-import { NewAutomationButton } from "@/components/new-automation";
 import { WorkspaceSwitcher } from "@/components/workspace/switcher";
 import type { Role } from "@/lib/roles";
 
 interface SidebarProps {
   usage: { replies: number; repliesLimit: number; accounts: number; accountsLimit: number };
   workspace: {
-    current: { id: string; name: string; role: Role };
-    all: Array<{ id: string; name: string; role: Role }>;
+    current: { id: string; name: string; color: string; role: Role };
+    all: Array<{ id: string; name: string; color: string; role: Role }>;
+    invites: Array<{ id: string; workspaceName: string; invitedBy: string }>;
   };
 }
 
@@ -79,19 +79,8 @@ export function Sidebar({ usage, workspace }: SidebarProps) {
         </button>
       </div>
 
-      <div className={cn("mb-3", collapsed ? "px-3" : "px-4")}>
-        <WorkspaceSwitcher current={workspace.current} all={workspace.all} collapsed={collapsed} />
-      </div>
-
-      {/* Primary action (5.png) */}
-      <div className={collapsed ? "px-3" : "px-4"}>
-        <NewAutomationButton
-          collapsed={collapsed}
-          className={cn(
-            "w-full flex items-center justify-center gap-2 rounded-2xl bg-lime text-gray-950 font-bold hover:bg-lime-400 shadow-[inset_0_-3px_0_rgba(0,0,0,0.08)] transition-colors",
-            collapsed ? "h-12" : "h-12 text-[15px]"
-          )}
-        />
+      <div data-tour="workspace" className={cn("mb-3", collapsed ? "px-3" : "px-4")}>
+        <WorkspaceSwitcher current={workspace.current} all={workspace.all} invites={workspace.invites} collapsed={collapsed} />
       </div>
 
       <nav className="flex-1 overflow-y-auto mt-6">
@@ -131,6 +120,7 @@ function NavItem({
   return (
     <Link
       href={href}
+      data-tour={`nav-${href.slice(1)}`}
       title={collapsed ? label : undefined}
       className={cn(
         "relative flex items-center text-[15px] transition-colors",

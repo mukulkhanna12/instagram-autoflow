@@ -29,6 +29,9 @@ model User {
   onboardingAnswers Json?
   onboardedAt       DateTime?
   quickStartSeenAt  DateTime?
+  // The first-run product tour (components/product-tour.tsx) was finished or
+  // skipped. It can still be replayed from the profile menu.
+  tourSeenAt        DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -49,6 +52,8 @@ model User {
 model Workspace {
   id        String   @id @default(cuid())
   name      String
+  // Key into lib/workspace-colors.ts — tints the workspace's icon.
+  color     String   @default("green")
   ownerId   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

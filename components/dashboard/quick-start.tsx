@@ -2,6 +2,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { useRouter } from "next/navigation";
+import { startProductTour } from "@/components/product-tour";
 import { ArrowRight, Clock, CornerDownRight, Eye, Film, X, Zap } from "lucide-react";
 
 /**
@@ -22,6 +23,8 @@ export function QuickStartModal({
   function dismiss() {
     fetch("/api/onboarding/quick-start", { method: "POST" }).catch(() => {});
     onClose();
+    // First run: show them around once the welcome is out of the way.
+    setTimeout(startProductTour, 400);
   }
 
   function go(href: string) {

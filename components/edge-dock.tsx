@@ -17,7 +17,7 @@ export function EdgeDock() {
   const showStats = pathname !== "/analytics";
 
   return (
-    <div className="fixed right-0 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-1.5" aria-label="Quick tools">
+    <div data-tour="dock" className="fixed right-0 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-1.5" aria-label="Quick tools">
       {showStats && (
         <Tab onClick={() => openQuickStats()} label="Stats" dark>
           <BarChart3 className="w-4 h-4" strokeWidth={2.5} />

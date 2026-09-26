@@ -2,10 +2,13 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Check, Copy, Crown, Link2, Mail, Pencil, Send, Users, X } from "lucide-react";
+import { Check, Copy, Crown, Link2, Mail, Send, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { AccountRowSkeleton } from "@/components/skeletons";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { InfoTip } from "@/components/ui/info-tip";
+import { WorkspaceExplainer } from "@/components/workspace/explainer";
 import { ROLE_BLURB, ROLE_LABEL, isRole } from "@/lib/roles";
 
 interface Member { userId: string; name: string | null; email: string; image: string | null; role: string; joinedAt: string }
@@ -24,21 +27,19 @@ interface Data {
  */
 export function TeamPanel() {
   const router = useRouter();
+  const confirm = useConfirm();
   const [data, setData] = useState<Data | null>(null);
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState<{ email: string; url: string; emailed: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [editingName, setEditingName] = useState(false);
-  const [name, setName] = useState("");
 
   async function load() {
     const res = await fetch("/api/workspaces/members");
     if (res.ok) {
       const d: Data = await res.json();
       setData(d);
-      setName(d.workspace.name);
     }
   }
   useEffect(() => { load(); }, []);
@@ -73,36 +74,59 @@ export function TeamPanel() {
     }
   }
 
-  async function revoke(id: string) {
+  async function revoke(i: Invite) {
+    const ok = await confirm({
+      title: `Cancel the invite to ${i.email}?`,
+      body: "The link stops working straight away. You can always send a new one.",
+      confirmLabel: "Cancel invite",
+      cancelLabel: "Keep it",
+      tone: "danger",
+      icon: "remove",
+    });
+    if (!ok) return;
+    const id = i.id;
     await fetch(`/api/workspaces/invites/${id}`, { method: "DELETE" });
     load();
   }
 
   async function remove(m: Member) {
     const leaving = m.userId === data?.you.userId;
-    const msg = leaving
-      ? `Leave ${data?.workspace.name}? You'll lose access until you're invited again.`
-      : `Remove ${m.name ?? m.email} from ${data?.workspace.name}? They lose access straight away.`;
-    if (!confirm(msg)) return;
+    const ws = data?.workspace.name ?? "this workspace";
+    const ok = await confirm(
+      leaving
+        ? {
+            title: `Leave ${ws}?`,
+            body: (
+              <>
+                You&apos;ll stop seeing its automations, reels and results straight away. Nothing is deleted —
+                the owner can invite you back any time. You&apos;ll be moved to your own workspace.
+              </>
+            ),
+            confirmLabel: "Leave workspace",
+            cancelLabel: "Stay",
+            tone: "danger",
+            icon: "leave",
+          }
+        : {
+            title: `Remove ${m.name ?? m.email}?`,
+            body: (
+              <>
+                They lose access to <strong>{ws}</strong> straight away. Their work — automations they built —
+                stays in the workspace. You can invite them again later.
+              </>
+            ),
+            confirmLabel: "Remove",
+            tone: "danger",
+            icon: "remove",
+          }
+    );
+    if (!ok) return;
     const res = await fetch(`/api/workspaces/members/${m.userId}`, { method: "DELETE" });
     if (!res.ok) return setError((await res.json().catch(() => ({}))).error ?? "Couldn't do that.");
     if (leaving) {
       router.push("/dashboard");
       router.refresh();
     } else load();
-  }
-
-  async function rename() {
-    const res = await fetch("/api/workspaces/current", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    if (res.ok) {
-      setEditingName(false);
-      load();
-      router.refresh();
-    }
   }
 
   if (!data) {
@@ -121,29 +145,11 @@ export function TeamPanel() {
               <Users className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
-              {editingName ? (
-                <form onSubmit={(e) => { e.preventDefault(); rename(); }} className="flex items-center gap-2">
-                  <input
-                    autoFocus
-                    value={name}
-                    maxLength={60}
-                    onChange={(e) => setName(e.target.value)}
-                    className="h-9 flex-1 rounded-lg border border-gray-200 px-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                  <button type="submit" className="w-9 h-9 rounded-lg bg-brand-700 text-white flex items-center justify-center cursor-pointer" aria-label="Save name"><Check className="w-4 h-4" /></button>
-                  <button type="button" onClick={() => { setEditingName(false); setName(data.workspace.name); }} className="w-9 h-9 rounded-lg text-gray-400 hover:bg-gray-100 flex items-center justify-center cursor-pointer" aria-label="Cancel"><X className="w-4 h-4" /></button>
-                </form>
-              ) : (
-                <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                  {data.workspace.name}
-                  {owner && (
-                    <button onClick={() => setEditingName(true)} className="text-gray-300 hover:text-gray-600 cursor-pointer" aria-label="Rename workspace">
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </h2>
-              )}
-              <p className="text-xs text-gray-400">{data.members.length} {data.members.length === 1 ? "person" : "people"} · one Instagram account</p>
+              <h2 className="font-semibold text-gray-900">Team</h2>
+              <p className="text-xs text-gray-400 flex items-center gap-1">
+                {data.members.length} {data.members.length === 1 ? "person" : "people"} · one Instagram account
+                <InfoTip title="What's a workspace?"><WorkspaceExplainer /></InfoTip>
+              </p>
             </div>
           </div>
         </CardHeader>
@@ -253,7 +259,7 @@ export function TeamPanel() {
                   Resend
                 </Button>
                 {i.status === "pending" && (
-                  <Button variant="ghost" size="sm" onClick={() => revoke(i.id)}>Cancel</Button>
+                  <Button variant="ghost" size="sm" onClick={() => revoke(i)}>Cancel</Button>
                 )}
               </div>
             ))}

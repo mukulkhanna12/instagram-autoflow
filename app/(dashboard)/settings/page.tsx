@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Instagram, CheckCircle, AlertCircle, UserRound, Check, KeyRound, Users } from "lucide-react";
+import { Instagram, CheckCircle, AlertCircle, UserRound, Check, KeyRound, Users, Settings2 } from "lucide-react";
+import { GeneralPanel } from "@/components/workspace/general-panel";
+import { colorTile } from "@/lib/workspace-colors";
 import { TeamPanel } from "@/components/workspace/team-panel";
 import Link from "next/link";
 import { SignInMethods } from "@/components/sign-in-methods";
@@ -13,12 +15,18 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AccountRowSkeleton, FormPageSkeleton } from "@/components/skeletons";
 
-const TABS = [
-  { id: "instagram", label: "Instagram", icon: Instagram },
-  { id: "profile", label: "Profile", icon: UserRound },
+// Two settings areas, side by side: the workspace (shared with your team) and
+// your own account. The side menu groups them so each is one click away.
+const WORKSPACE_TABS = [
+  { id: "general", label: "General", icon: Settings2 },
   { id: "team", label: "Team", icon: Users },
+  { id: "instagram", label: "Instagram", icon: Instagram },
+] as const;
+const ACCOUNT_TABS = [
+  { id: "profile", label: "Profile", icon: UserRound },
   { id: "sign-in", label: "Sign-in methods", icon: KeyRound },
 ] as const;
+const TABS = [...WORKSPACE_TABS, ...ACCOUNT_TABS];
 type TabId = (typeof TABS)[number]["id"];
 
 interface IgAccount {
@@ -35,10 +43,15 @@ function SettingsContent() {
   const [disconnecting, setDisconnecting] = useState(false);
   // Only the owner connects or disconnects; members see who can.
   const [isOwner, setIsOwner] = useState(true);
+  const [ws, setWs] = useState<{ name: string; color: string } | null>(null);
   useEffect(() => {
     fetch("/api/workspaces")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setIsOwner(d.current.role === "owner"))
+      .then((d) => {
+        if (!d) return;
+        setIsOwner(d.current.role === "owner");
+        setWs({ name: d.current.name, color: d.current.color });
+      })
       .catch(() => {});
   }, []);
 
@@ -64,29 +77,48 @@ function SettingsContent() {
     setDisconnecting(false);
   }
 
+  const tabLink = (id: TabId) => (id === "instagram" ? "/settings" : `/settings?tab=${id}`);
+  const item = (t: (typeof TABS)[number]) => (
+    <Link
+      key={t.id}
+      href={tabLink(t.id)}
+      scroll={false}
+      aria-current={tab === t.id ? "page" : undefined}
+      className={`shrink-0 flex items-center gap-2.5 rounded-xl px-3 h-10 text-sm font-semibold transition-colors ${
+        tab === t.id ? "bg-white text-gray-950 shadow-sm" : "text-gray-500 hover:text-gray-900 hover:bg-white/60"
+      }`}
+    >
+      <t.icon className="w-4 h-4" /> {t.label}
+    </Link>
+  );
+
   return (
-    <div className="p-8 max-w-3xl space-y-6">
+    <div className="p-6 lg:p-8 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-500 text-sm mt-1">Your Instagram connection, team, profile and how you sign in</p>
+        <p className="text-gray-500 text-sm mt-1">Your workspace — shared with your team — and your own account, side by side.</p>
       </div>
 
-      <nav className="flex gap-1 border-b border-gray-200 overflow-x-auto" aria-label="Settings sections">
-        {TABS.map((t) => (
-          <Link
-            key={t.id}
-            href={t.id === "instagram" ? "/settings" : `/settings?tab=${t.id}`}
-            scroll={false}
-            aria-current={tab === t.id ? "page" : undefined}
-            className={`relative shrink-0 inline-flex items-center gap-2 px-4 h-11 text-sm font-semibold transition-colors ${
-              tab === t.id ? "text-gray-950" : "text-gray-500 hover:text-gray-900"
-            }`}
-          >
-            <t.icon className="w-4 h-4" /> {t.label}
-            {tab === t.id && <span className="absolute left-3 right-3 -bottom-px h-0.5 rounded-full bg-brand-700" />}
-          </Link>
-        ))}
+      <div className="mt-6 grid gap-6 md:grid-cols-[220px_1fr]">
+      <nav className="md:sticky md:top-6 self-start rounded-2xl bg-[#eef0eb] p-2 flex md:flex-col gap-1 overflow-x-auto" aria-label="Settings sections">
+        <p className="hidden md:flex items-center gap-2 px-3 pt-2 pb-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-gray-400">
+          Workspace
+        </p>
+        {ws && (
+          <p className="hidden md:flex items-center gap-2 px-3 pb-2 text-sm font-bold text-gray-900 min-w-0">
+            <span className={`w-6 h-6 rounded-lg text-[11px] font-extrabold flex items-center justify-center shrink-0 ${colorTile(ws.color)}`}>
+              {(ws.name.trim()[0] ?? "W").toUpperCase()}
+            </span>
+            <span className="truncate">{ws.name}</span>
+          </p>
+        )}
+        {WORKSPACE_TABS.map(item)}
+        <span className="hidden md:block my-2 h-px bg-gray-200 mx-3" />
+        <p className="hidden md:block px-3 pt-1 pb-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-gray-400">Your account</p>
+        {ACCOUNT_TABS.map(item)}
       </nav>
+
+      <div className="min-w-0 space-y-6">
 
       {tab === "instagram" && (<>
       {/* Status banners */}
@@ -172,9 +204,12 @@ function SettingsContent() {
         </CardBody>
       </Card>
       </>)}
+      {tab === "general" && <GeneralPanel />}
       {tab === "profile" && <ProfileCard />}
       {tab === "team" && <TeamPanel />}
       {tab === "sign-in" && <SignInMethodsCard linkedNow={searchParams.get("linked")} />}
+      </div>
+      </div>
     </div>
   );
 }

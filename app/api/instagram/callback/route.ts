@@ -71,14 +71,15 @@ export async function GET(req: NextRequest) {
     // normal client, and that is precisely the case a reconnect would steal.
     const existing = await dbUnfiltered.instagramAccount.findUnique({
       where: { instagramId: profile.id },
-      select: { userId: true, workspaceId: true },
+      select: { userId: true, workspaceId: true, workspace: { select: { isDeleted: true } } },
     });
     // A row from before workspaces (no workspaceId yet) still belongs to
     // whoever connected it; anything else belongs to its workspace.
+    // An account left behind in a deleted workspace is free to move here.
     const ownedHere = existing
-      ? existing.workspaceId
+      ? existing.workspaceId && !existing.workspace?.isDeleted
         ? existing.workspaceId === ctx.workspace.id
-        : existing.userId === session.user.id
+        : !existing.workspaceId ? existing.userId === session.user.id : true
       : true;
     if (!ownedHere) return done("error=account_taken");
 

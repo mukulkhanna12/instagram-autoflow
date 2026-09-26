@@ -24,13 +24,14 @@ export const WORKSPACE_COOKIE = "af_ws";
 export interface WorkspaceSummary {
   id: string;
   name: string;
+  color: string;
   role: Role;
 }
 
 export interface WorkspaceContext {
   userId: string;
   email: string;
-  workspace: { id: string; name: string; ownerId: string };
+  workspace: { id: string; name: string; ownerId: string; color: string; personal: boolean };
   role: Role;
   /** The workspace's live Instagram account, if one is connected. */
   igAccount: InstagramAccount | null;
@@ -87,7 +88,7 @@ export const getWorkspaceContext = cache(async (): Promise<WorkspaceContext | nu
 
   const memberships = await db.membership.findMany({
     where: { userId },
-    include: { workspace: { select: { id: true, name: true, ownerId: true } } },
+    include: { workspace: { select: { id: true, name: true, ownerId: true, color: true } } },
     orderBy: { createdAt: "asc" },
   });
   const valid = memberships.filter((m) => isRole(m.role));
@@ -107,10 +108,10 @@ export const getWorkspaceContext = cache(async (): Promise<WorkspaceContext | nu
   return {
     userId,
     email: user.email,
-    workspace: active.workspace,
+    workspace: { ...active.workspace, personal: active.workspaceId === personalWorkspaceId(userId) },
     role: active.role as Role,
     igAccount,
-    workspaces: valid.map((m) => ({ id: m.workspace.id, name: m.workspace.name, role: m.role as Role })),
+    workspaces: valid.map((m) => ({ id: m.workspace.id, name: m.workspace.name, color: m.workspace.color, role: m.role as Role })),
   };
 });
 

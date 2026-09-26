@@ -3,22 +3,27 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, ChevronsUpDown, Plus, Users, X } from "lucide-react";
+import { Check, ChevronsUpDown, Mail, Plus, Settings2, Users, X } from "lucide-react";
+import { InfoTip } from "@/components/ui/info-tip";
+import { WorkspaceExplainer } from "@/components/workspace/explainer";
 import { ROLE_LABEL, type Role } from "@/lib/roles";
 import { cn } from "@/lib/utils";
+import { colorTile } from "@/lib/workspace-colors";
 
-interface Ws { id: string; name: string; role: Role }
+interface Ws { id: string; name: string; color: string; role: Role }
 
 /**
  * Top of the sidebar: which workspace you're in, and a menu to switch, create
  * one, or open its team settings. Each workspace has its own Instagram account.
  */
 export function WorkspaceSwitcher({
-  current, all, collapsed,
+  current, all, collapsed, invites = [],
 }: {
   current: Ws;
   all: Ws[];
   collapsed: boolean;
+  /** Invitations waiting for you — also shown as a banner on every page. */
+  invites?: Array<{ id: string; workspaceName: string; invitedBy: string }>;
 }) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
@@ -32,6 +37,18 @@ export function WorkspaceSwitcher({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ workspaceId: id }),
+    });
+    if (res.ok) {
+      router.push("/dashboard");
+      router.refresh();
+    }
+  }
+
+  async function acceptInvite(id: string) {
+    const res = await fetch("/api/invites/accept", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
     });
     if (res.ok) {
       router.push("/dashboard");
@@ -64,19 +81,21 @@ export function WorkspaceSwitcher({
       <Menu.Root>
         <Menu.Trigger
           className={cn(
-            "w-full flex items-center gap-3 rounded-2xl border border-gray-100 hover:bg-[#fafbf8] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
+            "relative w-full flex items-center gap-3 rounded-2xl border border-gray-100 hover:bg-[#fafbf8] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
             collapsed ? "justify-center p-1.5" : "px-2.5 py-2"
           )}
           title={collapsed ? current.name : undefined}
           aria-label="Switch workspace"
         >
-          <WsMark initial={initial} />
+          <WsMark initial={initial} color={current.color} />
+          {collapsed && invites.length > 0 && <Dot />}
           {!collapsed && (
             <>
               <span className="min-w-0 flex-1 text-left">
                 <span className="block text-sm font-bold text-gray-950 truncate">{current.name}</span>
                 <span className="block text-xs text-gray-400">{ROLE_LABEL[current.role]}</span>
               </span>
+              {invites.length > 0 && <Dot inline />}
               <ChevronsUpDown className="w-4 h-4 text-gray-400 shrink-0" />
             </>
           )}
@@ -88,14 +107,37 @@ export function WorkspaceSwitcher({
             sideOffset={8}
             className="z-50 w-72 rounded-3xl bg-white border border-gray-100 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.3)] p-2"
           >
-            <p className="px-3 pt-2 pb-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-gray-400">Workspaces</p>
+            {invites.length > 0 && (
+              <>
+                <p className="px-3 pt-2 pb-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-gray-400">Invitations</p>
+                {invites.map((i) => (
+                  <Menu.Item
+                    key={i.id}
+                    onSelect={() => acceptInvite(i.id)}
+                    className="flex items-center gap-3 rounded-xl px-2.5 py-2 outline-none data-[highlighted]:bg-lime-50 cursor-pointer"
+                  >
+                    <span className="w-8 h-8 rounded-xl bg-lime text-gray-950 flex items-center justify-center shrink-0"><Mail className="w-4 h-4" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-gray-900 truncate">{i.workspaceName}</span>
+                      <span className="block text-xs text-gray-400 truncate">from {i.invitedBy}</span>
+                    </span>
+                    <span className="text-xs font-extrabold text-brand-700">Join</span>
+                  </Menu.Item>
+                ))}
+                <Menu.Separator className="my-1 h-px bg-gray-100" />
+              </>
+            )}
+            <p className="px-3 pt-2 pb-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-gray-400 flex items-center gap-1">
+              Workspaces
+              <InfoTip title="What's a workspace?"><WorkspaceExplainer /></InfoTip>
+            </p>
             {all.map((w) => (
               <Menu.Item
                 key={w.id}
                 onSelect={() => switchTo(w.id)}
                 className="flex items-center gap-3 rounded-xl px-2.5 py-2 outline-none data-[highlighted]:bg-[#f7f8f5] cursor-pointer"
               >
-                <WsMark initial={w.name.trim()[0]?.toUpperCase() ?? "W"} small />
+                <WsMark initial={w.name.trim()[0]?.toUpperCase() ?? "W"} color={w.color} small />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold text-gray-900 truncate">{w.name}</span>
                   <span className="block text-xs text-gray-400">{ROLE_LABEL[w.role]}</span>
@@ -104,6 +146,12 @@ export function WorkspaceSwitcher({
               </Menu.Item>
             ))}
             <Menu.Separator className="my-1 h-px bg-gray-100" />
+            <Menu.Item
+              onSelect={() => router.push("/settings?tab=general")}
+              className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-700 outline-none data-[highlighted]:bg-[#f7f8f5] cursor-pointer"
+            >
+              <Settings2 className="w-4 h-4 text-gray-400" /> Workspace settings
+            </Menu.Item>
             <Menu.Item
               onSelect={() => router.push("/settings?tab=team")}
               className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-700 outline-none data-[highlighted]:bg-[#f7f8f5] cursor-pointer"
@@ -161,13 +209,27 @@ export function WorkspaceSwitcher({
   );
 }
 
-function WsMark({ initial, small }: { initial: string; small?: boolean }) {
+function WsMark({ initial, color, small }: { initial: string; color: string; small?: boolean }) {
   return (
     <span className={cn(
-      "rounded-xl bg-brand-900 text-lime font-extrabold flex items-center justify-center shrink-0",
+      "rounded-xl font-extrabold flex items-center justify-center shrink-0",
+      colorTile(color),
       small ? "w-8 h-8 text-sm" : "w-9 h-9"
     )}>
       {initial}
     </span>
+  );
+}
+
+/** A small lime dot: you have invitations waiting. */
+function Dot({ inline }: { inline?: boolean }) {
+  return (
+    <span
+      aria-label="Invitations waiting"
+      className={cn(
+        "w-2.5 h-2.5 rounded-full bg-lime ring-2 ring-white shrink-0",
+        inline ? "" : "absolute top-1 right-1"
+      )}
+    />
   );
 }

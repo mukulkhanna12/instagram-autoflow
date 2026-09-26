@@ -6,6 +6,8 @@ import { Topbar } from "@/components/topbar";
 import { QuickStats } from "@/components/analytics/quick-panel";
 import { HelpAssistant } from "@/components/help/help-assistant";
 import { EdgeDock } from "@/components/edge-dock";
+import { ProductTour } from "@/components/product-tour";
+import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import { needsOnboarding } from "@/lib/onboarding";
 import { IG_ACCOUNT_LIMIT, PRIVATE_REPLY_HOURLY_LIMIT, privateRepliesLastHour } from "@/lib/usage";
 import { getWorkspaceContext } from "@/lib/workspace";
@@ -21,7 +23,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!ctx) redirect("/login");
 
   const [user, repliesThisHour, pendingInvites] = await Promise.all([
-    db.user.findUnique({ where: { id: userId }, select: { onboardedAt: true, name: true, email: true, image: true } }),
+    db.user.findUnique({ where: { id: userId }, select: { onboardedAt: true, name: true, email: true, image: true, quickStartSeenAt: true, tourSeenAt: true } }),
     privateRepliesLastHour(ctx.workspace.id),
     pendingInvitesFor(ctx.email),
   ]);
@@ -32,11 +34,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (user && ctx.role === "owner" && needsOnboarding(user, !!igAccount)) redirect("/onboarding");
 
   return (
+    <ConfirmProvider>
     <div className="flex min-h-screen gap-3 p-3 bg-[#eceee9]">
       <Sidebar
         workspace={{
-          current: { id: ctx.workspace.id, name: ctx.workspace.name, role: ctx.role },
+          current: { id: ctx.workspace.id, name: ctx.workspace.name, color: ctx.workspace.color, role: ctx.role },
           all: ctx.workspaces,
+          invites: pendingInvites,
         }}
         usage={{
           replies: repliesThisHour,
@@ -50,7 +54,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
             Settings → Profile shows straight away rather than at next sign-in. */}
         <Topbar
           user={user ? { name: user.name, email: user.email, image: user.image ?? session.user.image } : session.user}
-          igAccount={igAccount}
+          igAccount={igAccount ? { username: igAccount.username, profilePicUrl: igAccount.profilePicUrl } : null}
+          workspace={{ name: ctx.workspace.name, color: ctx.workspace.color }}
         />
         <main className="flex-1 min-w-0 rounded-3xl bg-[#f7f8f5] overflow-auto">
           {pendingInvites.length > 0 && <PendingInvites invites={pendingInvites} />}
@@ -61,6 +66,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
       {/* Both open from the tabs on the right edge rather than corner buttons. */}
       <HelpAssistant launcher={false} />
       <EdgeDock />
+      {/* First run: starts on its own once the welcome quick-start has been
+          closed (that modal starts it directly the first time). */}
+      <ProductTour autoStart={!!user && !user.tourSeenAt && !!user.quickStartSeenAt} />
     </div>
+    </ConfirmProvider>
   );
 }

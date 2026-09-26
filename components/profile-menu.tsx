@@ -2,7 +2,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import * as Menu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, Instagram, LogOut, Pencil, UserRound } from "lucide-react";
+import { ChevronDown, Compass, Instagram, LogOut, Pencil, Settings2, UserRound, Users } from "lucide-react";
+import { colorTile } from "@/lib/workspace-colors";
+import { startProductTour } from "@/components/product-tour";
 import { signOut } from "next-auth/react";
 import { FacebookIcon, GoogleIcon } from "@/components/brand";
 
@@ -12,9 +14,11 @@ import { FacebookIcon, GoogleIcon } from "@/components/brand";
  * app to sign out.
  */
 export function ProfileMenu({
-  user,
+  user, workspace,
 }: {
   user: { name?: string | null; email?: string | null; image?: string | null };
+  /** The workspace you're in, for the menu's Workspace group. */
+  workspace?: { name: string; color: string };
 }) {
   const display = user.name && user.name !== "AutoFlow" ? user.name : "Your account";
   const initial = (user.name || user.email || "U")[0]?.toUpperCase();
@@ -52,11 +56,25 @@ export function ProfileMenu({
             </div>
           </div>
 
-          <Menu.Separator className="my-1 h-px bg-gray-100" />
-          <Item href="/settings?tab=profile" icon={UserRound}>Manage profile</Item>
-          <Item href="/settings" icon={Instagram}>Instagram account</Item>
+          {workspace && (
+            <>
+              <Menu.Separator className="my-1 h-px bg-gray-100" />
+              <p className="px-3 pt-2 pb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-gray-400 flex items-center gap-2 min-w-0">
+                Workspace
+                <span className={`w-4 h-4 rounded-[5px] text-[9px] font-extrabold flex items-center justify-center normal-case tracking-normal ${colorTile(workspace.color)}`}>
+                  {(workspace.name.trim()[0] ?? "W").toUpperCase()}
+                </span>
+                <span className="truncate normal-case tracking-normal text-gray-500">{workspace.name}</span>
+              </p>
+              <Item href="/settings?tab=general" icon={Settings2}>Workspace settings</Item>
+              <Item href="/settings?tab=team" icon={Users}>Team</Item>
+              <Item href="/settings" icon={Instagram}>Instagram account</Item>
+            </>
+          )}
 
           <Menu.Separator className="my-1 h-px bg-gray-100" />
+          <p className="px-3 pt-2 pb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-gray-400">Your account</p>
+          <Item href="/settings?tab=profile" icon={UserRound}>Manage profile</Item>
           <Menu.Item asChild>
             <Link
               href="/settings?tab=sign-in"
@@ -68,6 +86,12 @@ export function ProfileMenu({
                 <GoogleIcon className="w-4 h-4" />
               </span>
             </Link>
+          </Menu.Item>
+          <Menu.Item
+            onSelect={() => setTimeout(startProductTour, 150)}
+            className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-700 outline-none data-[highlighted]:bg-[#f7f8f5] data-[highlighted]:text-gray-950 cursor-pointer"
+          >
+            <Compass className="w-4 h-4 text-gray-400" /> Take the tour
           </Menu.Item>
           <Menu.Item
             onSelect={() => signOut({ callbackUrl: "/login" })}

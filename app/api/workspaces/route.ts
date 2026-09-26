@@ -3,18 +3,22 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireWorkspace } from "@/lib/workspace";
 import { setWorkspaceCookie } from "@/lib/workspace-cookie";
+import { isWorkspaceColor } from "@/lib/workspace-colors";
 
 /** Every workspace you belong to, and which one you're in. */
 export async function GET() {
   const { ctx, error } = await requireWorkspace();
   if (error) return error;
   return NextResponse.json({
-    current: { id: ctx.workspace.id, name: ctx.workspace.name, role: ctx.role },
+    current: { id: ctx.workspace.id, name: ctx.workspace.name, color: ctx.workspace.color, role: ctx.role },
     workspaces: ctx.workspaces,
   });
 }
 
-const createSchema = z.object({ name: z.string().trim().min(1).max(60) });
+const createSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  color: z.string().refine(isWorkspaceColor).optional(),
+});
 
 /** A new, empty workspace with you as owner — and switch into it. */
 export async function POST(req: NextRequest) {
@@ -30,6 +34,7 @@ export async function POST(req: NextRequest) {
   const workspace = await db.workspace.create({
     data: {
       name: body.data.name,
+      color: body.data.color ?? "green",
       ownerId: ctx.userId,
       members: { create: { userId: ctx.userId, role: "owner" } },
     },
