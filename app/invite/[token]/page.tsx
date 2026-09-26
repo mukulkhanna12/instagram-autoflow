@@ -59,7 +59,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
 
         <div className="mt-8">
           {!me ? (
-            <JoinWithInviteForm token={token} email={invite.email} workspaceId={invite.workspace.id} />
+            <JoinWithInviteForm token={token} email={invite.email} workspaceName={invite.workspace.name} />
           ) : normalizeEmail(me.email) === invite.email ? (
             <AcceptInviteButton token={token} />
           ) : (

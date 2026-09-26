@@ -127,6 +127,21 @@ function generateCode(): string {
   return crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
 }
 
+/** How long before another code can be sent to the same address. */
+export const RESEND_COOLDOWN_SEC = 60;
+
+/** Seconds left before a new code may be sent to this address (0 = now). */
+export async function resendWaitSeconds(email: string): Promise<number> {
+  const last = await db.loginCode.findFirst({
+    where: { email: normalizeEmail(email), expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  if (!last) return 0;
+  const elapsed = (Date.now() - last.createdAt.getTime()) / 1000;
+  return Math.max(0, Math.ceil(RESEND_COOLDOWN_SEC - elapsed));
+}
+
 /**
  * Issue a new login code for an allow-listed email.
  * Returns the plaintext code to email, or null if the per-hour cap is hit.

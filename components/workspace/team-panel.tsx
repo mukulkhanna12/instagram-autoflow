@@ -31,7 +31,6 @@ export function TeamPanel() {
   const confirm = useConfirm();
   const [data, setData] = useState<Data | null>(null);
   const [email, setEmail] = useState("");
-  const [expiryHours, setExpiryHours] = useState<24 | 72 | 168>(168);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState<{ email: string; url: string; emailed: boolean; expiresAt: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +57,6 @@ export function TeamPanel() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email,
-        expiryHours,
         // So the email can say when the link expires in your local time.
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       }),
@@ -198,16 +196,6 @@ export function TeamPanel() {
                     className="w-full h-11 rounded-full border border-gray-200 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
-                <select
-                  value={expiryHours}
-                  onChange={(e) => setExpiryHours(Number(e.target.value) as 24 | 72 | 168)}
-                  aria-label="Link expires after"
-                  className="h-11 rounded-full border border-gray-200 bg-white px-4 text-sm text-gray-700 cursor-pointer"
-                >
-                  <option value={24}>Expires in 24 hours</option>
-                  <option value={72}>Expires in 3 days</option>
-                  <option value={168}>Expires in 7 days</option>
-                </select>
                 <Button type="submit" loading={sending} className="h-11 px-5">
                   <Send className="w-4 h-4" /> Send invite
                 </Button>

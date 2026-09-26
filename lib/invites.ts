@@ -15,7 +15,7 @@ import { db, dbUnfiltered } from "./db";
 import { normalizeEmail } from "./otp";
 import { sendEmail } from "./email";
 
-/** How long an invite link stays valid; the owner picks one when inviting. */
+/** How long an invite link stays valid — the same 7 days for everyone. */
 export const INVITE_EXPIRY_HOURS = [24, 72, 168] as const;
 export type InviteExpiryHours = (typeof INVITE_EXPIRY_HOURS)[number];
 export const DEFAULT_EXPIRY_HOURS: InviteExpiryHours = 168;
@@ -197,7 +197,7 @@ function buildInviteEmail(opts: {
           </tr></table>
           <p style="margin:0 0 26px;font-size:15px;line-height:1.6;color:#4b5563">
             You&#39;ll build and run its Instagram automations together — comment replies, DMs and follow-gated links.
-            No setup needed: just enter your name and you&#39;re in.
+            No setup needed: open the link, agree, and you&#39;re in.
           </p>
           <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:999px;background:#dcfb4b">
             <a href="${opts.url}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:800;color:#111827;text-decoration:none">Join ${ws} &rarr;</a>
@@ -313,9 +313,9 @@ export type JoinResult =
 
 /**
  * Join straight from the invite link, signed out: the link was sent to this
- * address, so opening it proves the email. Creates the account if it's new
- * (approved, and counted as onboarded), accepts the invite and returns the
- * user to sign in. Single use — the invite is spent here.
+ * address, so opening it and agreeing proves the email. Creates the account if
+ * it's new (approved, and counted as onboarded) and accepts the invite. Doesn't
+ * sign anyone in — they log in afterwards as usual. Single use.
  */
 export async function joinWithInvite(token: string, name?: string): Promise<JoinResult> {
   const inv = await db.invite.findUnique({ where: { tokenHash: hashInviteToken(token) } });

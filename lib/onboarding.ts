@@ -74,3 +74,17 @@ export function normalizeUsername(input: string): string {
 export function isValidUsername(v: string): boolean {
   return /^[a-z0-9._]{1,30}$/.test(v);
 }
+
+/**
+ * Should an owner be sent to finish setting up this workspace's Instagram?
+ * Every workspace runs one account, so an owner who isn't brand-new (that's
+ * onboarding) and is in a workspace without one — they closed the Instagram
+ * login, or logged out halfway — comes back to /setup/instagram until it's
+ * connected. Members can't connect one, so they're never sent there.
+ */
+export function needsInstagramSetup(
+  user: { onboardedAt: Date | null },
+  ws: { hasInstagram: boolean; role: "owner" | "member"; workspaceCount: number }
+): boolean {
+  return ws.role === "owner" && !ws.hasInstagram && !shouldForceOnboarding(user, ws);
+}

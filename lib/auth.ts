@@ -7,7 +7,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "./db";
 import { isApprovedEmail, normalizeEmail, registerOrGetAccess, verifyLoginCode } from "./otp";
 import { facebookConfig, googleConfig } from "./social-auth";
-import { joinWithInvite } from "./invites";
+import { LIMITS, clientIp, rateLimit } from "./rate-limit";
 
 /** How often a signed-in session re-confirms the user is still approved. */
 const APPROVAL_RECHECK_MS = 5 * 60 * 1000;
@@ -39,7 +39,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // The login page collects the email, requests a code (/api/auth/otp), then
       // submits email + code here. We re-check approval and verify the code.
       credentials: { email: {}, code: {} },
-      authorize: async (creds) => {
+      authorize: async (creds, request) => {
+        // Per-device cap on code guesses, on top of each code's own 5 tries.
+        const limited = await rateLimit(LIMITS.otpVerify, clientIp(request.headers));
+        if (!limited.ok) return null;
+
         const email = typeof creds?.email === "string" ? normalizeEmail(creds.email) : "";
         const code = typeof creds?.code === "string" ? creds.code : "";
         if (!email || !code) return null;
@@ -56,20 +60,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const user = await db.user.findUnique({ where: { email } });
         if (!user) return null;
         return { id: user.id, email: user.email, name: user.name };
-      },
-    }),
-    // One-click join from an invite link (signed out). The link was emailed to
-    // the invited address, so it stands in for a login code — once.
-    Credentials({
-      id: "invite",
-      credentials: { token: {}, name: {} },
-      authorize: async (creds) => {
-        const token = typeof creds?.token === "string" ? creds.token : "";
-        const name = typeof creds?.name === "string" ? creds.name : undefined;
-        if (!token || token.length > 200) return null;
-        const joined = await joinWithInvite(token, name);
-        if (!joined.ok) return null;
-        return { id: joined.user.id, email: joined.user.email, name: joined.user.name };
       },
     }),
     ...socialProviders,

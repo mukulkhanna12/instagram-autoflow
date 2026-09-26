@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { OnboardingLogout } from "@/components/onboarding/logout-link";
 
 /**
  * Gate for the three first-run steps. Each step draws its own split-screen
@@ -17,5 +18,10 @@ export default async function OnboardingLayout({ children }: { children: React.R
   });
   if (user?.onboardedAt) redirect("/dashboard");
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <OnboardingLogout />
+    </>
+  );
 }

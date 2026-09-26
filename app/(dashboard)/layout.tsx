@@ -8,7 +8,7 @@ import { HelpAssistant } from "@/components/help/help-assistant";
 import { EdgeDock } from "@/components/edge-dock";
 import { ProductTour } from "@/components/product-tour";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
-import { shouldForceOnboarding } from "@/lib/onboarding";
+import { needsInstagramSetup, shouldForceOnboarding } from "@/lib/onboarding";
 import { IG_ACCOUNT_LIMIT, PRIVATE_REPLY_HOURLY_LIMIT, privateRepliesLastHour } from "@/lib/usage";
 import { getWorkspaceContext } from "@/lib/workspace";
 import { pendingInvitesFor } from "@/lib/invites";
@@ -31,12 +31,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   // A brand-new account is walked through connecting Instagram first. Only an
   // owner can connect one, so members skip it — the owner will.
-  if (
-    user &&
-    shouldForceOnboarding(user, { hasInstagram: !!igAccount, role: ctx.role, workspaceCount: ctx.workspaces.length })
-  ) {
-    redirect("/onboarding");
-  }
+  const wsState = { hasInstagram: !!igAccount, role: ctx.role, workspaceCount: ctx.workspaces.length };
+  if (user && shouldForceOnboarding(user, wsState)) redirect("/onboarding");
+  // Every workspace needs its Instagram account; an owner picks up where they left off.
+  if (user && needsInstagramSetup(user, wsState)) redirect("/setup/instagram");
 
   return (
     <ConfirmProvider>

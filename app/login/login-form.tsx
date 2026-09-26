@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -44,19 +44,27 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [notReady, setNotReady] = useState<string | null>(null);
+  // Seconds until another code may be requested; counts down on the code step.
+  const [resendIn, setResendIn] = useState(0);
+  const [honeypot, setHoneypot] = useState("");
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setTimeout(() => setResendIn((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
   const oauthError = initialError
     ? OAUTH_ERRORS[initialError] ?? "Couldn't sign you in. Please try again."
     : null;
 
-  async function requestCode(e: React.FormEvent) {
-    e.preventDefault();
+  async function requestCode(e?: React.FormEvent) {
+    e?.preventDefault();
     setError(null);
     setLoading(true);
     try {
       const res = await fetch("/api/auth/otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, website: honeypot }),
       });
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: null }));
@@ -66,6 +74,7 @@ export function LoginForm({
       // In demo mode the API returns the code so it can be shown on-screen.
       const data = await res.json().catch(() => ({}));
       if (data.devCode) setDevCode(data.devCode);
+      if (typeof data.resendIn === "number") setResendIn(data.resendIn);
       if (data.status === "pending") {
         setStep("pending");
         return;
@@ -207,6 +216,17 @@ export function LoginForm({
               </div>
 
               <form onSubmit={requestCode} className="space-y-3">
+                {/* Honeypot: invisible to people, tempting to bots. */}
+                <input
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  value={honeypot}
+                  onChange={(e) => setHoneypot(e.target.value)}
+                  className="absolute -left-[9999px] w-px h-px opacity-0"
+                />
                 <Input
                   aria-label="Email address"
                   type="email"
@@ -252,6 +272,23 @@ export function LoginForm({
               <Button type="submit" variant="dark" className="w-full h-14 text-base" loading={loading}>
                 Verify & sign in
               </Button>
+              <p className="text-center text-sm text-gray-500">
+                Didn&apos;t get it?{" "}
+                {resendIn > 0 ? (
+                  <span className="tabular-nums">
+                    Resend code in <b className="text-gray-900">{Math.floor(resendIn / 60)}:{String(resendIn % 60).padStart(2, "0")}</b>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => requestCode()}
+                    disabled={loading}
+                    className="font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 cursor-pointer"
+                  >
+                    Resend code
+                  </button>
+                )}
+              </p>
               <button
                 type="button"
                 onClick={backToEmail}

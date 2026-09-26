@@ -22,3 +22,16 @@ describe("shouldForceOnboarding", () => {
     expect(shouldForceOnboarding(fresh, { hasInstagram: false, role: "owner", workspaceCount: 4 })).toBe(false);
   });
 });
+
+import { needsInstagramSetup } from "@/lib/onboarding";
+
+describe("needsInstagramSetup", () => {
+  it("sends an owner of an Instagram-less workspace back to set it up", () => {
+    expect(needsInstagramSetup(done, { hasInstagram: false, role: "owner", workspaceCount: 2 })).toBe(true);
+  });
+  it("leaves brand-new users to onboarding, members alone, and connected workspaces be", () => {
+    expect(needsInstagramSetup(fresh, { hasInstagram: false, role: "owner", workspaceCount: 1 })).toBe(false);
+    expect(needsInstagramSetup(done, { hasInstagram: false, role: "member", workspaceCount: 2 })).toBe(false);
+    expect(needsInstagramSetup(done, { hasInstagram: true, role: "owner", workspaceCount: 2 })).toBe(false);
+  });
+});

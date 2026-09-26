@@ -406,3 +406,12 @@ model Feedback {
   @@index([userId])
   @@index([status])
 }
+
+// Fixed-window request counters for rate limiting by IP (lib/rate-limit.ts):
+// one row per action + IP, reset in place when its window passes — so the
+// table never needs rows deleted.
+model RateLimit {
+  key         String   @id
+  count       Int      @default(0)
+  windowStart DateTime @default(now())
+}

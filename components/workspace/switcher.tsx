@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, ChevronsUpDown, Instagram, Mail, Plus, Settings2, Users, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronsUpDown, Instagram, Mail, Plus, Settings2, Users, X } from "lucide-react";
 import { InfoTip } from "@/components/ui/info-tip";
 import { WorkspaceExplainer } from "@/components/workspace/explainer";
 import { ROLE_LABEL, type Role } from "@/lib/roles";
@@ -196,8 +196,10 @@ interface IgChoice { username: string; profilePicUrl: string | null; workspaceId
 
 /**
  * New workspace, in two steps: name it (and pick a colour), then give it an
- * Instagram account — move one you already own from another workspace, connect
- * a new one, or skip for now. No onboarding: that's only for brand-new users.
+ * Instagram account — move one you already own from another workspace, or
+ * connect a new one. There's no skipping: every workspace runs an account, and
+ * nothing is created until one is chosen (Back returns to the name). If the
+ * Instagram login is abandoned, /setup/instagram picks up from there.
  */
 function CreateWorkspaceDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const router = useRouter();
@@ -213,35 +215,52 @@ function CreateWorkspaceDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     setStep("name"); setName(""); setColor("green"); setError(null); setAccounts(null); setPick(null); setBusy(false);
   }
 
-  async function create() {
+  // Step 1 → 2: list the accounts you could move, from every workspace you own.
+  async function next() {
     setBusy(true);
     setError(null);
+    const list = await fetch("/api/workspaces/instagram-accounts?all=1")
+      .then((r) => (r.ok ? r.json() : { accounts: [] }))
+      .catch(() => ({ accounts: [] }));
+    setAccounts(list.accounts ?? []);
+    setBusy(false);
+    setStep("instagram");
+  }
+
+  /** Create the workspace (and switch into it). Only called once an account is chosen. */
+  async function createWorkspace(): Promise<boolean> {
     const res = await fetch("/api/workspaces", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, color }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) { setBusy(false); return setError(data.error ?? "Couldn't create it."); }
-    // Now inside the new workspace: which Instagram accounts could move here?
-    const list = await fetch("/api/workspaces/instagram-accounts").then((r) => (r.ok ? r.json() : { accounts: [] })).catch(() => ({ accounts: [] }));
-    setAccounts(list.accounts ?? []);
-    setBusy(false);
-    setStep("instagram");
+    if (!res.ok) { setError(data.error ?? "Couldn't create it."); return false; }
+    return true;
   }
 
   async function moveHere() {
     if (!pick) return;
     setBusy(true);
     setError(null);
+    if (!(await createWorkspace())) return setBusy(false);
     const res = await fetch("/api/workspaces/move-instagram", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fromWorkspaceId: pick }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) { setBusy(false); return setError(data.error ?? "Couldn't move it."); }
+    // The workspace now exists; if the move failed, setup picks up from here.
+    if (!res.ok) { setBusy(false); setError(data.error ?? "Couldn't move it."); return finish("/setup/instagram"); }
     finish("/dashboard");
+  }
+
+  async function connectNew() {
+    setBusy(true);
+    setError(null);
+    if (!(await createWorkspace())) return setBusy(false);
+    // Off to Instagram's login; it returns to Settings, or to setup if abandoned.
+    window.location.href = "/api/instagram/connect";
   }
 
   function finish(href: string) {
@@ -255,8 +274,7 @@ function CreateWorkspaceDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => {
-      // Closing after the workspace exists still lands you in it.
-      if (!o && step === "instagram") return finish("/dashboard");
+      // Nothing is created until an account is chosen, so closing just cancels.
       if (!o) reset();
       onOpenChange(o);
     }}>
@@ -272,7 +290,7 @@ function CreateWorkspaceDialog({ open, onOpenChange }: { open: boolean; onOpenCh
               <Dialog.Description className="mt-1 text-sm text-gray-500">
                 {step === "name"
                   ? "A separate space with its own Instagram account, automations and team — for a client or a second page."
-                  : "Each workspace runs one Instagram account. You can also do this later from Settings."}
+                  : "Each workspace runs one Instagram account — choose one to create the workspace."}
               </Dialog.Description>
             </div>
             <Dialog.Close aria-label="Close" className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 cursor-pointer shrink-0">
@@ -281,7 +299,7 @@ function CreateWorkspaceDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           </div>
 
           {step === "name" ? (
-            <form onSubmit={(e) => { e.preventDefault(); create(); }} className="mt-6 space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); next(); }} className="mt-6 space-y-4">
               <input
                 autoFocus
                 value={name}
@@ -313,7 +331,7 @@ function CreateWorkspaceDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                 disabled={busy || !name.trim()}
                 className="w-full h-12 rounded-full bg-lime text-gray-950 font-extrabold hover:bg-lime-400 disabled:opacity-50 cursor-pointer"
               >
-                {busy ? "Creating…" : "Continue"}
+                {busy ? "Loading…" : "Continue"}
               </button>
             </form>
           ) : (
@@ -352,23 +370,26 @@ function CreateWorkspaceDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                     disabled={!pick || busy}
                     className="w-full h-11 rounded-full bg-gray-950 text-white text-sm font-bold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                   >
-                    {busy ? "Moving…" : "Move it here"}
+                    {busy ? "Creating…" : "Create & move it here"}
                   </button>
                 </div>
               )}
 
-              <a
-                href="/api/instagram/connect"
-                className="w-full h-12 rounded-full bg-gradient-to-r from-amber-400 via-pink-500 to-purple-600 text-white font-bold inline-flex items-center justify-center gap-2"
-              >
-                <Instagram className="w-4 h-4" /> Connect a new Instagram account
-              </a>
               <button
                 type="button"
-                onClick={() => finish("/dashboard")}
-                className="w-full h-11 rounded-full text-sm font-semibold text-gray-500 hover:text-gray-900 cursor-pointer"
+                onClick={connectNew}
+                disabled={busy}
+                className="w-full h-12 rounded-full bg-gradient-to-r from-amber-400 via-pink-500 to-purple-600 text-white font-bold inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
-                Skip for now
+                <Instagram className="w-4 h-4" /> Connect a new Instagram account
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStep("name"); setError(null); }}
+                disabled={busy}
+                className="w-full h-11 rounded-full text-sm font-semibold text-gray-500 hover:text-gray-900 inline-flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
               </button>
               {error && <p className="text-sm text-red-600">{error}</p>}
             </div>

@@ -11,6 +11,9 @@ import { WorkspaceExplainer } from "@/components/workspace/explainer";
 import { WORKSPACE_COLORS, colorTile, type WorkspaceColor } from "@/lib/workspace-colors";
 import { cn } from "@/lib/utils";
 
+/** Fired after the workspace's name or colour is saved. */
+export const WORKSPACE_UPDATED = "autoflow:workspace-updated";
+
 interface Data {
   workspace: { id: string; name: string; color: string; personal: boolean };
   role: "owner" | "member";
@@ -59,6 +62,8 @@ export function GeneralPanel() {
     setSaving(false);
     if (!res.ok) return setError(d.error ?? "Couldn't save.");
     setData((prev) => prev && { ...prev, workspace: { ...prev.workspace, ...d.workspace } });
+    // Let the Settings side menu (loaded once) show the new name and colour now.
+    window.dispatchEvent(new CustomEvent(WORKSPACE_UPDATED, { detail: { name: d.workspace.name, color: d.workspace.color } }));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
     router.refresh();
@@ -151,7 +156,7 @@ export function GeneralPanel() {
                     Everyone loses access and its Instagram account is disconnected, so nothing more is sent.
                   </p>
                 </div>
-                <Button variant="destructive" size="sm" onClick={() => setDeleting(true)}>
+                <Button variant="destructive" size="sm" className="shrink-0 whitespace-nowrap" onClick={() => setDeleting(true)}>
                   <Trash2 className="w-4 h-4" /> Delete workspace
                 </Button>
               </div>

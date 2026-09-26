@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { createInvite, isInviteExpiryHours } from "@/lib/invites";
+import { createInvite } from "@/lib/invites";
 import { requireWorkspace } from "@/lib/workspace";
 
 const schema = z.object({
   email: z.string().trim().email().max(254),
-  expiryHours: z.number().refine(isInviteExpiryHours).optional(),
   // The inviter's IANA zone, e.g. "Asia/Kolkata" — used to word the expiry in the email.
   timeZone: z.string().max(64).optional(),
 });
@@ -27,7 +26,6 @@ export async function POST(req: NextRequest) {
     workspace: ctx.workspace,
     email: body.data.email,
     invitedBy: me!,
-    expiryHours: body.data.expiryHours as 24 | 72 | 168 | undefined,
     timeZone: body.data.timeZone,
   });
 

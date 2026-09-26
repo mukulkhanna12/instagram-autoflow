@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Instagram, CheckCircle, AlertCircle, UserRound, Check, KeyRound, Users, Settings2 } from "lucide-react";
-import { GeneralPanel } from "@/components/workspace/general-panel";
+import { GeneralPanel, WORKSPACE_UPDATED } from "@/components/workspace/general-panel";
 import { colorTile } from "@/lib/workspace-colors";
 import { TeamPanel } from "@/components/workspace/team-panel";
 import Link from "next/link";
@@ -54,6 +54,10 @@ function SettingsContent() {
         setWs({ name: d.current.name, color: d.current.color });
       })
       .catch(() => {});
+    // Renaming or recolouring on the General tab updates this straight away.
+    const onUpdate = (e: Event) => setWs((e as CustomEvent<{ name: string; color: string }>).detail);
+    window.addEventListener(WORKSPACE_UPDATED, onUpdate);
+    return () => window.removeEventListener(WORKSPACE_UPDATED, onUpdate);
   }, []);
 
   const tab = TABS.some((t) => t.id === searchParams.get("tab")) ? (searchParams.get("tab") as TabId) : "instagram";

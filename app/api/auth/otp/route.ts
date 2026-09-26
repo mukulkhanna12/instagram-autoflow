@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { registerOrGetAccess, createLoginCode } from "@/lib/otp";
+import { registerOrGetAccess, createLoginCode, resendWaitSeconds, RESEND_COOLDOWN_SEC } from "@/lib/otp";
+import { LIMITS, clientIp, rateLimit } from "@/lib/rate-limit";
 import { sendEmail, otpEmail } from "@/lib/email";
 
-const schema = z.object({ email: z.string().email() });
+const schema = z.object({
+  email: z.string().email().max(254),
+  // Honeypot: hidden from people, so only a bot fills it in.
+  website: z.string().optional(),
+});
 
 /**
  * Request a login code.
@@ -19,7 +24,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
   }
 
-  const { email } = parsed.data;
+  const { email, website } = parsed.data;
+
+  // A filled honeypot is a bot. Answer like a normal pending sign-up so it
+  // learns nothing — and do nothing at all.
+  if (website) return NextResponse.json({ ok: true, status: "pending" });
+
+  // Per-device limit, so one bot can't burn through sign-ups or codes.
+  const limited = await rateLimit(LIMITS.otpRequest, clientIp(req.headers));
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: `Too many attempts from this device. Try again in ${Math.ceil(limited.retryAfterSec / 60)} min.` },
+      { status: 429, headers: { "Retry-After": String(limited.retryAfterSec) } }
+    );
+  }
 
   // Registers the address on first sight. Anyone may sign up; only an approved
   // account is sent a code, so nothing is emailed while they're pending.
@@ -32,6 +50,13 @@ export async function POST(req: NextRequest) {
   }
   if (access === "pending") {
     return NextResponse.json({ ok: true, status: "pending" });
+  }
+
+  // One code a minute per address. A request inside that minute doesn't send
+  // another — the last code still works — it just says how long to wait.
+  const wait = await resendWaitSeconds(email);
+  if (wait > 0) {
+    return NextResponse.json({ ok: true, status: "approved", resendIn: wait, reused: true });
   }
 
   const code = await createLoginCode(email);
@@ -59,5 +84,10 @@ export async function POST(req: NextRequest) {
   const showCode =
     process.env.NODE_ENV !== "production" && process.env.DEMO_SHOW_OTP === "1";
 
-  return NextResponse.json({ ok: true, status: "approved", ...(showCode ? { devCode: code } : {}) });
+  return NextResponse.json({
+    ok: true,
+    status: "approved",
+    resendIn: RESEND_COOLDOWN_SEC,
+    ...(showCode ? { devCode: code } : {}),
+  });
 }

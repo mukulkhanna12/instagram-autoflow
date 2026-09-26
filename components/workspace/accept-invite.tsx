@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn, signOut } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { ArrowRight, Clock } from "lucide-react";
 
 /** Signed in as the invited address: one click to join. */
@@ -43,63 +43,64 @@ export function AcceptInviteButton({ token }: { token: string }) {
 }
 
 /**
- * Signed out: type your name and join. The link itself proves the email (it
- * was sent there), so there's no code to wait for — this signs you in, joins
- * the workspace and drops you on its dashboard. No onboarding.
+ * Signed out: agree to join, and it's done — the link came to their inbox, so
+ * there's nothing else to check. Then a link to log in (which goes straight to
+ * the dashboard if they're already logged in).
  */
-export function JoinWithInviteForm({ token, email, workspaceId }: { token: string; email: string; workspaceId: string }) {
-  const [name, setName] = useState("");
+export function JoinWithInviteForm({ token, email, workspaceName }: { token: string; email: string; workspaceName: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [joined, setJoined] = useState(false);
 
-  async function join(e: React.FormEvent) {
-    e.preventDefault();
+  async function join() {
     setBusy(true);
     setError(null);
-    const res = await signIn("invite", { token, name, redirect: false });
-    if (!res || res.error) {
-      setBusy(false);
-      setError("This invite can't be used any more — it may have expired or already been used. Ask for a new one.");
-      return;
-    }
-    // Land in the workspace they just joined.
-    await fetch("/api/workspaces/switch", {
+    const res = await fetch("/api/invites/join", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId }),
-    }).catch(() => {});
-    window.location.href = "/dashboard?joined=1";
+      body: JSON.stringify({ token }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) return setError(data.error ?? "Couldn't join — try again.");
+    setJoined(true);
+  }
+
+  if (joined) {
+    return (
+      <div className="space-y-4">
+        <p className="rounded-2xl bg-lime-50 border border-lime-200 px-4 py-3 text-sm text-gray-900">
+          🎉 You&apos;ve joined <b>{workspaceName}</b>.
+        </p>
+        <a
+          href={`/login?email=${encodeURIComponent(email)}`}
+          className="w-full h-12 rounded-full bg-gray-950 font-bold text-white hover:bg-brand-900 inline-flex items-center justify-center gap-2"
+        >
+          Log in to get started <ArrowRight className="w-4 h-4" />
+        </a>
+        <p className="text-xs text-gray-400">Log in with {email} — we&apos;ll email you a code.</p>
+      </div>
+    );
   }
 
   return (
-    <form onSubmit={join} className="space-y-3 text-left">
-      <label className="block">
-        <span className="text-sm font-semibold text-gray-700">Your name</span>
-        <input
-          autoFocus
-          value={name}
-          maxLength={60}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Sam Lee"
-          className="mt-1.5 w-full h-12 rounded-xl border border-gray-200 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
-      </label>
-      <label className="block">
-        <span className="text-sm font-semibold text-gray-700">Email</span>
-        <input value={email} disabled className="mt-1.5 w-full h-12 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm text-gray-500" />
+    <div className="space-y-3">
+      <label className="flex items-start gap-2.5 rounded-2xl border border-gray-200 px-4 py-3 text-left text-sm text-gray-600">
+        <span className="mt-0.5">✅</span>
+        <span>
+          By joining, you&apos;ll be a member of <b className="text-gray-900">{workspaceName}</b> as <b className="text-gray-900">{email}</b>.
+          The owner can see you in their team and remove you any time.
+        </span>
       </label>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
-        type="submit"
-        disabled={busy || !name.trim()}
-        className="w-full h-12 rounded-full bg-lime font-extrabold text-gray-950 hover:bg-lime-400 disabled:opacity-50 inline-flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+        onClick={join}
+        disabled={busy}
+        className="w-full h-12 rounded-full bg-lime font-extrabold text-gray-950 hover:bg-lime-400 disabled:opacity-60 inline-flex items-center justify-center gap-2 cursor-pointer"
       >
-        {busy ? "Joining…" : <>Join the workspace <ArrowRight className="w-4 h-4" /></>}
+        {busy ? "Joining…" : <>I agree, join the workspace <ArrowRight className="w-4 h-4" /></>}
       </button>
-      <p className="text-xs text-gray-400 text-center">
-        No password needed — this link was sent to your inbox. Next time, log in with {email}.
-      </p>
-    </form>
+    </div>
   );
 }
 

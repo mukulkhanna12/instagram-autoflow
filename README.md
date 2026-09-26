@@ -123,16 +123,14 @@ through a membership with one of two roles (`lib/roles.ts`):
   (one Instagram account per workspace — e.g. a client, or a second page).
 - **Settings → Team**: the owner invites by email (Resend) and also gets the link
   to share by hand; cancel, resend, remove. Members can leave.
-- **Invites** (`lib/invites.ts`): the owner picks an expiry — 24 hours, 3 days
-  or 7 days — and the email (a designed HTML template) states it in the
-  inviter's own timezone. A random token is in the link, only its SHA-256 is
+- **Invites** (`lib/invites.ts`): links last 7 days for everyone; the email (a
+  designed HTML template) states the expiry in the inviter's own timezone. A random token is in the link, only its SHA-256 is
   stored, single use, 20 invites per workspace per day; a new invite to the same
   address retires the old link.
-- **Joining** at `/invite/<token>` (public): someone signed out just types their
-  name and presses Join — the link was sent to their inbox, so it stands in for a
-  login code, once (the `invite` credentials provider in `lib/auth.ts`). The
-  account is created approved and counted as onboarded, so there's no
-  onboarding. Signed in as the invited address it's one click; as another
+- **Joining** at `/invite/<token>` (public): someone signed out agrees to join
+  and they're in — the link was sent to their inbox, so that's proof enough
+  (`/api/invites/join`, rate-limited). The account is created approved and
+  counted as onboarded, so there's no onboarding; they then log in as usual. Signed in as the invited address it's one click; as another
   address, it offers to log out and join as the right one. Pending invites also
   show in a banner and in the workspace switcher.
 - **Onboarding** is only for brand-new users (owner of their one and only

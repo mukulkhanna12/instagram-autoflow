@@ -29,7 +29,8 @@ const menu = [
 ];
 
 const general = [
-  { href: "/help", icon: LifeBuoy, label: "Help" },
+  // Opens in a new tab, so reading a guide doesn't lose your place in the app.
+  { href: "/help", icon: LifeBuoy, label: "Help", newTab: true },
   { href: "/feedback", icon: Lightbulb, label: "Feedback" },
   { href: "/privacy", icon: ShieldCheck, label: "Privacy" },
 ];
@@ -82,7 +83,10 @@ export function Sidebar({ usage, workspace }: SidebarProps) {
         <WorkspaceSwitcher current={workspace.current} all={workspace.all} invites={workspace.invites} collapsed={collapsed} />
       </div>
 
-      <nav className="flex-1 overflow-y-auto mt-6">
+      {/* Menu and usage scroll together on short screens, with soft fades at the
+          edges instead of items cutting off under a hard line. */}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col pt-3 [mask-image:linear-gradient(to_bottom,transparent,black_14px,black_calc(100%-14px),transparent)]">
+      <nav className="mt-1">
         <NavGroup title="Menu" collapsed={collapsed}>
           {menu.map((l) => <NavItem key={l.href} {...l} active={isActive(l.href)} collapsed={collapsed} />)}
         </NavGroup>
@@ -91,16 +95,17 @@ export function Sidebar({ usage, workspace }: SidebarProps) {
         </NavGroup>
       </nav>
 
-      {!collapsed && <UsagePanel {...usage} />}
+      {!collapsed && <div className="mt-auto pt-2"><UsagePanel {...usage} /></div>}
+      </div>
     </aside>
   );
 }
 
 function NavGroup({ title, collapsed, children }: { title: string; collapsed: boolean; children: React.ReactNode }) {
   return (
-    <div className="mb-6">
+    <div className="mb-4">
       {!collapsed && (
-        <p className="px-7 mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">{title}</p>
+        <p className="px-7 mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">{title}</p>
       )}
       <div className="space-y-0.5">{children}</div>
     </div>
@@ -108,8 +113,9 @@ function NavGroup({ title, collapsed, children }: { title: string; collapsed: bo
 }
 
 function NavItem({
-  href, icon: Icon, label, active, collapsed,
+  href, icon: Icon, label, active, collapsed, newTab,
 }: {
+  newTab?: boolean;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
@@ -119,17 +125,18 @@ function NavItem({
   return (
     <Link
       href={href}
+      {...(newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       data-tour={`nav-${href.slice(1)}`}
       title={collapsed ? label : undefined}
       className={cn(
-        "relative flex items-center text-[15px] transition-colors",
-        collapsed ? "justify-center py-3" : "gap-3.5 pl-7 pr-4 py-2.5",
+        "relative flex items-center text-sm transition-colors",
+        collapsed ? "justify-center py-2.5" : "gap-3 pl-7 pr-4 py-2",
         active ? "text-gray-950 font-bold" : "text-gray-500 font-medium hover:text-gray-950"
       )}
     >
       {/* The active marker from 6.png: a rounded bar on the panel's edge. */}
       {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-1.5 rounded-r-full bg-brand-700" />}
-      <Icon className={cn("w-5 h-5 shrink-0", active ? "text-brand-700" : "text-gray-400")} />
+      <Icon className={cn("w-[18px] h-[18px] shrink-0", active ? "text-brand-700" : "text-gray-400")} />
       {!collapsed && label}
     </Link>
   );
@@ -145,7 +152,7 @@ function UsagePanel({
   const pct = Math.min(100, (replies / repliesLimit) * 100);
   const nearLimit = pct >= 80;
   return (
-    <div className="mx-4 mb-4 rounded-2xl border border-gray-100 bg-[#fafbf8] p-4 space-y-4">
+    <div className="mx-4 mb-4 rounded-2xl border border-gray-100 bg-[#fafbf8] p-3 space-y-3">
       <UsageRow
         label="DMs this hour"
         value={`${replies}/${repliesLimit}`}
@@ -159,11 +166,6 @@ function UsagePanel({
         pct={(accounts / accountsLimit) * 100}
         barClass="bg-lime-400"
       />
-      {accounts === 0 && (
-        <Link href="/settings" className="block text-center text-xs font-bold text-brand-700 hover:underline">
-          Connect Instagram
-        </Link>
-      )}
     </div>
   );
 }
@@ -179,7 +181,7 @@ function UsageRow({
 }) {
   return (
     <div title={title}>
-      <div className="flex items-center justify-between text-sm mb-2">
+      <div className="flex items-center justify-between text-xs mb-1.5">
         <span className="text-gray-500 font-medium">{label}</span>
         <span className="font-extrabold text-gray-950 tabular-nums">{value}</span>
       </div>
