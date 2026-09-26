@@ -9,6 +9,7 @@ import { AccountRowSkeleton } from "@/components/skeletons";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { InfoTip } from "@/components/ui/info-tip";
 import { WorkspaceExplainer } from "@/components/workspace/explainer";
+import { openCreateWorkspace } from "@/components/workspace/switcher";
 import { ROLE_BLURB, ROLE_LABEL, isRole } from "@/lib/roles";
 
 interface Member { userId: string; name: string | null; email: string; image: string | null; role: string; joinedAt: string }
@@ -30,8 +31,9 @@ export function TeamPanel() {
   const confirm = useConfirm();
   const [data, setData] = useState<Data | null>(null);
   const [email, setEmail] = useState("");
+  const [expiryHours, setExpiryHours] = useState<24 | 72 | 168>(168);
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState<{ email: string; url: string; emailed: boolean } | null>(null);
+  const [sent, setSent] = useState<{ email: string; url: string; emailed: boolean; expiresAt: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -54,12 +56,17 @@ export function TeamPanel() {
     const res = await fetch("/api/workspaces/invites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({
+        email,
+        expiryHours,
+        // So the email can say when the link expires in your local time.
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }),
     });
     const d = await res.json().catch(() => ({}));
     setSending(false);
     if (!res.ok) return setError(d.error ?? "Couldn't send the invite.");
-    setSent({ email, url: d.url, emailed: d.emailed });
+    setSent({ email, url: d.url, emailed: d.emailed, expiresAt: d.expiresAt });
     setEmail("");
     load();
   }
@@ -92,14 +99,36 @@ export function TeamPanel() {
   async function remove(m: Member) {
     const leaving = m.userId === data?.you.userId;
     const ws = data?.workspace.name ?? "this workspace";
+
+    // Your only workspace: leaving would leave you nowhere to go.
+    if (leaving) {
+      const mine = await fetch("/api/workspaces").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      if (mine && mine.workspaces.length <= 1) {
+        const create = await confirm({
+          title: "This is your only workspace",
+          body: (
+            <>
+              You need at least one workspace to use AutoFlow. Create a workspace of your own first — with your
+              own Instagram account — then you can leave <strong>{ws}</strong>.
+            </>
+          ),
+          confirmLabel: "Create a workspace",
+          cancelLabel: "Stay",
+          icon: "warning",
+        });
+        if (create) openCreateWorkspace();
+        return;
+      }
+    }
+
     const ok = await confirm(
       leaving
         ? {
             title: `Leave ${ws}?`,
             body: (
               <>
-                You&apos;ll stop seeing its automations, reels and results straight away. Nothing is deleted —
-                the owner can invite you back any time. You&apos;ll be moved to your own workspace.
+                You&apos;ll stop seeing its automations, reels and results straight away. Anything you built stays in
+                the workspace for the team — nothing is deleted, and the owner can invite you back any time.
               </>
             ),
             confirmLabel: "Leave workspace",
@@ -169,6 +198,16 @@ export function TeamPanel() {
                     className="w-full h-11 rounded-full border border-gray-200 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
+                <select
+                  value={expiryHours}
+                  onChange={(e) => setExpiryHours(Number(e.target.value) as 24 | 72 | 168)}
+                  aria-label="Link expires after"
+                  className="h-11 rounded-full border border-gray-200 bg-white px-4 text-sm text-gray-700 cursor-pointer"
+                >
+                  <option value={24}>Expires in 24 hours</option>
+                  <option value={72}>Expires in 3 days</option>
+                  <option value={168}>Expires in 7 days</option>
+                </select>
                 <Button type="submit" loading={sending} className="h-11 px-5">
                   <Send className="w-4 h-4" /> Send invite
                 </Button>
@@ -189,7 +228,9 @@ export function TeamPanel() {
                       {copied ? <><Check className="w-4 h-4" /> Copied</> : <><Copy className="w-4 h-4" /> Copy</>}
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500">Works once, for that email address, for 7 days.</p>
+                  <p className="text-xs text-gray-500">
+                    Works once, only for that email address. Expires {fmtExpiry(sent.expiresAt)}.
+                  </p>
                 </div>
               )}
             </div>
@@ -252,7 +293,7 @@ export function TeamPanel() {
                   <p className="text-xs text-gray-400">
                     {i.status === "expired"
                       ? "Expired — send a new invite"
-                      : `Expires ${new Date(i.expiresAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`}
+                      : `Expires ${fmtExpiry(i.expiresAt)}`}
                   </p>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => { setEmail(i.email); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
@@ -268,4 +309,9 @@ export function TeamPanel() {
       )}
     </div>
   );
+}
+
+/** "Sat, 4 Oct, 3:06 AM" in your own timezone. */
+function fmtExpiry(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }

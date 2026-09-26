@@ -123,12 +123,26 @@ through a membership with one of two roles (`lib/roles.ts`):
   (one Instagram account per workspace — e.g. a client, or a second page).
 - **Settings → Team**: the owner invites by email (Resend) and also gets the link
   to share by hand; cancel, resend, remove. Members can leave.
-- **Invites** (`lib/invites.ts`): random token in the link, only its SHA-256
-  stored, single use, 7-day expiry, 20 per workspace per day. A new invite to the
-  same address retires the old link. Accepting also **approves** the account, and
-  an address with a live invite gets its login code without waiting.
-- `/invite/<token>` is public: see what you're invited to, sign up or log in
-  (you come straight back), accept. A banner offers any pending invites in-app.
+- **Invites** (`lib/invites.ts`): the owner picks an expiry — 24 hours, 3 days
+  or 7 days — and the email (a designed HTML template) states it in the
+  inviter's own timezone. A random token is in the link, only its SHA-256 is
+  stored, single use, 20 invites per workspace per day; a new invite to the same
+  address retires the old link.
+- **Joining** at `/invite/<token>` (public): someone signed out just types their
+  name and presses Join — the link was sent to their inbox, so it stands in for a
+  login code, once (the `invite` credentials provider in `lib/auth.ts`). The
+  account is created approved and counted as onboarded, so there's no
+  onboarding. Signed in as the invited address it's one click; as another
+  address, it offers to log out and join as the right one. Pending invites also
+  show in a banner and in the workspace switcher.
+- **Onboarding** is only for brand-new users (owner of their one and only
+  workspace, no survey, no Instagram — `shouldForceOnboarding`).
+- **New workspace** is two steps: name and colour, then Instagram — move an
+  account you already connected in another workspace you own (its automations
+  move with it), connect a new one, or skip.
+- **Leaving**: you can't leave your only workspace — you're asked to create one
+  first. What a member built stays in the workspace when they leave or are
+  removed; automations belong to the workspace, not the person.
 - **Access control** lives in `lib/workspace.ts`: every route resolves the
   current workspace (cookie `af_ws`, re-checked against your memberships) and
   its Instagram account from there. Owner-only routes return 403 to members.

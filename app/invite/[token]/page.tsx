@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { findInviteByToken } from "@/lib/invites";
 import { normalizeEmail } from "@/lib/otp";
 import { Logo } from "@/components/brand";
-import { AcceptInviteButton, SwitchAccountButton } from "@/components/workspace/accept-invite";
+import { AcceptInviteButton, ExpiresAt, JoinWithInviteForm, SwitchAccountButton } from "@/components/workspace/accept-invite";
 
 export const metadata = { title: "Join a workspace — AutoFlow" };
 
@@ -55,18 +55,11 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         <p className="mt-3 text-gray-500">
           You&apos;ll be able to build and run its Instagram automations, as a member.
         </p>
+        <div className="mt-4"><ExpiresAt iso={invite.expiresAt.toISOString()} /></div>
 
         <div className="mt-8">
           {!me ? (
-            <div className="space-y-3">
-              <Link
-                href={`/login?next=${encodeURIComponent(next)}&email=${encodeURIComponent(invite.email)}`}
-                className="flex h-12 items-center justify-center rounded-full bg-lime font-extrabold text-gray-950 hover:bg-lime-400"
-              >
-                Log in or sign up to accept
-              </Link>
-              <p className="text-xs text-gray-400">Use <strong>{invite.email}</strong> — the address this invite was sent to.</p>
-            </div>
+            <JoinWithInviteForm token={token} email={invite.email} workspaceId={invite.workspace.id} />
           ) : normalizeEmail(me.email) === invite.email ? (
             <AcceptInviteButton token={token} />
           ) : (

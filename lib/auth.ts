@@ -7,6 +7,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "./db";
 import { isApprovedEmail, normalizeEmail, registerOrGetAccess, verifyLoginCode } from "./otp";
 import { facebookConfig, googleConfig } from "./social-auth";
+import { joinWithInvite } from "./invites";
 
 /** How often a signed-in session re-confirms the user is still approved. */
 const APPROVAL_RECHECK_MS = 5 * 60 * 1000;
@@ -57,6 +58,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return { id: user.id, email: user.email, name: user.name };
       },
     }),
+    // One-click join from an invite link (signed out). The link was emailed to
+    // the invited address, so it stands in for a login code — once.
+    Credentials({
+      id: "invite",
+      credentials: { token: {}, name: {} },
+      authorize: async (creds) => {
+        const token = typeof creds?.token === "string" ? creds.token : "";
+        const name = typeof creds?.name === "string" ? creds.name : undefined;
+        if (!token || token.length > 200) return null;
+        const joined = await joinWithInvite(token, name);
+        if (!joined.ok) return null;
+        return { id: joined.user.id, email: joined.user.email, name: joined.user.name };
+      },
+    }),
     ...socialProviders,
   ],
   callbacks: {
@@ -67,7 +82,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
      * sent back to the login page's "waiting for approval" message.
      */
     signIn: async ({ account, profile, user }) => {
-      if (!account || account.provider === "credentials") return true;
+      // Email codes and invite links are checked in their own authorize().
+      if (!account || account.type === "credentials") return true;
 
       // Already linked to an account: sign in as that account, whatever email
       // the provider reports — it may differ from the one the account uses.

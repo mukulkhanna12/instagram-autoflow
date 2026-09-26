@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { createInvite } from "@/lib/invites";
+import { createInvite, isInviteExpiryHours } from "@/lib/invites";
 import { requireWorkspace } from "@/lib/workspace";
 
-const schema = z.object({ email: z.string().trim().email().max(254) });
+const schema = z.object({
+  email: z.string().trim().email().max(254),
+  expiryHours: z.number().refine(isInviteExpiryHours).optional(),
+  // The inviter's IANA zone, e.g. "Asia/Kolkata" — used to word the expiry in the email.
+  timeZone: z.string().max(64).optional(),
+});
 
 /** Invite someone by email. Owner only. Returns the link too, to share by hand. */
 export async function POST(req: NextRequest) {
@@ -18,11 +23,17 @@ export async function POST(req: NextRequest) {
   }
 
   const me = await db.user.findUnique({ where: { id: ctx.userId }, select: { id: true, name: true, email: true } });
-  const result = await createInvite({ workspace: ctx.workspace, email: body.data.email, invitedBy: me! });
+  const result = await createInvite({
+    workspace: ctx.workspace,
+    email: body.data.email,
+    invitedBy: me!,
+    expiryHours: body.data.expiryHours as 24 | 72 | 168 | undefined,
+    timeZone: body.data.timeZone,
+  });
 
   if (!result.ok) {
     const msg = result.reason === "already_member" ? "They're already in this workspace" : "Too many invites today — try again tomorrow";
     return NextResponse.json({ error: msg }, { status: result.reason === "limited" ? 429 : 409 });
   }
-  return NextResponse.json({ url: result.url, emailed: result.emailed });
+  return NextResponse.json({ url: result.url, emailed: result.emailed, expiresAt: result.expiresAt });
 }

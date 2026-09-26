@@ -20,6 +20,13 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (leaving && target.role === "owner") {
     return NextResponse.json({ error: "The owner can't leave their own workspace" }, { status: 400 });
   }
+  // Everyone needs somewhere to land: you can't leave your last workspace.
+  if (leaving && ctx.workspaces.length <= 1) {
+    return NextResponse.json(
+      { error: "This is your only workspace. Create one of your own first, then you can leave.", reason: "last_workspace" },
+      { status: 400 }
+    );
+  }
   if (!leaving && !canRemove(ctx.role, target.role)) {
     return NextResponse.json({ error: "Only the owner can remove people" }, { status: 403 });
   }
