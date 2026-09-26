@@ -40,7 +40,7 @@ export function emptyCompose(): ComposeState {
   const d = loadDefaults();
   const src = commentSource();
   return {
-    name: "Untitled flow",
+    name: "Untitled automation",
     status: "draft",
     reel: null,
     include: [],

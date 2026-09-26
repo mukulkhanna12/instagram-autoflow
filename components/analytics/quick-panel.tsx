@@ -50,7 +50,11 @@ interface Data {
   automations: { id: string; postCaption: string | null; postThumbnail: string | null; isActive: boolean; contacts: number }[];
 }
 
-export function QuickStats() {
+/**
+ * `launcher` shows the floating corner button. The app turns it off and opens
+ * the panel from the Stats tab on the right edge (components/edge-dock.tsx).
+ */
+export function QuickStats({ launcher = true }: { launcher?: boolean } = {}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [range, setRange] = useState<RangeKey>("7d");
@@ -92,7 +96,7 @@ export function QuickStats() {
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      {!onAnalyticsPage && (
+      {launcher && !onAnalyticsPage && (
         <button
           onClick={() => openQuickStats()}
           className={cn(

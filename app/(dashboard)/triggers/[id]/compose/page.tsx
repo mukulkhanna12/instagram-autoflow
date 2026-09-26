@@ -27,7 +27,7 @@ export default function ComposeEditPage() {
   return (
     <div className="p-8 max-w-lg">
       <h1 className="text-2xl font-extrabold text-gray-950">
-        {state.found ? "This flow needs the canvas" : "Flow not found"}
+        {state.found ? "This automation needs the canvas" : "Automation not found"}
       </h1>
       <p className="text-gray-500 mt-2">
         {state.found

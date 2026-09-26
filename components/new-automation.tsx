@@ -4,7 +4,7 @@ import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight, AtSign, BookMarked, CircleDashed, Film, Mail, Plus, Sparkles, X,
+  ArrowRight, BookMarked, Film, Plus, Sparkles, X,
 } from "lucide-react";
 import { PLAYBOOKS } from "@/lib/playbooks";
 import { cn } from "@/lib/utils";
@@ -12,10 +12,8 @@ import { cn } from "@/lib/utils";
 /**
  * "New automation" — the one place every new flow starts from.
  *
- * The first row is what the engine runs today. The second row is what's
- * planned; it's shown, switched off, so nobody hunts the app for a story or
- * inbox trigger that doesn't exist yet. Popular playbooks sit underneath as a
- * one-click shortcut into the setup dialog.
+ * Three ways to start, then popular playbooks as a one-click shortcut into
+ * their setup dialog.
  */
 export function NewAutomationButton({
   className, collapsed, children,
@@ -118,7 +116,7 @@ export function NewAutomationModal({ open, onClose }: { open: boolean; onClose: 
               <StartCard
                 eyebrow="Playbooks"
                 title="Start from a playbook"
-                body={`${PLAYBOOKS.length} ready-made flows. Every message written — just add your link.`}
+                body={`${PLAYBOOKS.length} ready-made automations. Every message written — just add your link.`}
                 tint="bg-amber-50"
                 onClick={() => go("/playbooks")}
                 art={
@@ -129,13 +127,6 @@ export function NewAutomationModal({ open, onClose }: { open: boolean; onClose: 
                   </div>
                 }
               />
-            </div>
-
-            <p className="mt-7 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">Coming soon</p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
-              <SoonCard icon={CircleDashed} title="DM on story reply" body="When someone reacts or replies to a story" />
-              <SoonCard icon={AtSign} title="DM on inbox keyword" body="When someone DMs you a keyword" />
-              <SoonCard icon={Mail} title="Collect emails first" body="Ask for an email before the link" />
             </div>
 
             <div className="mt-7 pt-5 border-t border-gray-100">
@@ -193,23 +184,5 @@ function StartCard({
         Start here <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
       </span>
     </button>
-  );
-}
-
-function SoonCard({
-  icon: Icon, title, body,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-3 flex items-start gap-3 opacity-70" aria-disabled="true">
-      <Icon className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-gray-700">{title}</p>
-        <p className="text-xs text-gray-400">{body}</p>
-      </div>
-    </div>
   );
 }

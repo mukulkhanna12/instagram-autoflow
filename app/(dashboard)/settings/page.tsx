@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Instagram, CheckCircle, AlertCircle, UserRound, LogOut, Check, KeyRound } from "lucide-react";
-import { signOut } from "next-auth/react";
+import { Instagram, CheckCircle, AlertCircle, UserRound, Check, KeyRound } from "lucide-react";
+import Link from "next/link";
 import { SignInMethods } from "@/components/sign-in-methods";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,13 @@ import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AccountRowSkeleton, FormPageSkeleton } from "@/components/skeletons";
+
+const TABS = [
+  { id: "instagram", label: "Instagram", icon: Instagram },
+  { id: "profile", label: "Profile", icon: UserRound },
+  { id: "sign-in", label: "Sign-in methods", icon: KeyRound },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
 
 interface IgAccount {
   id: string;
@@ -25,6 +32,7 @@ function SettingsContent() {
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
 
+  const tab = TABS.some((t) => t.id === searchParams.get("tab")) ? (searchParams.get("tab") as TabId) : "instagram";
   const successMsg = searchParams.get("success");
   const errorMsg = searchParams.get("error");
 
@@ -50,9 +58,27 @@ function SettingsContent() {
     <div className="p-8 max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-500 text-sm mt-1">Manage your profile and connected Instagram account</p>
+        <p className="text-gray-500 text-sm mt-1">Your Instagram connection, profile and how you sign in</p>
       </div>
 
+      <nav className="flex gap-1 border-b border-gray-200 overflow-x-auto" aria-label="Settings sections">
+        {TABS.map((t) => (
+          <Link
+            key={t.id}
+            href={t.id === "instagram" ? "/settings" : `/settings?tab=${t.id}`}
+            scroll={false}
+            aria-current={tab === t.id ? "page" : undefined}
+            className={`relative shrink-0 inline-flex items-center gap-2 px-4 h-11 text-sm font-semibold transition-colors ${
+              tab === t.id ? "text-gray-950" : "text-gray-500 hover:text-gray-900"
+            }`}
+          >
+            <t.icon className="w-4 h-4" /> {t.label}
+            {tab === t.id && <span className="absolute left-3 right-3 -bottom-px h-0.5 rounded-full bg-brand-700" />}
+          </Link>
+        ))}
+      </nav>
+
+      {tab === "instagram" && (<>
       {/* Status banners */}
       {successMsg === "connected" && (
         <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-700 text-sm">
@@ -70,8 +96,6 @@ function SettingsContent() {
         </div>
       )}
 
-      <ProfileCard />
-      <SignInMethodsCard linkedNow={searchParams.get("linked")} />
 
       {/* Instagram account card */}
       <Card>
@@ -127,6 +151,9 @@ function SettingsContent() {
           )}
         </CardBody>
       </Card>
+      </>)}
+      {tab === "profile" && <ProfileCard />}
+      {tab === "sign-in" && <SignInMethodsCard linkedNow={searchParams.get("linked")} />}
     </div>
   );
 }
@@ -181,7 +208,7 @@ function ProfileCard() {
   const dirty = name.trim() !== current;
 
   return (
-    <div id="profile" className="scroll-mt-6">
+    <div>
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
@@ -220,12 +247,9 @@ function ProfileCard() {
                 <Input label="Email" value={profile.email} disabled hint="Your login — it can't be changed here." />
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <div className="pt-1">
                 <Button size="sm" onClick={save} loading={saving} disabled={!dirty}>
                   {saved ? <><Check className="w-4 h-4" /> Saved</> : "Save changes"}
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
-                  <LogOut className="w-4 h-4" /> Log out
                 </Button>
               </div>
             </div>
@@ -236,10 +260,10 @@ function ProfileCard() {
   );
 }
 
-/** Settings → Sign-in methods; the same list the profile menu's dialog shows. */
+/** Settings → Sign-in methods. The profile menu's "Add sign-in options" opens this tab. */
 function SignInMethodsCard({ linkedNow }: { linkedNow: string | null }) {
   return (
-    <div id="sign-in" className="scroll-mt-6">
+    <div>
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
@@ -253,7 +277,7 @@ function SignInMethodsCard({ linkedNow }: { linkedNow: string | null }) {
           </div>
         </CardHeader>
         <CardBody>
-          <SignInMethods linkedNow={linkedNow} returnTo="/settings" />
+          <SignInMethods linkedNow={linkedNow} returnTo="/settings?tab=sign-in" />
         </CardBody>
       </Card>
     </div>

@@ -43,7 +43,7 @@ export default function TriggerDefaultsPage() {
         onClick={() => router.push("/triggers")}
         className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 mb-5 cursor-pointer"
       >
-        <ArrowLeft className="w-3.5 h-3.5" /> All flows
+        <ArrowLeft className="w-3.5 h-3.5" /> All automations
       </button>
 
       <div className="flex items-start justify-between gap-4 mb-2">
@@ -117,7 +117,7 @@ export default function TriggerDefaultsPage() {
           button={d.payoff.button}
           onText={(v) => set("payoff", "text", v)}
           onButton={(v) => set("payoff", "button", v)}
-          note="The link itself stays per-flow — it's different every time, so it isn't a default."
+          note="The link itself stays per-automation — it's different every time, so it isn't a default."
         />
       </div>
 

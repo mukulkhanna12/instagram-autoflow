@@ -36,12 +36,12 @@ const COMMANDS: Cmd[] = [
   nav("analytics", "Analytics", "/analytics", BarChart3, "stats insights numbers"),
   nav("reels", "Reels", "/posts", ImageIcon, "posts automations"),
   nav("playbooks", "Playbooks", "/playbooks", BookMarked, "templates"),
-  nav("flows", "Flows", "/triggers", Workflow, "triggers builder"),
+  nav("automations", "Automations", "/triggers", Workflow, "flows triggers builder"),
   nav("queue", "Upcoming reels", "/queue", Wand2, "queue next reel prepared"),
   nav("settings", "Settings", "/settings", Settings, "instagram connect profile"),
   nav("privacy", "Privacy", "/privacy", ShieldCheck, "policy"),
   nav("help", "Help center", "/help", LifeBuoy, "support docs faq assistant"),
-  { id: "new-flow", group: "Create", label: "New flow", icon: Plus, keywords: "trigger automation", run: (go) => go("/triggers/compose") },
+  { id: "new-flow", group: "Create", label: "New automation", icon: Plus, keywords: "flow trigger", run: (go) => go("/triggers/compose") },
   { id: "new-queue", group: "Create", label: "Prepare your next reel", icon: Plus, keywords: "queue upcoming", run: (go) => go("/queue") },
   { id: "reel-auto", group: "Create", label: "Automate a posted reel", icon: Plus, keywords: "configure reel", run: (go) => go("/posts") },
   ...PLAYBOOKS.map((p): Cmd => ({
@@ -49,8 +49,8 @@ const COMMANDS: Cmd[] = [
     hint: p.keyword, keywords: `${p.keyword} ${p.altKeywords?.join(" ") ?? ""} ${p.pitch}`,
     run: (go) => go(`/playbooks?playbook=${p.id}`),
   })),
-  { id: "profile", group: "Account", label: "Manage profile", icon: Settings, run: (go) => go("/settings#profile") },
-  { id: "sign-in", group: "Account", label: "Sign-in options", icon: KeyRound, keywords: "google facebook link", run: (go) => go("/settings#sign-in") },
+  { id: "profile", group: "Account", label: "Manage profile", icon: Settings, run: (go) => go("/settings?tab=profile") },
+  { id: "sign-in", group: "Account", label: "Sign-in options", icon: KeyRound, keywords: "google facebook link", run: (go) => go("/settings?tab=sign-in") },
   { id: "logout", group: "Account", label: "Log out", icon: LogOut, keywords: "sign out", run: () => signOut({ callbackUrl: "/login" }) },
 ];
 

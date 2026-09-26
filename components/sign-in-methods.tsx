@@ -14,7 +14,7 @@ type Social = "google" | "facebook";
  * account — even when its email differs from the account's (see the signIn
  * callback in lib/auth.ts).
  *
- * Used in Settings → Sign-in methods and in the profile menu's dialog.
+ * Shown on Settings → Sign-in methods.
  */
 export function SignInMethods({ linkedNow, returnTo }: { linkedNow?: string | null; returnTo: string }) {
   const [state, setState] = useState<{ email: string; linked: string[]; available: Record<Social, boolean> } | null>(null);

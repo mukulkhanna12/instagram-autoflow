@@ -31,7 +31,7 @@ export default function TriggersListPage() {
   const edit = (t: Trigger) => router.push(fromTrigger(t) ? `/triggers/${t.id}/compose` : `/triggers/${t.id}`);
 
   function remove(id: string) {
-    if (!confirm("Delete this flow?")) return;
+    if (!confirm("Delete this automation?")) return;
     deleteTrigger(id);
     setTriggers(loadTriggers());
   }
@@ -47,8 +47,8 @@ export default function TriggersListPage() {
     <div className="p-6 lg:p-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-gray-950">Flows</h1>
-          <p className="text-gray-500 mt-2">Build a flow once, then point it at a reel.</p>
+          <h1 className="text-4xl font-extrabold tracking-tight text-gray-950">Automations</h1>
+          <p className="text-gray-500 mt-2">Build an automation once, then point it at a reel.</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -67,7 +67,7 @@ export default function TriggersListPage() {
             onClick={create}
             className="inline-flex items-center gap-2 h-12 px-6 rounded-full bg-brand-700 text-white font-bold hover:bg-brand-800 transition-colors cursor-pointer"
           >
-            <Plus className="w-5 h-5" /> New flow
+            <Plus className="w-5 h-5" /> New automation
           </button>
         </div>
       </div>
@@ -75,18 +75,18 @@ export default function TriggersListPage() {
       <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-100 rounded-2xl p-4 mt-6">
         <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
         <p className="text-sm text-amber-900">
-          <strong>Design preview.</strong> Flows save to this browser only and don&apos;t send anything
+          <strong>Design preview.</strong> Automations here save to this browser only and don&apos;t send anything
           yet, so they have no numbers. Your live reel automations are untouched.
         </p>
       </div>
 
-      <h2 className="text-2xl font-extrabold text-gray-950 mt-8">Your flows</h2>
-      <p className="text-gray-500 mt-1 mb-5">Manage your flows and track their performance below.</p>
+      <h2 className="text-2xl font-extrabold text-gray-950 mt-8">Your automations</h2>
+      <p className="text-gray-500 mt-1 mb-5">Manage your automations and track their performance below.</p>
 
       {triggers.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed border-gray-300 p-14 text-center">
           <Workflow className="w-9 h-9 text-gray-300 mx-auto mb-3" />
-          <p className="font-bold text-gray-900">No flows yet</p>
+          <p className="font-bold text-gray-900">No automations yet</p>
           <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
             A flow is one complete automation — the reel, the keyword, and every message that follows.
           </p>
@@ -94,7 +94,7 @@ export default function TriggersListPage() {
             onClick={create}
             className="mt-5 inline-flex items-center gap-2 h-11 px-5 rounded-full bg-lime text-gray-950 font-bold hover:bg-lime-400 cursor-pointer"
           >
-            <Plus className="w-4 h-4" /> Create your first flow
+            <Plus className="w-4 h-4" /> Create your first automation
           </button>
         </div>
       ) : (

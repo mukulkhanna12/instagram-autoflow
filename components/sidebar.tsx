@@ -3,10 +3,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, ImageIcon, Settings, LogOut, Wand2, Workflow,
+  LayoutDashboard, ImageIcon, Settings, Wand2, Workflow,
   PanelLeftClose, PanelLeftOpen, ShieldCheck, BookMarked, BarChart3, LifeBuoy,
 } from "lucide-react";
-import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { Logo, LogoMark } from "@/components/brand";
 import { NewAutomationButton } from "@/components/new-automation";
@@ -20,7 +19,7 @@ const menu = [
   { href: "/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/posts", icon: ImageIcon, label: "Reels" },
   { href: "/playbooks", icon: BookMarked, label: "Playbooks" },
-  { href: "/triggers", icon: Workflow, label: "Flows" },
+  { href: "/triggers", icon: Workflow, label: "Automations" },
   { href: "/queue", icon: Wand2, label: "Upcoming reels" },
 ];
 
@@ -91,17 +90,6 @@ export function Sidebar({ usage }: SidebarProps) {
         </NavGroup>
         <NavGroup title="General" collapsed={collapsed}>
           {general.map((l) => <NavItem key={l.href} {...l} active={isActive(l.href)} collapsed={collapsed} />)}
-          <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            title={collapsed ? "Log out" : undefined}
-            className={cn(
-              "w-full flex items-center text-[15px] font-medium text-gray-500 hover:text-gray-950 transition-colors cursor-pointer",
-              collapsed ? "justify-center py-3" : "gap-3.5 pl-7 pr-4 py-2.5"
-            )}
-          >
-            <LogOut className="w-5 h-5 shrink-0" />
-            {!collapsed && "Log out"}
-          </button>
         </NavGroup>
       </nav>
 

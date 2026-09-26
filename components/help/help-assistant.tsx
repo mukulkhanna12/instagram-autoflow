@@ -34,9 +34,15 @@ let nextId = 1;
  * lib/help/search.ts for why there's no LLM behind it — and every answer links
  * to the full article. When it can't help, it says so and hands over to a human.
  */
-export function HelpAssistant({ raised = false }: {
+export function HelpAssistant({ raised = false, launcher = true }: {
   /** Sit above another corner button (the dashboard's Quick stats) instead of in the corner. */
   raised?: boolean;
+  /**
+   * Show the round corner button. Off in the app, where the Help tab on the
+   * right edge (components/edge-dock.tsx) opens it instead — the panel then
+   * sits beside that tab rather than above a corner button.
+   */
+  launcher?: boolean;
 } = {}) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -100,7 +106,9 @@ export function HelpAssistant({ raised = false }: {
           aria-label="Help assistant"
           className={cn(
             "fixed z-50 inset-x-3 bottom-3 top-16 sm:inset-auto sm:right-6 sm:w-[400px] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/5",
-            raised ? "sm:bottom-[9.5rem] sm:h-[min(640px,calc(100vh-11.5rem))]" : "sm:bottom-24 sm:h-[min(640px,calc(100vh-8rem))]"
+            !launcher
+              ? "sm:right-14 sm:top-1/2 sm:-translate-y-1/2 sm:h-[min(640px,calc(100vh-3rem))]"
+              : raised ? "sm:bottom-[9.5rem] sm:h-[min(640px,calc(100vh-11.5rem))]" : "sm:bottom-24 sm:h-[min(640px,calc(100vh-8rem))]"
           )}
         >
           {/* Header */}
@@ -208,7 +216,7 @@ export function HelpAssistant({ raised = false }: {
       )}
 
       {/* Launcher */}
-      <button
+      {launcher && <button
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? "Close help" : "Open help"}
         className={cn(
@@ -219,7 +227,7 @@ export function HelpAssistant({ raised = false }: {
         )}
       >
         {open ? <X className="h-6 w-6" /> : <><MessageCircleQuestion className="h-6 w-6 text-lime" /><span className="font-bold">Help</span></>}
-      </button>
+      </button>}
     </>
   );
 }

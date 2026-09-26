@@ -90,7 +90,7 @@ export function TriggerComposer({
 
   function save(status: ComposeState["status"]) {
     const id = triggerId ?? uid("tg");
-    upsertTrigger({ id, name: s.name.trim() || "Untitled flow", status, updatedAt: Date.now(), nodes: toNodes(s) });
+    upsertTrigger({ id, name: s.name.trim() || "Untitled automation", status, updatedAt: Date.now(), nodes: toNodes(s) });
     setS((prev) => ({ ...prev, status }));
     setSavedAt(Date.now());
     if (!triggerId) router.replace(`/triggers/${id}/compose`);
@@ -101,7 +101,7 @@ export function TriggerComposer({
     if (!p) return;
     const f = playbookFields(p);
     patch({
-      name: s.name === "Untitled flow" ? p.title : s.name,
+      name: s.name === "Untitled automation" ? p.title : s.name,
       include: f.keywords.split(",").map((k) => k.trim()).filter(Boolean),
       autoReply: true,
       replies: [...p.replies],
@@ -145,7 +145,7 @@ export function TriggerComposer({
               value={s.name}
               onChange={(e) => patch({ name: e.target.value })}
               className="text-xl font-extrabold text-gray-950 bg-transparent min-w-0 flex-1 focus:outline-none focus:bg-white rounded-lg px-2 py-1 -ml-2"
-              aria-label="Flow name"
+              aria-label="Automation name"
             />
             <span className={cn(
               "text-xs font-bold rounded-full px-2.5 py-1",
@@ -396,7 +396,7 @@ export function TriggerComposer({
             </div>
           )}
           <p className="text-[11px] text-gray-400 pt-2">
-            Flows are still a design preview — they save to this browser and don&apos;t send anything yet.
+            Automations here are still a design preview — they save to this browser and don&apos;t send anything yet.
           </p>
         </div>
       </div>

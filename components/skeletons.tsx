@@ -243,7 +243,7 @@ export function QueueSkeleton() {
 /** Trigger builder: editing drawer on the left, canvas on the right. */
 export function CanvasSkeleton() {
   return (
-    <Loading label="Loading flow" className="flex h-screen">
+    <Loading label="Loading automation" className="flex h-screen">
       <div className="w-[380px] shrink-0 bg-white border-r border-gray-100 p-6 space-y-5">
         <Skeleton className="h-6 w-40" />
         <FormFields />
