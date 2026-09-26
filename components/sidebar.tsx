@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ImageIcon, Settings, LogOut, Wand2, Workflow,
-  PanelLeftClose, PanelLeftOpen, ShieldCheck, BookMarked, BarChart3,
+  PanelLeftClose, PanelLeftOpen, ShieldCheck, BookMarked, BarChart3, LifeBuoy,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ const menu = [
 
 const general = [
   { href: "/settings", icon: Settings, label: "Settings" },
+  { href: "/help", icon: LifeBuoy, label: "Help" },
   { href: "/privacy", icon: ShieldCheck, label: "Privacy" },
 ];
 

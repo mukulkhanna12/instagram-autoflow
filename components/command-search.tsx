@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   BarChart3, BookMarked, CornerDownLeft, ImageIcon, KeyRound, LayoutDashboard, LogOut, Plus,
-  Search, Settings, ShieldCheck, Wand2, Workflow,
+  LifeBuoy, Search, Settings, ShieldCheck, Wand2, Workflow,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { PLAYBOOKS } from "@/lib/playbooks";
@@ -40,6 +40,7 @@ const COMMANDS: Cmd[] = [
   nav("queue", "Upcoming reels", "/queue", Wand2, "queue next reel prepared"),
   nav("settings", "Settings", "/settings", Settings, "instagram connect profile"),
   nav("privacy", "Privacy", "/privacy", ShieldCheck, "policy"),
+  nav("help", "Help center", "/help", LifeBuoy, "support docs faq assistant"),
   { id: "new-flow", group: "Create", label: "New flow", icon: Plus, keywords: "trigger automation", run: (go) => go("/triggers/compose") },
   { id: "new-queue", group: "Create", label: "Prepare your next reel", icon: Plus, keywords: "queue upcoming", run: (go) => go("/queue") },
   { id: "reel-auto", group: "Create", label: "Automate a posted reel", icon: Plus, keywords: "configure reel", run: (go) => go("/posts") },

@@ -22,6 +22,7 @@ const COLUMNS: Array<{ title: string; links: Array<{ label: string; href: string
       { label: "Analytics", href: "/login" },
       { label: "Pricing", href: "/pricing" },
       { label: "FAQ", href: "/#faq" },
+      { label: "Help center", href: "/help" },
     ],
   },
   {

@@ -30,6 +30,7 @@ const LINKS = [
   { label: "How it works", href: "/#how" },
   { label: "Pricing", href: "/pricing" },
   { label: "FAQ", href: "/#faq" },
+  { label: "Help", href: "/help" },
 ];
 
 export function SiteHeader() {
